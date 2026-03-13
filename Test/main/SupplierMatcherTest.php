@@ -21,7 +21,6 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SupplierMatcherTest extends TestCase
@@ -66,31 +65,35 @@ final class SupplierMatcherTest extends TestCase
         $this->assertArrayHasKey('candidates', $result);
     }
 
-    #[DataProvider('legalFormProvider')]
-    public function testNormalizeNameStripsLegalForms(
-        string $input,
-        string $expected
-    ): void {
-        $method = new \ReflectionMethod(SupplierMatcher::class, 'normalizeName');
-        $method->setAccessible(true);
-        $result = $method->invoke($this->matcher, $input);
-        $this->assertEquals($expected, $result);
-    }
-
-    public static function legalFormProvider(): array
+    public function testNormalizeNameStripsLegalForms(): void
     {
-        return [
-            'S.A.' => ['Empresa S.A.', 'Empresa'],
-            'S.L.' => ['Acme S.L.', 'Acme'],
-            'S.R.L.' => ['Compañía S.R.L.', 'Compañía'],
-            'S.L.U.' => ['Tech S.L.U.', 'Tech'],
-            'S.A.U.' => ['Mega Corp S.A.U.', 'Mega Corp'],
-            'S.C.' => ['Cooperativa S.C.', 'Cooperativa'],
-            'without dots SA' => ['Empresa SA', 'Empresa'],
-            'without dots SL' => ['Acme SL', 'Acme'],
-            'no legal form' => ['Simple Company', 'Simple Company'],
-            'empty string' => ['', ''],
-            'only legal form' => ['S.L.', ''],
+        $cases = [
+            ['Empresa S.A.', 'Empresa'],
+            ['Acme S.L.', 'Acme'],
+            ['Compañía S.R.L.', 'Compañía'],
+            ['Tech S.L.U.', 'Tech'],
+            ['Mega Corp S.A.U.', 'Mega Corp'],
+            ['Cooperativa S.C.', 'Cooperativa'],
+            ['Empresa SA', 'Empresa'],
+            ['Acme SL', 'Acme'],
+            ['Simple Company', 'Simple Company'],
+            ['', ''],
+            ['S.L.', ''],
         ];
+
+        $method = new \ReflectionMethod(
+            SupplierMatcher::class,
+            'normalizeName'
+        );
+        $method->setAccessible(true);
+
+        foreach ($cases as [$input, $expected]) {
+            $result = $method->invoke($this->matcher, $input);
+            $this->assertEquals(
+                $expected,
+                $result,
+                "normalizeName('$input') should return '$expected'"
+            );
+        }
     }
 }
