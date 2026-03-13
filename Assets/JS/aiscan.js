@@ -40,6 +40,53 @@
     // Fallback prompt for Browser AI when server prompt is not available
     const FALLBACK_PROMPT = 'You are an invoice extraction engine. Extract data from the provided invoice and return ONLY valid JSON with supplier, invoice, taxes, lines, confidence and warnings fields. Never invent values, use null for unknown fields.';
 
+    function trans(key, replacements = {}) {
+        let value = key;
+
+        if (window.i18n && typeof window.i18n.trans === 'function') {
+            value = window.i18n.trans(key);
+        }
+
+        value = typeof value === 'string' ? value : String(value);
+        Object.entries(replacements).forEach(([placeholder, replacement]) => {
+            value = value.replaceAll(placeholder, replacement == null ? '' : String(replacement));
+        });
+        return value;
+    }
+
+    function providerLabel(provider) {
+        const labels = {
+            'browser-prompt': trans('aiscan-provider-label-browser-prompt'),
+            gemini: trans('aiscan-provider-gemini'),
+            mistral: trans('aiscan-provider-mistral'),
+            openai: trans('aiscan-provider-openai'),
+            'openai-compatible': trans('aiscan-provider-openai-compatible'),
+        };
+
+        return labels[provider] || provider || trans('aiscan-loading-provider');
+    }
+
+    function dropAreaHtml() {
+        return `
+            <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
+                <div>
+                    <div class="fs-3 mb-2 text-muted"><i class="fa-solid fa-file-arrow-up"></i></div>
+                    <div>${escapeHtml(trans('aiscan-document-and-image-drop'))}</div>
+                    <div class="small text-muted mt-1">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function setInitialReviewMessage() {
+        const review = document.getElementById(selectors.review);
+        if (!review) {
+            return;
+        }
+
+        review.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>`;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         checkBrowserPromptSupport();
         ensureModal();
@@ -70,34 +117,28 @@
                 <div class="modal-dialog modal-xl modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title"><i class="fa-solid fa-file-invoice me-2"></i>Scan invoice</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <h5 class="modal-title"><i class="fa-solid fa-file-invoice me-2"></i>${escapeHtml(trans('scan-invoice'))}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="${escapeAttribute(trans('close'))}"></button>
                         </div>
                         <div class="modal-body p-0">
                             <div class="aiscan-split" id="aiscan-split">
                                 <div class="aiscan-split-left" id="aiscan-split-left">
                                     <div class="card h-100 border-0 rounded-0">
                                         <div class="card-header d-flex justify-content-between align-items-center py-2 rounded-0">
-                                            <span>Document</span>
+                                            <span>${escapeHtml(trans('aiscan-document'))}</span>
                                             <div class="d-flex align-items-center gap-2" id="${selectors.toolbar}" style="display:none!important">
                                                 <select class="form-select form-select-sm" id="${selectors.providerSelect}" style="width:auto;min-width:140px"></select>
                                                 <button type="button" class="btn btn-primary btn-sm text-nowrap" id="${selectors.scanBtn}" disabled>
-                                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Analyze
+                                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>${escapeHtml(trans('aiscan-analyze'))}
                                                 </button>
                                             </div>
                                         </div>
                                         <div class="card-body p-0 position-relative">
                                             <input id="${selectors.fileInput}" type="file" class="d-none" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
                                             <div class="aiscan-preview-area" id="${selectors.previewArea}">
-                                                <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
-                                                    <div>
-                                                        <div class="fs-3 mb-2 text-muted"><i class="fa-solid fa-file-arrow-up"></i></div>
-                                                        <div>Drop a PDF or image here</div>
-                                                        <div class="small text-muted mt-1">or click to select a file</div>
-                                                    </div>
-                                                </div>
+                                                ${dropAreaHtml()}
                                             </div>
-                                            <button type="button" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 rounded-circle shadow-sm d-none" id="${selectors.clearBtn}" title="Remove file" style="z-index:2;width:32px;height:32px;padding:0">
+                                            <button type="button" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 rounded-circle shadow-sm d-none" id="${selectors.clearBtn}" title="${escapeAttribute(trans('aiscan-clear-file'))}" style="z-index:2;width:32px;height:32px;padding:0">
                                                 <i class="fa-solid fa-xmark"></i>
                                             </button>
                                         </div>
@@ -106,16 +147,16 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="aiscan-split-handle" id="aiscan-split-handle" title="Drag to resize"><div class="aiscan-split-handle-grip"></div></div>
+                                <div class="aiscan-split-handle" id="aiscan-split-handle" title="${escapeAttribute(trans('aiscan-drag-to-resize'))}"><div class="aiscan-split-handle-grip"></div></div>
                                 <div class="aiscan-split-right" id="aiscan-split-right">
                                     <div class="card h-100 border-0 rounded-0">
-                                        <div class="card-header py-2 rounded-0">Review extracted data</div>
+                                        <div class="card-header py-2 rounded-0">${escapeHtml(trans('aiscan-review-extracted-data'))}</div>
                                         <div class="card-body aiscan-sidebar" id="${selectors.review}">
-                                            <p class="text-muted mb-0">Upload a document and analyze it to review supplier, invoice and line data.</p>
+                                            <p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>
                                         </div>
                                         <div class="card-footer text-end py-2 rounded-0">
                                             <button type="button" class="btn btn-success btn-sm" id="${selectors.acceptBtn}" disabled>
-                                                <i class="fa-solid fa-check me-1"></i>Create / update invoice
+                                                <i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-create-or-update-invoice'))}
                                             </button>
                                         </div>
                                     </div>
@@ -139,7 +180,7 @@
         providers.forEach((p) => {
             const opt = document.createElement('option');
             opt.value = p;
-            opt.textContent = p;
+            opt.textContent = providerLabel(p);
             if (p === state.defaultProvider) {
                 opt.selected = true;
             }
@@ -149,7 +190,7 @@
         if (state.browserPromptSupported) {
             const opt = document.createElement('option');
             opt.value = 'browser-prompt';
-            opt.textContent = 'Browser AI';
+            opt.textContent = providerLabel('browser-prompt');
             if (state.defaultProvider === 'browser-prompt') {
                 opt.selected = true;
             }
@@ -273,15 +314,7 @@
         state.objectUrl = null;
 
         const previewArea = document.getElementById(selectors.previewArea);
-        previewArea.innerHTML = `
-            <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
-                <div>
-                    <div class="fs-3 mb-2 text-muted"><i class="fa-solid fa-file-arrow-up"></i></div>
-                    <div>Drop a PDF or image here</div>
-                    <div class="small text-muted mt-1">or click to select a file</div>
-                </div>
-            </div>
-        `;
+        previewArea.innerHTML = dropAreaHtml();
 
         document.getElementById(selectors.clearBtn).classList.add('d-none');
         document.getElementById(selectors.scanBtn).disabled = true;
@@ -301,15 +334,7 @@
         state.objectUrl = null;
 
         const previewArea = document.getElementById(selectors.previewArea);
-        previewArea.innerHTML = `
-            <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
-                <div>
-                    <div class="fs-3 mb-2 text-muted"><i class="fa-solid fa-file-arrow-up"></i></div>
-                    <div>Drop a PDF or image here</div>
-                    <div class="small text-muted mt-1">or click to select a file</div>
-                </div>
-            </div>
-        `;
+        previewArea.innerHTML = dropAreaHtml();
 
         document.getElementById(selectors.fileInput).value = '';
         document.getElementById(selectors.clearBtn).classList.add('d-none');
@@ -317,7 +342,7 @@
         document.getElementById(selectors.toolbar).style.display = 'none';
         document.getElementById(selectors.acceptBtn).disabled = true;
         document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
-        document.getElementById(selectors.review).innerHTML = '<p class="text-muted mb-0">Upload a document and analyze it to review supplier, invoice and line data.</p>';
+        setInitialReviewMessage();
         const splitLeft = document.getElementById('aiscan-split-left');
         if (splitLeft) {
             splitLeft.style.flexBasis = '';
@@ -345,9 +370,9 @@
         previewArea.innerHTML = '';
 
         if (file.type === 'application/pdf') {
-            previewArea.innerHTML = `<iframe src="${state.objectUrl}" title="Invoice preview"></iframe>`;
+            previewArea.innerHTML = `<iframe src="${state.objectUrl}" title="${escapeAttribute(trans('aiscan-document-preview'))}"></iframe>`;
         } else {
-            previewArea.innerHTML = `<img src="${state.objectUrl}" alt="Invoice preview">`;
+            previewArea.innerHTML = `<img src="${state.objectUrl}" alt="${escapeAttribute(trans('aiscan-document-preview'))}">`;
         }
 
         document.getElementById(selectors.clearBtn).classList.remove('d-none');
@@ -356,7 +381,7 @@
     function uploadFile(file) {
         const formData = new FormData();
         formData.append('invoice_file', file);
-        setStatus('Uploading file…', 'info');
+        setStatus(trans('aiscan-uploading-file'), 'info');
 
         fetch('AiScanInvoice?action=upload', {
             method: 'POST',
@@ -373,12 +398,12 @@
                 state.originalName = data.original_name;
                 state.defaultProvider = data.provider || 'unknown';
                 state.availableProviders = data.available_providers || [data.provider || 'unknown'];
-                state.extractionPrompt = data.extraction_prompt || EXTRACTION_PROMPT;
+                state.extractionPrompt = data.extraction_prompt || FALLBACK_PROMPT;
 
                 document.getElementById(selectors.toolbar).style.display = '';
                 document.getElementById(selectors.scanBtn).disabled = false;
                 buildProviderSelect();
-                setStatus('File uploaded. Select a provider and click Analyze.', 'success');
+                setStatus(trans('aiscan-file-uploaded-select-provider'), 'success');
 
                 if (data.auto_scan) {
                     const selected = document.getElementById(selectors.providerSelect)?.value || '';
@@ -397,8 +422,8 @@
             return;
         }
 
-        const providerName = provider || state.defaultProvider;
-        setStatus('Analyzing invoice with ' + providerName + '…', 'info');
+        const providerName = providerLabel(provider || state.defaultProvider);
+        setStatus(trans('aiscan-analysis-started', {'%provider%': providerName}), 'info');
         document.getElementById(selectors.scanBtn).disabled = true;
 
         const params = new URLSearchParams({
@@ -418,7 +443,12 @@
                 }
 
                 renderReviewForm(data.data);
-                setStatus('Analysis completed (' + (data.data._provider || providerName) + ').', 'success');
+                setStatus(
+                    trans('aiscan-analysis-completed', {
+                        '%provider%': providerLabel(data.data._provider || provider || state.defaultProvider),
+                    }),
+                    'success'
+                );
             })
             .catch((error) => setStatus(error.message, 'danger'))
             .finally(() => {
@@ -428,11 +458,11 @@
 
     async function analyzeWithBrowserPrompt() {
         if (typeof LanguageModel === 'undefined') {
-            setStatus('Browser Prompt API is not available in this browser.', 'danger');
+            setStatus(trans('aiscan-browser-prompt-not-available'), 'danger');
             return;
         }
 
-        setStatus('Analyzing with Browser AI (this may take a moment)…', 'info');
+        setStatus(trans('aiscan-analyzing-browser-ai'), 'info');
         document.getElementById(selectors.scanBtn).disabled = true;
 
         try {
@@ -448,8 +478,8 @@
             if (!textContent) {
                 const isImage = state.mimeType && state.mimeType.startsWith('image/');
                 const msg = isImage
-                    ? 'Browser AI cannot analyze images. Please select a cloud provider (OpenAI, Gemini, etc.).'
-                    : 'Could not extract text from this PDF. Please select a cloud provider for analysis.';
+                    ? trans('aiscan-use-cloud-provider-for-image')
+                    : trans('aiscan-use-cloud-provider-for-pdf');
                 setStatus(msg, 'danger');
                 return;
             }
@@ -465,9 +495,9 @@
             data._validation_errors = [];
 
             renderReviewForm(data);
-            setStatus('Analysis completed (Browser AI).', 'success');
+            setStatus(trans('aiscan-analysis-completed', {'%provider%': providerLabel('browser-prompt')}), 'success');
         } catch (error) {
-            setStatus('Browser AI error: ' + error.message, 'danger');
+            setStatus(trans('aiscan-browser-ai-error', {'%message%': error.message}), 'danger');
         } finally {
             document.getElementById(selectors.scanBtn).disabled = false;
         }
@@ -543,7 +573,7 @@
         if (validationErrors.length > 0) {
             review.insertAdjacentHTML('beforeend', `
                 <div class="alert alert-warning py-2">
-                    <strong class="small">Warnings</strong>
+                    <strong class="small">${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
                     <ul class="mb-0 small">${validationErrors.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
                 </div>
             `);
@@ -552,37 +582,37 @@
         if (data.document_type && data.document_type !== 'invoice') {
             review.insertAdjacentHTML('beforeend', `
                 <div class="alert alert-info py-2 small">
-                    <i class="fa-solid fa-circle-info me-1"></i>Document type: <strong>${escapeHtml(data.document_type)}</strong>
+                    <i class="fa-solid fa-circle-info me-1"></i>${escapeHtml(trans('aiscan-document-type'))}: <strong>${escapeHtml(data.document_type)}</strong>
                 </div>
             `);
         }
 
-        review.appendChild(buildSection('Supplier', `
-            ${buildInput('Name', 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}
-            ${buildInput('Tax ID', 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}
-            ${buildInput('Email', 'supplier_email', supplier.email || '')}
-            ${buildInput('Phone', 'supplier_phone', supplier.phone || '')}
-            ${buildTextarea('Address', 'supplier_address', supplier.address || '')}
+        review.appendChild(buildSection(trans('supplier'), `
+            ${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}
+            ${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}
+            ${buildInput(trans('email'), 'supplier_email', supplier.email || '')}
+            ${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}
+            ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
             ${buildSupplierStatus(supplier)}
         `));
 
-        review.appendChild(buildSection('Invoice', `
-            ${buildInput('Number', 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
-            ${buildInput('Issue date', 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
-            ${buildInput('Due date', 'invoice_due_date', invoice.due_date || '', 'date', null, confidence.due_date)}
-            ${buildInput('Currency', 'invoice_currency', invoice.currency || 'EUR')}
-            ${buildInput('Subtotal', 'invoice_subtotal', invoice.subtotal ?? '', 'number', '0.01')}
-            ${buildInput('Tax amount', 'invoice_tax_amount', invoice.tax_amount ?? '', 'number', '0.01')}
-            ${invoice.withholding_amount ? buildInput('Withholding (IRPF)', 'invoice_withholding', invoice.withholding_amount, 'number', '0.01') : ''}
-            ${buildInput('Total', 'invoice_total', invoice.total ?? '', 'number', '0.01', confidence.total)}
-            ${buildTextarea('Summary', 'invoice_summary', invoice.summary || '')}
-            ${invoice.payment_terms ? buildInput('Payment terms', 'invoice_payment_terms', invoice.payment_terms) : ''}
+        review.appendChild(buildSection(trans('invoice'), `
+            ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
+            ${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
+            ${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date', null, confidence.due_date)}
+            ${buildInput(trans('currency'), 'invoice_currency', invoice.currency || 'EUR')}
+            ${buildInput(trans('subtotal'), 'invoice_subtotal', invoice.subtotal ?? '', 'number', '0.01')}
+            ${buildInput(trans('tax-amount'), 'invoice_tax_amount', invoice.tax_amount ?? '', 'number', '0.01')}
+            ${invoice.withholding_amount ? buildInput(trans('irpf'), 'invoice_withholding', invoice.withholding_amount, 'number', '0.01') : ''}
+            ${buildInput(trans('total'), 'invoice_total', invoice.total ?? '', 'number', '0.01', confidence.total)}
+            ${buildTextarea(trans('summary'), 'invoice_summary', invoice.summary || '')}
+            ${invoice.payment_terms ? buildInput(trans('payment-terms'), 'invoice_payment_terms', invoice.payment_terms) : ''}
         `));
 
         if (taxes.length > 0) {
-            review.appendChild(buildSection('Taxes', `
+            review.appendChild(buildSection(trans('taxes'), `
                 <div class="small">
-                    ${taxes.map((tax) => `<strong>${escapeHtml(tax.name || 'Tax')}</strong>: ${escapeHtml(tax.rate || 0)}% — base ${escapeHtml(tax.base || 0)} — amount ${escapeHtml(tax.amount || 0)}`).join('<br>')}
+                    ${taxes.map((tax) => `<strong>${escapeHtml(tax.name || trans('tax'))}</strong>: ${escapeHtml(tax.rate || 0)}% - ${escapeHtml(trans('base-imponible'))} ${escapeHtml(tax.base || 0)} - ${escapeHtml(trans('amount'))} ${escapeHtml(tax.amount || 0)}`).join('<br>')}
                 </div>
             `));
         }
@@ -606,7 +636,7 @@
     }
 
     function buildInput(label, id, value, type = 'text', step = null, confidence = null) {
-        const badge = confidence != null ? ` <span class="badge ${confidence >= 0.7 ? 'text-bg-success' : confidence >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}" title="Confidence">${Math.round(confidence * 100)}%</span>` : '';
+        const badge = confidence != null ? ` <span class="badge ${confidence >= 0.7 ? 'text-bg-success' : confidence >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}" title="${escapeAttribute(trans('confidence'))}">${Math.round(confidence * 100)}%</span>` : '';
         return `
             <div class="mb-2">
                 <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}${badge}</label>
@@ -627,10 +657,10 @@
     function buildSupplierStatus(supplier) {
         const status = supplier.match_status || 'not_found';
         const variants = {
-            ambiguous: {klass: 'warning', text: 'Multiple supplier matches found. Select the correct supplier.'},
-            created: {klass: 'info', text: 'A new supplier will be created when you save the invoice.'},
-            matched: {klass: 'success', text: 'Matched with: ' + (supplier.matched_name || '')},
-            not_found: {klass: 'secondary', text: 'No supplier match found. You can create one during save.'},
+            ambiguous: {klass: 'warning', text: trans('aiscan-supplier-ambiguous')},
+            created: {klass: 'info', text: trans('aiscan-supplier-created-on-save')},
+            matched: {klass: 'success', text: trans('aiscan-matched-with', {'%name%': supplier.matched_name || ''})},
+            not_found: {klass: 'secondary', text: trans('aiscan-supplier-not-found-on-save')},
         };
         const variant = variants[status] || variants.not_found;
         let select = '';
@@ -648,7 +678,7 @@
         const searchBox = `
             <div class="mt-2">
                 <div class="input-group input-group-sm">
-                    <input type="text" class="form-control" id="aiscan-supplier-search" placeholder="Search existing supplier…">
+                    <input type="text" class="form-control" id="aiscan-supplier-search" placeholder="${escapeAttribute(trans('search'))}">
                     <button class="btn btn-outline-secondary" type="button" id="aiscan-supplier-search-btn"><i class="fa-solid fa-search"></i></button>
                 </div>
                 <div id="aiscan-supplier-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
@@ -680,7 +710,7 @@
                 .then((data) => {
                     const items = data.results || [];
                     if (items.length === 0) {
-                        resultsDiv.innerHTML = '<div class="list-group-item small text-muted">No results</div>';
+                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
                         return;
                     }
                     resultsDiv.innerHTML = items.map((s) =>
@@ -739,14 +769,17 @@
             const alertEl = resultsDiv.closest('.card-body')?.querySelector('.alert');
             if (alertEl) {
                 alertEl.className = 'alert alert-success small mb-0';
-                alertEl.textContent = 'Selected: ' + item.dataset.name + ' (' + item.dataset.taxid + ')';
+                alertEl.textContent = trans('aiscan-selected-supplier', {
+                    '%name%': item.dataset.name,
+                    '%taxId%': item.dataset.taxid,
+                });
             }
         });
     }
 
     function buildLinesSection(lines) {
         const rows = (lines.length > 0 ? lines : [{
-            description: 'Scanned supplier invoice',
+            description: trans('aiscan-scanned-supplier-invoice'),
             discount: 0,
             quantity: 1,
             tax_rate: 0,
@@ -759,20 +792,20 @@
                 <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="${escapeAttribute(line.discount ?? 0)}" style="width:70px"></td>
                 <td><input class="form-control form-control-sm" data-field="tax_rate" type="number" step="0.01" value="${escapeAttribute(line.tax_rate ?? 0)}" style="width:70px"></td>
                 <td><input class="form-control form-control-sm" data-field="sku" value="${escapeAttribute(line.sku || '')}" style="width:80px"></td>
-                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="Delete line"><i class="fa-solid fa-trash-can"></i></button></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttribute(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
             </tr>
         `).join('');
 
-        const section = buildSection('Line items', `
+        const section = buildSection(trans('aiscan-line-items'), `
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>Description</th>
-                            <th>Qty</th>
-                            <th>Unit price</th>
-                            <th>Disc. %</th>
-                            <th>Tax %</th>
+                            <th>${escapeHtml(trans('description'))}</th>
+                            <th>${escapeHtml(trans('quantity'))}</th>
+                            <th>${escapeHtml(trans('price'))}</th>
+                            <th>${escapeHtml(trans('discount'))} %</th>
+                            <th>${escapeHtml(trans('tax'))} %</th>
                             <th>SKU</th>
                             <th></th>
                         </tr>
@@ -832,7 +865,7 @@
         if (selectedSupplier) {
             data.supplier.matched_supplier_id = selectedSupplier.value;
         } else if ((data.supplier.match_status || 'not_found') === 'not_found') {
-            if (!window.confirm('Supplier not found. Do you want AiScan to create a new supplier with the extracted data?')) {
+            if (!window.confirm(trans('aiscan-create-new-supplier-confirm'))) {
                 return;
             }
             data.supplier.create_if_missing = true;
@@ -852,7 +885,7 @@
             tmp_file: state.tmpFile,
         };
 
-        setStatus('Saving purchase invoice…', 'info');
+        setStatus(trans('aiscan-saving-invoice'), 'info');
 
         const params = new URLSearchParams({
             action: 'apply',
@@ -870,7 +903,7 @@
                     throw new Error(result.error);
                 }
 
-                setStatus('Invoice saved successfully.', 'success');
+                setStatus(trans('aiscan-invoice-saved-successfully'), 'success');
                 bootstrap.Modal.getInstance(document.getElementById(selectors.modalId))?.hide();
                 setTimeout(() => window.location.href = 'EditFacturaProveedor?code=' + encodeURIComponent(result.invoice_id), 300);
             })

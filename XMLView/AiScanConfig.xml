@@ -10,11 +10,11 @@
             </column>
             <column name="default-provider" numcolumns="4" order="110">
                 <widget type="select" fieldname="default_provider" required="true">
-                    <values title="OpenAI">openai</values>
-                    <values title="Google Gemini">gemini</values>
-                    <values title="Mistral">mistral</values>
-                    <values title="OpenAI compatible">openai-compatible</values>
-                    <values title="Browser Prompt API (experimental)">browser-prompt</values>
+                    <values title="aiscan-provider-openai">openai</values>
+                    <values title="aiscan-provider-gemini">gemini</values>
+                    <values title="aiscan-provider-mistral">mistral</values>
+                    <values title="aiscan-provider-openai-compatible">openai-compatible</values>
+                    <values title="aiscan-provider-browser-prompt">browser-prompt</values>
                 </widget>
             </column>
             <column name="max-upload-size-mb" numcolumns="2" order="120">
@@ -38,7 +38,7 @@
                 <widget type="textarea" fieldname="extraction_prompt" rows="10"/>
             </column>
         </group>
-        <group name="openai" title="OpenAI" icon="fa-solid fa-circle-nodes" numcolumns="12">
+        <group name="openai" title="aiscan-provider-openai" icon="fa-solid fa-circle-nodes" numcolumns="12">
             <column name="openai-api-key" numcolumns="4" order="100">
                 <widget type="password" fieldname="openai_api_key"/>
             </column>
@@ -49,7 +49,7 @@
                 <widget type="text" fieldname="openai_base_url"/>
             </column>
         </group>
-        <group name="gemini" title="Google Gemini" icon="fa-solid fa-wand-magic-sparkles" numcolumns="12">
+        <group name="gemini" title="aiscan-provider-gemini" icon="fa-solid fa-wand-magic-sparkles" numcolumns="12">
             <column name="gemini-api-key" numcolumns="6" order="100">
                 <widget type="password" fieldname="gemini_api_key"/>
             </column>
@@ -57,7 +57,7 @@
                 <widget type="text" fieldname="gemini_model"/>
             </column>
         </group>
-        <group name="mistral" title="Mistral" icon="fa-solid fa-wind" numcolumns="12">
+        <group name="mistral" title="aiscan-provider-mistral" icon="fa-solid fa-wind" numcolumns="12">
             <column name="mistral-api-key" numcolumns="6" order="100">
                 <widget type="password" fieldname="mistral_api_key"/>
             </column>
@@ -65,7 +65,7 @@
                 <widget type="text" fieldname="mistral_model"/>
             </column>
         </group>
-        <group name="compatible" title="OpenAI compatible" icon="fa-solid fa-plug" numcolumns="12">
+        <group name="compatible" title="aiscan-provider-openai-compatible" icon="fa-solid fa-plug" numcolumns="12">
             <column name="custom-api-key" numcolumns="4" order="100">
                 <widget type="password" fieldname="custom_api_key"/>
             </column>
