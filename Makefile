@@ -82,7 +82,9 @@ package:
 		-x "*.php-cs-fixer.cache" \
 		-x "*.phpunit.result.cache" \
 		-x "*.playwright-mcp/*" \
+		-x "*AGENTS.md" \
 		-x "*CLAUDE.md" \
+		-x "*GEMINI.md" \
 		-x "*composer.json" \
 		-x "*composer.lock" \
 		-x "*dist/*" \
