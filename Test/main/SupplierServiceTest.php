@@ -17,8 +17,33 @@ use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @runTestsInSeparateProcesses
+ * @preserveGlobalState disabled
+ */
 final class SupplierServiceTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        if (false === class_exists('FacturaScripts\\Dinamic\\Model\\Proveedor', false)) {
+            eval(
+                'namespace FacturaScripts\Dinamic\Model;'
+                . ' class Proveedor {'
+                . ' public string $codproveedor = "";'
+                . ' public string $nombre = "";'
+                . ' public string $razonsocial = "";'
+                . ' public string $cifnif = "";'
+                . ' public string $email = "";'
+                . ' public string $telefono1 = "";'
+                . ' public string $observaciones = "";'
+                . ' public bool $personafisica = false;'
+                . ' public function loadFromCode(string $code): bool { return false; }'
+                . ' public function save(): bool { return true; }'
+                . ' }'
+            );
+        }
+    }
+
     public function testUsesMatchedSupplierBeforeCreateFallback(): void
     {
         $matchedSupplier = $this->stubSupplier('SUP-01', 'Acme S.L.');
