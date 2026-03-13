@@ -37,6 +37,7 @@ class EditFacturaProveedor
                 'color' => 'info',
                 'icon' => 'fa-solid fa-file-invoice',
                 'label' => 'scan-invoice',
+                'row' => true,
                 'type' => 'modal',
                 'target' => 'modalaiscan',
             ]);

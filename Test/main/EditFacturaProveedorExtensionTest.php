@@ -55,6 +55,7 @@ final class EditFacturaProveedorExtensionTest extends TestCase
         $this->assertCount(1, $controller->buttons);
         $this->assertSame('MainView', $controller->buttons[0][0]);
         $this->assertSame('aiscan', $controller->buttons[0][1]['action']);
+        $this->assertTrue($controller->buttons[0][1]['row']);
     }
 
     public function testLoadDataOnlyStoresInvoiceIdOnMainView(): void
