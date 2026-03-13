@@ -1,8 +1,8 @@
 {
-    "aiscan-config": "AiScan Configuration",
+    "aiscan-config": "AiScan",
     "aiscan-filename-required": "Filename is required",
     "aiscan-invoice": "Scan Invoice",
-    "aiscan-settings": "AiScan Settings",
+    "aiscan-settings": "AiScan",
     "allowed-extensions": "Allowed extensions",
     "auto-scan": "Analyze automatically after upload",
     "browser-prompt-enabled": "Enable experimental Browser Prompt API provider",
@@ -19,6 +19,7 @@
     "custom-api-key": "OpenAI-compatible API key",
     "custom-base-url": "OpenAI-compatible base URL",
     "custom-model": "OpenAI-compatible model",
+    "extraction-prompt": "Extraction prompt",
     "request-timeout": "Request timeout (seconds)",
     "scan-invoice": "Scan Invoice"
 }

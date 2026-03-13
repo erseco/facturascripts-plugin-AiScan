@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -49,46 +50,37 @@ class AiScanInvoice extends Controller
 
     public function run(): void
     {
+        parent::run();
+
         if (!$this->permissions->allowUpdate) {
-            $this->setTemplate(false);
             http_response_code(403);
             echo json_encode(['error' => 'Permission denied']);
             return;
         }
 
-        $action = $this->request->get('action', '');
+        $action = $this->request()->get('action', '');
 
-        $this->setTemplate(false);
         header('Content-Type: application/json');
 
         try {
             switch ($action) {
                 case 'upload':
-                    if (false === $this->validateFormToken()) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Invalid request token']);
-                        break;
-                    }
                     $this->handleUpload();
                     break;
                 case 'analyze':
-                    if (false === $this->validateFormToken()) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Invalid request token']);
-                        break;
-                    }
                     $this->handleAnalyze();
                     break;
                 case 'match-supplier':
                     $this->handleMatchSupplier();
                     break;
                 case 'apply':
-                    if (false === $this->validateFormToken()) {
-                        http_response_code(400);
-                        echo json_encode(['error' => 'Invalid request token']);
-                        break;
-                    }
                     $this->handleApply();
+                    break;
+                case 'get-text':
+                    $this->handleGetText();
+                    break;
+                case 'search-suppliers':
+                    $this->handleSearchSuppliers();
                     break;
                 default:
                     http_response_code(400);
@@ -96,7 +88,7 @@ class AiScanInvoice extends Controller
             }
         } catch (\Exception $e) {
             http_response_code(500);
-            $message = AiScanSettings::isDebugMode() ? $e->getMessage() : 'Internal server error';
+            $message = $e->getMessage();
             echo json_encode(['error' => $message]);
             Tools::log()->error('AiScan error: ' . $e->getMessage());
         }
@@ -158,6 +150,7 @@ class AiScanInvoice extends Controller
             return;
         }
 
+        $service = new ExtractionService();
         echo json_encode([
             'success' => true,
             'tmp_file' => $tmpFilename,
@@ -166,6 +159,8 @@ class AiScanInvoice extends Controller
             'size' => $file['size'],
             'auto_scan' => AiScanSettings::isAutoScanEnabled(),
             'provider' => AiScanSettings::getDefaultProvider(),
+            'available_providers' => $service->getAvailableProviderNames(),
+            'extraction_prompt' => ExtractionService::getSystemPrompt(),
         ]);
     }
 
@@ -178,8 +173,8 @@ class AiScanInvoice extends Controller
 
     private function handleAnalyze(): void
     {
-        $tmpFile = $this->request->get('tmp_file', '');
-        $mimeType = $this->request->get('mime_type', '');
+        $tmpFile = $this->request()->get('tmp_file', '');
+        $mimeType = $this->request()->get('mime_type', '');
 
         if (empty($tmpFile)) {
             http_response_code(400);
@@ -208,8 +203,9 @@ class AiScanInvoice extends Controller
             return;
         }
 
+        $provider = $this->request()->get('provider', '');
         $service = new ExtractionService();
-        $extracted = $service->extractFromFile($tmpPath, $mimeType);
+        $extracted = $service->extractFromFile($tmpPath, $mimeType, $provider ?: null);
 
         if (!empty($extracted['supplier'])) {
             $matcher = new SupplierMatcher();
@@ -231,8 +227,8 @@ class AiScanInvoice extends Controller
 
     private function handleMatchSupplier(): void
     {
-        $name = $this->request->get('name', '');
-        $taxId = $this->request->get('tax_id', '');
+        $name = $this->request()->get('name', '');
+        $taxId = $this->request()->get('tax_id', '');
 
         $matcher = new SupplierMatcher();
         $matchResult = $matcher->findMatch(['name' => $name, 'tax_id' => $taxId]);
@@ -254,9 +250,112 @@ class AiScanInvoice extends Controller
         echo json_encode($response);
     }
 
+    private function handleSearchSuppliers(): void
+    {
+        $query = trim($this->request()->get('query', ''));
+        if (strlen($query) < 2) {
+            echo json_encode(['results' => []]);
+            return;
+        }
+
+        $supplier = new \FacturaScripts\Dinamic\Model\Proveedor();
+        $where = [
+            new \FacturaScripts\Core\Where('nombre', 'LIKE', '%' . $query . '%'),
+        ];
+        $results = $supplier->all($where, ['nombre' => 'ASC'], 0, 20);
+
+        // Also search by tax ID if the query looks like one
+        if (preg_match('/^[A-Z0-9]/i', $query)) {
+            $whereCif = [
+                new \FacturaScripts\Core\Where('cifnif', 'LIKE', '%' . $query . '%'),
+            ];
+            $byCif = $supplier->all($whereCif, [], 0, 10);
+            $existingIds = array_map(fn ($s) => $s->codproveedor, $results);
+            foreach ($byCif as $s) {
+                if (!in_array($s->codproveedor, $existingIds)) {
+                    $results[] = $s;
+                }
+            }
+        }
+
+        $items = array_map(fn ($s) => [
+            'id' => $s->codproveedor,
+            'name' => $s->nombre,
+            'tax_id' => $s->cifnif,
+        ], array_slice($results, 0, 20));
+
+        echo json_encode(['results' => $items]);
+    }
+
+    private function handleGetText(): void
+    {
+        $tmpFile = $this->request()->get('tmp_file', '');
+
+        if (empty($tmpFile)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'No file specified']);
+            return;
+        }
+
+        $tmpFile = basename($tmpFile);
+        if (!preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/', $tmpFile)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid file name']);
+            return;
+        }
+        $tmpPath = FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile;
+
+        if (!file_exists($tmpPath)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Temporary file not found']);
+            return;
+        }
+
+        $extension = strtolower(pathinfo($tmpPath, PATHINFO_EXTENSION));
+        $text = '';
+
+        if ($extension === 'pdf') {
+            $text = $this->extractPdfTextForBrowser($tmpPath);
+        } else {
+            $text = '[Image file - text extraction requires an AI provider]';
+        }
+
+        echo json_encode(['success' => true, 'text' => $text]);
+    }
+
+    private function extractPdfTextForBrowser(string $filePath): string
+    {
+        $pdftotextBin = null;
+        foreach (['/usr/bin/pdftotext', '/usr/local/bin/pdftotext'] as $candidate) {
+            if (is_executable($candidate)) {
+                $pdftotextBin = $candidate;
+                break;
+            }
+        }
+
+        if ($pdftotextBin === null) {
+            return '';
+        }
+
+        $realPath = realpath($filePath);
+        $expectedDir = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp');
+        if ($realPath === false || $expectedDir === false || strpos($realPath, $expectedDir) !== 0) {
+            return '';
+        }
+
+        $output = [];
+        $returnCode = 0;
+        exec($pdftotextBin . ' ' . escapeshellarg($realPath) . ' - 2>/dev/null', $output, $returnCode);
+        if ($returnCode === 0 && !empty($output)) {
+            return implode("\n", $output);
+        }
+
+        return '';
+    }
+
     private function handleApply(): void
     {
-        $invoiceId = $this->request->get('invoice_id', '');
+        $invoiceId = $this->request()->get('invoice_id', '');
         $invoiceId = $invoiceId !== '' ? (int) $invoiceId : null;
 
         $body = file_get_contents('php://input');

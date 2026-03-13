@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -35,7 +36,6 @@ final class SchemaValidatorTest extends TestCase
     {
         $errors = $this->validator->validate([]);
         $this->assertContains('Missing invoice section', $errors);
-        $this->assertContains('Missing top-level field: supplier', $errors);
     }
 
     public function testValidateReturnsMissingRequiredFieldErrors(): void

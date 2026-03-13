@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -44,22 +45,39 @@ class MistralProvider implements ProviderInterface
         return !empty($this->apiKey);
     }
 
-    public function analyzeDocument(string $content, string $mimeType, string $prompt): string
-    {
-        $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    public function analyzeDocument(
+        string $content,
+        string $mimeType,
+        string $prompt,
+        string $systemPrompt = ''
+    ): string {
+        $isBinary = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
-        $messageContent = $isImage
-            ? [
+        $messages = [];
+
+        if (!empty($systemPrompt)) {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+
+        if ($isBinary && $mimeType === 'application/pdf') {
+            $messageContent = [
+                ['type' => 'document_url', 'document_url' => 'data:application/pdf;base64,' . $content],
+                ['type' => 'text', 'text' => $prompt],
+            ];
+        } elseif ($isBinary) {
+            $messageContent = [
                 ['type' => 'image_url', 'image_url' => 'data:' . $mimeType . ';base64,' . $content],
                 ['type' => 'text', 'text' => $prompt],
-            ]
-            : $prompt . "\n\nDocument content:\n" . $content;
+            ];
+        } else {
+            $messageContent = $prompt . "\n\nDocument content:\n" . $content;
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $messageContent];
 
         $payload = json_encode([
             'model' => $this->model,
-            'messages' => [
-                ['role' => 'user', 'content' => $messageContent],
-            ],
+            'messages' => $messages,
             'response_format' => ['type' => 'json_object'],
             'temperature' => 0,
             'max_tokens' => 4096,

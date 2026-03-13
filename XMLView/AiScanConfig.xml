@@ -33,6 +33,11 @@
                 <widget type="checkbox" fieldname="debug_mode"/>
             </column>
         </group>
+        <group name="prompt" title="extraction-prompt" icon="fa-solid fa-comment-dots" numcolumns="12">
+            <column name="extraction-prompt" numcolumns="12" order="100">
+                <widget type="textarea" fieldname="extraction_prompt" rows="10"/>
+            </column>
+        </group>
         <group name="openai" title="OpenAI" icon="fa-solid fa-circle-nodes" numcolumns="12">
             <column name="openai-api-key" numcolumns="4" order="100">
                 <widget type="password" fieldname="openai_api_key"/>
@@ -69,11 +74,6 @@
             </column>
             <column name="custom-base-url" numcolumns="4" order="120">
                 <widget type="text" fieldname="custom_base_url"/>
-            </column>
-        </group>
-        <group name="experimental" title="experimental" icon="fa-solid fa-flask" numcolumns="12">
-            <column name="browser-prompt-enabled" order="100">
-                <widget type="checkbox" fieldname="browser_prompt_enabled"/>
             </column>
         </group>
     </columns>

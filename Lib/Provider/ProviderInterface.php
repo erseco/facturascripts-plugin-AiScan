@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -25,5 +26,10 @@ interface ProviderInterface
 
     public function isAvailable(): bool;
 
-    public function analyzeDocument(string $content, string $mimeType, string $prompt): string;
+    public function analyzeDocument(
+        string $content,
+        string $mimeType,
+        string $prompt,
+        string $systemPrompt = ''
+    ): string;
 }

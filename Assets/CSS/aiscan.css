@@ -2,11 +2,92 @@
     max-width: 1200px;
 }
 
+.aiscan-modal .modal-body {
+    padding: 0;
+}
+
+/* Split pane layout */
+.aiscan-split {
+    display: flex;
+    height: 75vh;
+    min-height: 400px;
+}
+
+.aiscan-split-left {
+    flex: 0 0 55%;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.aiscan-split-left > .card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.aiscan-split-left > .card > .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.aiscan-split-right {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.aiscan-split-right > .card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.aiscan-split-handle {
+    flex: 0 0 6px;
+    background: var(--bs-border-color);
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.aiscan-split-handle:hover,
+.aiscan-split-handle:active {
+    background: var(--bs-primary);
+}
+
+.aiscan-split-handle-grip {
+    width: 2px;
+    height: 32px;
+    border-left: 1px solid rgba(0, 0, 0, 0.25);
+    border-right: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.aiscan-split-handle:hover .aiscan-split-handle-grip,
+.aiscan-split-handle:active .aiscan-split-handle-grip {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Block iframe pointer events during drag */
+.aiscan-split-dragging iframe {
+    pointer-events: none;
+}
+
+/* Drop area */
 .aiscan-drop-area {
     border: 2px dashed var(--bs-border-color);
     border-radius: 0.5rem;
     cursor: pointer;
-    min-height: 180px;
+    height: 100%;
+    min-height: 300px;
     transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
@@ -15,20 +96,24 @@
     border-color: var(--bs-primary);
 }
 
-.aiscan-preview {
-    background: var(--bs-tertiary-bg);
-    border-radius: 0.5rem;
-    min-height: 420px;
+/* Preview */
+.aiscan-preview-area {
+    height: 100%;
     overflow: hidden;
 }
 
-.aiscan-preview iframe,
-.aiscan-preview img {
+.aiscan-preview-area iframe,
+.aiscan-preview-area img {
     border: 0;
+    display: block;
+    height: 100%;
+    object-fit: contain;
     width: 100%;
 }
 
+/* Sidebar */
 .aiscan-sidebar {
-    max-height: 70vh;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
