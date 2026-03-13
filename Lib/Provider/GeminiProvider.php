@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -30,7 +31,7 @@ class GeminiProvider implements ProviderInterface
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'gemini_api_key', '');
-        $this->model = Tools::settings('AiScan', 'gemini_model', 'gemini-1.5-flash');
+        $this->model = Tools::settings('AiScan', 'gemini_model', 'gemini-2.5-flash');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
 
@@ -44,12 +45,16 @@ class GeminiProvider implements ProviderInterface
         return !empty($this->apiKey);
     }
 
-    public function analyzeDocument(string $content, string $mimeType, string $prompt): string
-    {
-        $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    public function analyzeDocument(
+        string $content,
+        string $mimeType,
+        string $prompt,
+        string $systemPrompt = ''
+    ): string {
+        $isBinary = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
         $parts = [];
-        if ($isImage) {
+        if ($isBinary) {
             $parts[] = [
                 'inline_data' => [
                     'mime_type' => $mimeType,
@@ -61,7 +66,7 @@ class GeminiProvider implements ProviderInterface
         }
         $parts[] = ['text' => $prompt];
 
-        $payload = json_encode([
+        $payload = [
             'contents' => [
                 ['parts' => $parts],
             ],
@@ -70,7 +75,13 @@ class GeminiProvider implements ProviderInterface
                 'maxOutputTokens' => 4096,
                 'responseMimeType' => 'application/json',
             ],
-        ]);
+        ];
+
+        if (!empty($systemPrompt)) {
+            $payload['systemInstruction'] = [
+                'parts' => [['text' => $systemPrompt]],
+            ];
+        }
 
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
             . $this->model . ':generateContent?key=' . $this->apiKey;
@@ -79,7 +90,7 @@ class GeminiProvider implements ProviderInterface
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_SSL_VERIFYPEER => true,

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -19,23 +20,30 @@
 
 namespace FacturaScripts\Test\Plugins;
 
-require_once dirname(__DIR__, 2) . '/Extension/Controller/EditFacturaProveedor.php';
-
 use FacturaScripts\Plugins\AiScan\Extension\Controller\EditFacturaProveedor;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @runTestsInSeparateProcesses
- * @preserveGlobalState disabled
- */
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class EditFacturaProveedorExtensionTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        // In Docker, tests run from /var/www/html/Test/Plugins/
+        // but the plugin lives at /var/www/html/Plugins/AiScan/
+        $base = dirname(__DIR__, 2) . '/Plugins/AiScan';
+        require_once $base
+            . '/Extension/Controller/EditFacturaProveedor.php';
+    }
+
     public function testCreateViewsUsesMainViewNameForButton(): void
     {
         $this->defineExtensionStubs();
 
         $extension = new EditFacturaProveedor();
-        $controller = new class {
+        $controller = new class () {
             public array $buttons = [];
 
             public function getMainViewName(): string
@@ -54,14 +62,15 @@ final class EditFacturaProveedorExtensionTest extends TestCase
 
         $this->assertCount(1, $controller->buttons);
         $this->assertSame('MainView', $controller->buttons[0][0]);
-        $this->assertSame('aiscan', $controller->buttons[0][1]['action']);
-        $this->assertTrue($controller->buttons[0][1]['row']);
+        $this->assertSame('js', $controller->buttons[0][1]['type']);
+        $this->assertStringContainsString('modalaiscan', $controller->buttons[0][1]['action']);
+        $this->assertArrayNotHasKey('row', $controller->buttons[0][1]);
     }
 
     public function testLoadDataOnlyStoresInvoiceIdOnMainView(): void
     {
         $extension = new EditFacturaProveedor();
-        $controller = new class {
+        $controller = new class () {
             public array $settings = [];
 
             public function getMainViewName(): string
@@ -75,12 +84,12 @@ final class EditFacturaProveedorExtensionTest extends TestCase
             }
         };
 
-        $view = new class {
+        $view = new class () {
             public object $model;
 
             public function __construct()
             {
-                $this->model = new class {
+                $this->model = new class () {
                     public function primaryColumnValue(): int
                     {
                         return 42;
@@ -100,11 +109,21 @@ final class EditFacturaProveedorExtensionTest extends TestCase
     private function defineExtensionStubs(): void
     {
         if (false === class_exists('FacturaScripts\\Core\\Tools', false)) {
-            eval('namespace FacturaScripts\Core; class Tools { public static function config(string $name) { return ""; } }');
+            eval(
+                'namespace FacturaScripts\Core;'
+                . ' class Tools { public static function config(string $name)'
+                . ' { return ""; } }'
+            );
         }
 
         if (false === class_exists('FacturaScripts\\Dinamic\\Lib\\AssetManager', false)) {
-            eval('namespace FacturaScripts\Dinamic\Lib; class AssetManager { public static function addCss(string $asset): void {} public static function addJs(string $asset): void {} }');
+            eval(
+                'namespace FacturaScripts\Dinamic\Lib;'
+                . ' class AssetManager {'
+                . ' public static function addCss(string $asset): void {}'
+                . ' public static function addJs(string $asset): void {}'
+                . ' }'
+            );
         }
     }
 }

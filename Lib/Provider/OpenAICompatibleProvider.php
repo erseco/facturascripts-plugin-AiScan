@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -46,12 +47,21 @@ class OpenAICompatibleProvider implements ProviderInterface
         return !empty($this->apiKey) && !empty($this->baseUrl) && !empty($this->model);
     }
 
-    public function analyzeDocument(string $content, string $mimeType, string $prompt): string
-    {
-        $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    public function analyzeDocument(
+        string $content,
+        string $mimeType,
+        string $prompt,
+        string $systemPrompt = ''
+    ): string {
+        $isBinary = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
         $messages = [];
-        if ($isImage) {
+
+        if (!empty($systemPrompt)) {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+
+        if ($isBinary) {
             $messages[] = [
                 'role' => 'user',
                 'content' => [

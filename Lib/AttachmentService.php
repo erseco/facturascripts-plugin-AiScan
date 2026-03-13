@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -36,7 +37,12 @@ class AttachmentService
         $tmpDir = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp');
         $tmpPath = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile);
         $prefix = false === $tmpDir ? '' : rtrim($tmpDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-        if (false === $tmpDir || false === $tmpPath || false === str_starts_with($tmpPath, $prefix) || false === is_file($tmpPath)) {
+        if (
+            false === $tmpDir
+            || false === $tmpPath
+            || false === str_starts_with($tmpPath, $prefix)
+            || false === is_file($tmpPath)
+        ) {
             return;
         }
 

@@ -1,6 +1,7 @@
 # Export ignore - these files will not be included in git archive or releases
 # Development and testing files
 /.aider*                export-ignore
+/.claude/               export-ignore
 /.DS_Store              export-ignore
 /.editorconfig          export-ignore
 /.env                   export-ignore
@@ -8,6 +9,8 @@
 /.gitattributes         export-ignore
 /.github/               export-ignore
 /.gitignore             export-ignore
+/.playwright-mcp/       export-ignore
+/CLAUDE.md              export-ignore
 /Test/                  export-ignore
 /tests/                 export-ignore
 

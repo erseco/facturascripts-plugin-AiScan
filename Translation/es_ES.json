@@ -1,8 +1,8 @@
 {
-    "aiscan-config": "Configuración AiScan",
+    "aiscan-config": "AiScan",
     "aiscan-filename-required": "El nombre de archivo es obligatorio",
     "aiscan-invoice": "Escanear Factura",
-    "aiscan-settings": "Configuración AiScan",
+    "aiscan-settings": "AiScan",
     "allowed-extensions": "Extensiones permitidas",
     "auto-scan": "Analizar automáticamente tras la subida",
     "browser-prompt-enabled": "Activar el proveedor experimental Browser Prompt API",
@@ -19,6 +19,7 @@
     "custom-api-key": "Clave API compatible con OpenAI",
     "custom-base-url": "URL base compatible con OpenAI",
     "custom-model": "Modelo compatible con OpenAI",
+    "extraction-prompt": "Prompt de extracción",
     "request-timeout": "Tiempo de espera de la petición (segundos)",
     "scan-invoice": "Escanear Factura"
 }

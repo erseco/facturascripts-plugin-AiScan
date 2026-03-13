@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -31,15 +32,68 @@ final class SupplierMatcherTest extends TestCase
         $this->matcher = new SupplierMatcher();
     }
 
-    public function testReturnsNotFoundWhenNoData(): void
-    {
-        $result = $this->matcher->findMatch(['name' => '', 'tax_id' => '']);
-        $this->assertEquals('not_found', $result['match_status']);
-        $this->assertNull($result['supplier']);
-    }
-
     public function testCanInstantiate(): void
     {
         $this->assertInstanceOf(SupplierMatcher::class, $this->matcher);
+    }
+
+    public function testReturnsNotFoundWhenNoData(): void
+    {
+        $result = $this->matcher->findMatch([
+            'name' => '',
+            'tax_id' => '',
+        ]);
+        $this->assertEquals('not_found', $result['match_status']);
+        $this->assertNull($result['supplier']);
+        $this->assertEmpty($result['candidates']);
+    }
+
+    public function testReturnsNotFoundWhenBothFieldsNull(): void
+    {
+        $result = $this->matcher->findMatch([
+            'name' => null,
+            'tax_id' => null,
+        ]);
+        $this->assertEquals('not_found', $result['match_status']);
+    }
+
+    public function testResultStructureHasRequiredKeys(): void
+    {
+        $result = $this->matcher->findMatch([]);
+        $this->assertArrayHasKey('match_status', $result);
+        $this->assertArrayHasKey('supplier', $result);
+        $this->assertArrayHasKey('candidates', $result);
+    }
+
+    public function testNormalizeNameStripsLegalForms(): void
+    {
+        $cases = [
+            ['Empresa S.A.', 'Empresa'],
+            ['Acme S.L.', 'Acme'],
+            ['Compañía S.R.L.', 'Compañía'],
+            ['Tech S.L.U.', 'Tech'],
+            ['Mega Corp S.A.U.', 'Mega Corp'],
+            ['Cooperativa S.C.', 'Cooperativa'],
+            ['Empresa SA', 'Empresa'],
+            ['Acme SL', 'Acme'],
+            ['Simple Company', 'Simple Company'],
+            ['', ''],
+            ['S.L.', ''],
+        ];
+
+        $method = new \ReflectionMethod(
+            SupplierMatcher::class,
+            'normalizeName'
+        );
+        $method->setAccessible(true);
+
+        foreach ($cases as [$input, $expected]) {
+            $result = $method->invoke($this->matcher, $input);
+            $this->assertEquals(
+                $expected,
+                $result,
+                "normalizeName('$input') should return '$expected'"
+            );
+        }
     }
 }

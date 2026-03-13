@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -31,7 +32,7 @@ class OpenAIProvider implements ProviderInterface
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'openai_api_key', '');
-        $this->model = Tools::settings('AiScan', 'openai_model', 'gpt-4o');
+        $this->model = Tools::settings('AiScan', 'openai_model', 'gpt-5-mini');
         $this->baseUrl = Tools::settings('AiScan', 'openai_base_url', 'https://api.openai.com/v1');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
@@ -46,24 +47,43 @@ class OpenAIProvider implements ProviderInterface
         return !empty($this->apiKey);
     }
 
-    public function analyzeDocument(string $content, string $mimeType, string $prompt): string
-    {
-        $isImage = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    public function analyzeDocument(
+        string $content,
+        string $mimeType,
+        string $prompt,
+        string $systemPrompt = ''
+    ): string {
+        $isBinary = in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
 
         $messages = [];
 
-        if ($isImage) {
+        if (!empty($systemPrompt)) {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+
+        if ($isBinary) {
+            $contentParts = [];
+            if ($mimeType === 'application/pdf') {
+                $contentParts[] = [
+                    'type' => 'file',
+                    'file' => [
+                        'filename' => 'invoice.pdf',
+                        'file_data' => 'data:application/pdf;base64,' . $content,
+                    ],
+                ];
+            } else {
+                $contentParts[] = [
+                    'type' => 'image_url',
+                    'image_url' => [
+                        'url' => 'data:' . $mimeType . ';base64,' . $content,
+                    ],
+                ];
+            }
+            $contentParts[] = ['type' => 'text', 'text' => $prompt];
+
             $messages[] = [
                 'role' => 'user',
-                'content' => [
-                    [
-                        'type' => 'image_url',
-                        'image_url' => [
-                            'url' => 'data:' . $mimeType . ';base64,' . $content,
-                        ],
-                    ],
-                    ['type' => 'text', 'text' => $prompt],
-                ],
+                'content' => $contentParts,
             ];
         } else {
             $messages[] = [
@@ -76,8 +96,7 @@ class OpenAIProvider implements ProviderInterface
             'model' => $this->model,
             'messages' => $messages,
             'response_format' => ['type' => 'json_object'],
-            'temperature' => 0,
-            'max_tokens' => 4096,
+            'max_completion_tokens' => 4096,
         ]);
 
         $ch = curl_init($this->baseUrl . '/chat/completions');

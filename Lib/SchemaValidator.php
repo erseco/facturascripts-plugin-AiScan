@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -21,7 +22,6 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 class SchemaValidator
 {
-    private const REQUIRED_TOP_LEVEL_FIELDS = ['supplier', 'invoice', 'taxes', 'lines', 'meta'];
     private const REQUIRED_INVOICE_FIELDS = ['number', 'issue_date', 'total'];
 
     // Regex to detect European number format (e.g. 1.234,56)
@@ -30,12 +30,6 @@ class SchemaValidator
     public function validate(array $data): array
     {
         $errors = [];
-
-        foreach (self::REQUIRED_TOP_LEVEL_FIELDS as $field) {
-            if (!array_key_exists($field, $data)) {
-                $errors[] = 'Missing top-level field: ' . $field;
-            }
-        }
 
         if (!isset($data['invoice']) || false === is_array($data['invoice'])) {
             $errors[] = 'Missing invoice section';
@@ -56,21 +50,31 @@ class SchemaValidator
             $errors[] = 'Lines must be an array';
         }
 
-        foreach ($data['lines'] ?? [] as $index => $line) {
+        $lines = is_array($data['lines'] ?? null) ? $data['lines'] : [];
+        foreach ($lines as $index => $line) {
             if (empty($line['description'])) {
                 $errors[] = 'Missing line description at index ' . $index;
             }
         }
 
-        if (!empty($data['invoice']['issue_date']) && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['issue_date'])) {
+        if (
+            !empty($data['invoice']['issue_date'])
+            && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['issue_date'])
+        ) {
             $errors[] = 'Issue date must use YYYY-MM-DD format';
         }
 
-        if (!empty($data['invoice']['due_date']) && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['due_date'])) {
+        if (
+            !empty($data['invoice']['due_date'])
+            && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['due_date'])
+        ) {
             $errors[] = 'Due date must use YYYY-MM-DD format';
         }
 
-        if (!empty($data['invoice']['currency']) && false === $this->isValidCurrencyCode($data['invoice']['currency'])) {
+        if (
+            !empty($data['invoice']['currency'])
+            && false === $this->isValidCurrencyCode($data['invoice']['currency'])
+        ) {
             $errors[] = 'Currency must be a 3-letter ISO code';
         }
 
@@ -79,16 +83,27 @@ class SchemaValidator
             && isset($data['invoice']['tax_amount'])
             && isset($data['invoice']['total'])
         ) {
-            $computed = (float) $data['invoice']['subtotal'] + (float) $data['invoice']['tax_amount'];
+            $withholding = (float) ($data['invoice']['withholding_amount'] ?? 0);
+            $computed = (float) $data['invoice']['subtotal'] + (float) $data['invoice']['tax_amount'] - $withholding;
             $declared = (float) $data['invoice']['total'];
             if (abs($computed - $declared) > 0.02) {
                 $errors[] = sprintf(
-                    'Tax mismatch: subtotal(%.2f) + tax(%.2f) = %.2f but total is %.2f',
+                    'Tax mismatch: subtotal(%.2f) + tax(%.2f) - withholding(%.2f) = %.2f but total is %.2f',
                     $data['invoice']['subtotal'],
                     $data['invoice']['tax_amount'],
+                    $withholding,
                     $computed,
                     $declared
                 );
+            }
+        }
+
+        // Include AI-generated warnings
+        if (!empty($data['warnings']) && is_array($data['warnings'])) {
+            foreach ($data['warnings'] as $warning) {
+                if (is_string($warning) && !empty($warning)) {
+                    $errors[] = $warning;
+                }
             }
         }
 
@@ -101,7 +116,9 @@ class SchemaValidator
         $data['invoice'] = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
         $data['taxes'] = is_array($data['taxes'] ?? null) ? $data['taxes'] : [];
         $data['lines'] = is_array($data['lines'] ?? null) ? $data['lines'] : [];
-        $data['meta'] = is_array($data['meta'] ?? null) ? $data['meta'] : [];
+        $data['warnings'] = is_array($data['warnings'] ?? null) ? $data['warnings'] : [];
+        $data['confidence'] = is_array($data['confidence'] ?? null) ? $data['confidence'] : [];
+        $data['customer'] = is_array($data['customer'] ?? null) ? $data['customer'] : [];
 
         if (!empty($data['invoice']['issue_date'])) {
             $data['invoice']['issue_date'] = $this->normalizeDate($data['invoice']['issue_date']);
@@ -110,14 +127,15 @@ class SchemaValidator
             $data['invoice']['due_date'] = $this->normalizeDate($data['invoice']['due_date']);
         }
 
-        foreach (['subtotal', 'tax_amount', 'total'] as $field) {
+        foreach (['subtotal', 'tax_amount', 'withholding_amount', 'total'] as $field) {
             if (isset($data['invoice'][$field])) {
                 $data['invoice'][$field] = $this->normalizeDecimal($data['invoice'][$field]);
             }
         }
 
         if (!empty($data['invoice']['currency'])) {
-            $data['invoice']['currency'] = strtoupper(trim((string) $data['invoice']['currency']));
+            $raw = strtoupper(trim((string) $data['invoice']['currency']));
+            $data['invoice']['currency'] = $this->normalizeCurrencySymbol($raw);
         }
 
         if (isset($data['lines']) && is_array($data['lines'])) {
@@ -163,8 +181,8 @@ class SchemaValidator
 
     private function normalizeDecimal(mixed $value): float
     {
-        if (is_float($value)) {
-            return $value;
+        if (is_float($value) || is_int($value)) {
+            return (float) $value;
         }
 
         $str = (string) $value;
@@ -178,18 +196,17 @@ class SchemaValidator
         return (float) $str;
     }
 
+    private function normalizeCurrencySymbol(string $currency): string
+    {
+        $symbolMap = [
+            '€' => 'EUR', '$' => 'USD', '£' => 'GBP', '¥' => 'JPY',
+        ];
+
+        return $symbolMap[$currency] ?? $currency;
+    }
+
     private function isValidCurrencyCode(string $currency): bool
     {
-        if (1 !== preg_match('/^[A-Z]{3}$/', $currency)) {
-            return false;
-        }
-
-        if (false === class_exists(\ResourceBundle::class)) {
-            return true;
-        }
-
-        $bundle = \ResourceBundle::create('en', 'ICUDATA-curr');
-        $value = $bundle instanceof \ResourceBundle ? $bundle->get($currency) : false;
-        return false !== $value && null !== $value;
+        return 1 === preg_match('/^[A-Z]{3}$/', $currency);
     }
 }

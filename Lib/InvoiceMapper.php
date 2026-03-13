@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -20,9 +21,9 @@
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
-use FacturaScripts\Core\Model\Divisa;
-use FacturaScripts\Core\Model\FacturaProveedor;
-use FacturaScripts\Core\Model\Proveedor;
+use FacturaScripts\Dinamic\Model\Divisa;
+use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\Proveedor;
 
 class InvoiceMapper
 {
@@ -79,6 +80,10 @@ class InvoiceMapper
                 }
             }
 
+            if (!empty($invoiceData['withholding_amount'])) {
+                $invoice->totalirpf = (float) $invoiceData['withholding_amount'];
+            }
+
             $invoice->observaciones = $this->buildNotes($invoiceData);
 
             if (!$invoice->save()) {
@@ -127,7 +132,7 @@ class InvoiceMapper
     private function buildNotes(array $invoiceData): string
     {
         $parts = [];
-        foreach (['summary', 'notes'] as $field) {
+        foreach (['summary', 'payment_terms', 'notes'] as $field) {
             $value = trim((string) ($invoiceData[$field] ?? ''));
             if (!empty($value)) {
                 $parts[] = $value;

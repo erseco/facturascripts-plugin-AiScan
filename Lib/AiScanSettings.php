@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -31,10 +32,10 @@ class AiScanSettings
         'auto_scan' => false,
         'debug_mode' => false,
         'request_timeout' => 120,
-        'openai_model' => 'gpt-4o-mini',
-        'gemini_model' => 'gemini-1.5-flash',
+        'openai_model' => 'gpt-5-mini',
+        'openai_base_url' => 'https://api.openai.com/v1',
+        'gemini_model' => 'gemini-2.5-flash',
         'mistral_model' => 'mistral-small-latest',
-        'browser_prompt_enabled' => false,
     ];
 
     public static function get(string $key, mixed $default = null): mixed

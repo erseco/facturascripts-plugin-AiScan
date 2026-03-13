@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of AiScan plugin for FacturaScripts.
  * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
@@ -20,12 +21,14 @@
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Where;
-use FacturaScripts\Core\Model\Proveedor;
+use FacturaScripts\Dinamic\Model\Proveedor;
 
 class SupplierMatcher
 {
     // Legal form suffixes to strip for normalized name matching
-    private const LEGAL_FORM_PATTERN = '/\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\b/i';
+    private const LEGAL_FORM_PATTERN =
+        '/\s*\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?'
+        . '|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\.?\s*/i';
     public function findMatch(array $supplierData): array
     {
         $result = [
