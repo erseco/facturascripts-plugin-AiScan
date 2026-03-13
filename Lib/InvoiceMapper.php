@@ -97,7 +97,7 @@ class InvoiceMapper
                 $reference = $this->productMatcher->findReference($lineData);
                 $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
                 $line->descripcion = trim((string) ($lineData['description'] ?? $line->descripcion));
-                $line->cantidad = max(0.00001, (float) ($lineData['quantity'] ?? 1));
+                $line->cantidad = max(1, (float) ($lineData['quantity'] ?? 1));
                 $line->pvpunitario = (float) ($lineData['unit_price'] ?? $line->pvpunitario);
                 $line->dtopor = (float) ($lineData['discount'] ?? 0);
 

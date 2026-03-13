@@ -483,7 +483,7 @@
     }
 
     function updateBrowserPromptSupport() {
-        const supported = Boolean(window.ai && (window.ai.languageModel || window.ai.promptManager || window.ai.createTextSession));
+        const supported = isBrowserPromptApiSupported();
         const badge = document.getElementById(selectors.supportBadge);
         if (!badge) {
             return;
@@ -491,6 +491,21 @@
 
         badge.className = 'badge ' + (supported ? 'text-bg-success' : 'text-bg-secondary');
         badge.textContent = supported ? 'Browser Prompt API available' : 'Browser Prompt API unavailable';
+    }
+
+    function isBrowserPromptApiSupported() {
+        try {
+            return Boolean(window.ai && (
+                typeof window.ai.createTextSession === 'function'
+                || typeof window.ai.promptManager === 'object'
+                || typeof window.ai.languageModel === 'object'
+            ));
+        } catch (error) {
+            if (window.console && typeof window.console.debug === 'function') {
+                window.console.debug('AiScan Browser Prompt API detection failed.', error);
+            }
+            return false;
+        }
     }
 
     function escapeHtml(value) {

@@ -148,9 +148,7 @@ class AiScanInvoice extends Controller
             mkdir($tmpDir, 0700, true);
         }
 
-        $safeBaseName = preg_replace('/[^a-zA-Z0-9_-]/', '-', pathinfo($file['name'], PATHINFO_FILENAME));
-        $safeBaseName = trim((string) $safeBaseName, '-');
-        $safeBaseName = substr($safeBaseName ?: 'invoice', 0, 40);
+        $safeBaseName = $this->sanitizeBaseFilename((string) $file['name']);
         $tmpFilename = 'aiscan_' . $safeBaseName . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
         $tmpPath = $tmpDir . '/' . $tmpFilename;
 
@@ -169,6 +167,13 @@ class AiScanInvoice extends Controller
             'auto_scan' => AiScanSettings::isAutoScanEnabled(),
             'provider' => AiScanSettings::getDefaultProvider(),
         ]);
+    }
+
+    private function sanitizeBaseFilename(string $filename): string
+    {
+        $safeBaseName = preg_replace('/[^a-zA-Z0-9_-]/', '-', pathinfo($filename, PATHINFO_FILENAME));
+        $safeBaseName = trim((string) $safeBaseName, '-');
+        return substr($safeBaseName ?: 'invoice', 0, 40);
     }
 
     private function handleAnalyze(): void

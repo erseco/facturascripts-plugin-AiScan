@@ -70,7 +70,7 @@ class SchemaValidator
             $errors[] = 'Due date must use YYYY-MM-DD format';
         }
 
-        if (!empty($data['invoice']['currency']) && 1 !== preg_match('/^[A-Z]{3}$/', $data['invoice']['currency'])) {
+        if (!empty($data['invoice']['currency']) && false === $this->isValidCurrencyCode($data['invoice']['currency'])) {
             $errors[] = 'Currency must be a 3-letter ISO code';
         }
 
@@ -176,5 +176,19 @@ class SchemaValidator
             $str = str_replace(',', '.', $str);
         }
         return (float) $str;
+    }
+
+    private function isValidCurrencyCode(string $currency): bool
+    {
+        if (1 !== preg_match('/^[A-Z]{3}$/', $currency)) {
+            return false;
+        }
+
+        if (false === class_exists(\ResourceBundle::class)) {
+            return true;
+        }
+
+        $bundle = \ResourceBundle::create('en', 'ICUDATA-curr');
+        return $bundle instanceof \ResourceBundle && false !== $bundle->get($currency) && null !== $bundle->get($currency);
     }
 }

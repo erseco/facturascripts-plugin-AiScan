@@ -35,7 +35,8 @@ class AttachmentService
 
         $tmpDir = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp');
         $tmpPath = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile);
-        if (false === $tmpDir || false === $tmpPath || strpos($tmpPath, $tmpDir) !== 0 || false === is_file($tmpPath)) {
+        $prefix = false === $tmpDir ? '' : rtrim($tmpDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        if (false === $tmpDir || false === $tmpPath || false === str_starts_with($tmpPath, $prefix) || false === is_file($tmpPath)) {
             return;
         }
 
@@ -50,7 +51,7 @@ class AttachmentService
         $relation->model = 'FacturaProveedor';
         $relation->modelid = (int) $invoice->idfactura;
         $relation->modelcode = (string) $invoice->idfactura;
-        $relation->nick = Session::get('user')->nick ?? $invoice->nick;
+        $relation->nick = Session::get('user')?->nick ?? $invoice->nick;
         $relation->observations = 'Scanned source invoice';
 
         if (false === $relation->save()) {
