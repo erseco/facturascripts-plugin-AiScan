@@ -20,8 +20,8 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
-use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Lib\Calculator;
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\Proveedor;
