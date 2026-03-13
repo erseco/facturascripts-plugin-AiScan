@@ -189,6 +189,7 @@ class SchemaValidator
         }
 
         $bundle = \ResourceBundle::create('en', 'ICUDATA-curr');
-        return $bundle instanceof \ResourceBundle && false !== $bundle->get($currency) && null !== $bundle->get($currency);
+        $value = $bundle instanceof \ResourceBundle ? $bundle->get($currency) : false;
+        return false !== $value && null !== $value;
     }
 }
