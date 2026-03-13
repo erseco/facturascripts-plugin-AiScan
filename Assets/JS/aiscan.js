@@ -40,11 +40,117 @@
     // Fallback prompt for Browser AI when server prompt is not available
     const FALLBACK_PROMPT = 'You are an invoice extraction engine. Extract data from the provided invoice and return ONLY valid JSON with supplier, invoice, taxes, lines, confidence and warnings fields. Never invent values, use null for unknown fields.';
 
+    const FALLBACK_TRANSLATIONS = {
+        en: {
+            'aiscan-analyze': 'Analyze',
+            'aiscan-analysis-completed': 'Analysis completed (%provider%).',
+            'aiscan-analysis-started': 'Analyzing invoice with %provider%...',
+            'aiscan-analyzing-browser-ai': 'Analyzing with Browser AI (this may take a moment)...',
+            'aiscan-browser-ai-error': 'Browser AI error: %message%',
+            'aiscan-browser-prompt-not-available': 'Browser Prompt API is not available in this browser.',
+            'aiscan-clear-file': 'Remove file',
+            'aiscan-create-new-supplier-confirm': 'Supplier not found. Do you want AiScan to create a new supplier with the extracted data?',
+            'aiscan-create-or-update-invoice': 'Create / update invoice',
+            'aiscan-delete-line': 'Delete line',
+            'aiscan-document': 'Document',
+            'aiscan-document-and-image-drop': 'Drop a PDF or image here',
+            'aiscan-document-preview': 'Invoice preview',
+            'aiscan-document-type': 'Document type',
+            'aiscan-drag-to-resize': 'Drag to resize',
+            'aiscan-drop-or-click': 'or click to select a file',
+            'aiscan-file-uploaded-select-provider': 'File uploaded. Select a provider and click Analyze.',
+            'aiscan-initial-review-message': 'Upload a document and analyze it to review supplier, invoice and line data.',
+            'aiscan-invoice-saved-successfully': 'Invoice saved successfully.',
+            'aiscan-line-items': 'Line items',
+            'aiscan-loading-provider': 'Loading...',
+            'aiscan-matched-with': 'Matched with: %name%',
+            'aiscan-no-results': 'No results',
+            'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
+            'aiscan-provider-gemini': 'Google Gemini',
+            'aiscan-provider-label-browser-prompt': 'Browser AI',
+            'aiscan-provider-mistral': 'Mistral',
+            'aiscan-provider-openai': 'OpenAI',
+            'aiscan-provider-openai-compatible': 'OpenAI compatible',
+            'aiscan-review-extracted-data': 'Review extracted data',
+            'aiscan-saving-invoice': 'Saving purchase invoice...',
+            'aiscan-scanned-supplier-invoice': 'Scanned supplier invoice',
+            'aiscan-selected-supplier': 'Selected: %name% (%taxId%)',
+            'aiscan-supplier-ambiguous': 'Multiple supplier matches found. Select the correct supplier.',
+            'aiscan-supplier-created-on-save': 'A new supplier will be created when you save the invoice.',
+            'aiscan-supplier-not-found-on-save': 'No supplier match found. You can create one during save.',
+            'aiscan-uploading-file': 'Uploading file...',
+            'aiscan-use-cloud-provider-for-image': 'Browser AI cannot analyze images. Please select a cloud provider (OpenAI, Gemini, etc.).',
+            'aiscan-use-cloud-provider-for-pdf': 'Could not extract text from this PDF. Please select a cloud provider for analysis.',
+            'aiscan-validation-warnings': 'Warnings',
+            'confidence': 'Confidence',
+            'scan-invoice': 'Scan Invoice',
+        },
+        es: {
+            'aiscan-analyze': 'Analizar',
+            'aiscan-analysis-completed': 'Analisis completado (%provider%).',
+            'aiscan-analysis-started': 'Analizando factura con %provider%...',
+            'aiscan-analyzing-browser-ai': 'Analizando con Browser AI (esto puede tardar un momento)...',
+            'aiscan-browser-ai-error': 'Error de Browser AI: %message%',
+            'aiscan-browser-prompt-not-available': 'La API Browser Prompt no esta disponible en este navegador.',
+            'aiscan-clear-file': 'Quitar archivo',
+            'aiscan-create-new-supplier-confirm': 'No se ha encontrado el proveedor. Quieres que AiScan cree uno nuevo con los datos extraidos?',
+            'aiscan-create-or-update-invoice': 'Crear / actualizar factura',
+            'aiscan-delete-line': 'Eliminar linea',
+            'aiscan-document': 'Documento',
+            'aiscan-document-and-image-drop': 'Suelta aqui un PDF o una imagen',
+            'aiscan-document-preview': 'Vista previa de la factura',
+            'aiscan-document-type': 'Tipo de documento',
+            'aiscan-drag-to-resize': 'Arrastra para redimensionar',
+            'aiscan-drop-or-click': 'o haz clic para seleccionar un archivo',
+            'aiscan-file-uploaded-select-provider': 'Archivo subido. Selecciona un proveedor y pulsa Analizar.',
+            'aiscan-initial-review-message': 'Sube un documento y analizalo para revisar proveedor, factura y lineas.',
+            'aiscan-invoice-saved-successfully': 'Factura guardada correctamente.',
+            'aiscan-line-items': 'Lineas',
+            'aiscan-loading-provider': 'Cargando...',
+            'aiscan-matched-with': 'Coincide con: %name%',
+            'aiscan-no-results': 'Sin resultados',
+            'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
+            'aiscan-provider-gemini': 'Google Gemini',
+            'aiscan-provider-label-browser-prompt': 'Browser AI',
+            'aiscan-provider-mistral': 'Mistral',
+            'aiscan-provider-openai': 'OpenAI',
+            'aiscan-provider-openai-compatible': 'OpenAI compatible',
+            'aiscan-review-extracted-data': 'Revisar datos extraidos',
+            'aiscan-saving-invoice': 'Guardando factura de proveedor...',
+            'aiscan-scanned-supplier-invoice': 'Factura de proveedor escaneada',
+            'aiscan-selected-supplier': 'Seleccionado: %name% (%taxId%)',
+            'aiscan-supplier-ambiguous': 'Se han encontrado varios proveedores coincidentes. Selecciona el correcto.',
+            'aiscan-supplier-created-on-save': 'Se creara un nuevo proveedor al guardar la factura.',
+            'aiscan-supplier-not-found-on-save': 'No se ha encontrado coincidencia de proveedor. Puedes crear uno al guardar.',
+            'aiscan-uploading-file': 'Subiendo archivo...',
+            'aiscan-use-cloud-provider-for-image': 'Browser AI no puede analizar imagenes. Selecciona un proveedor en la nube (OpenAI, Gemini, etc.).',
+            'aiscan-use-cloud-provider-for-pdf': 'No se pudo extraer texto de este PDF. Selecciona un proveedor en la nube para analizarlo.',
+            'aiscan-validation-warnings': 'Avisos',
+            'confidence': 'Confianza',
+            'scan-invoice': 'Escanear Factura',
+        },
+    };
+
+    function currentLang() {
+        const lang = (
+            document.documentElement.lang ||
+            document.body?.getAttribute('lang') ||
+            navigator.language ||
+            'en'
+        ).toLowerCase();
+
+        return lang.startsWith('es') ? 'es' : 'en';
+    }
+
     function trans(key, replacements = {}) {
         let value = key;
 
         if (window.i18n && typeof window.i18n.trans === 'function') {
             value = window.i18n.trans(key);
+        }
+
+        if (value === key) {
+            value = FALLBACK_TRANSLATIONS[currentLang()][key] || key;
         }
 
         value = typeof value === 'string' ? value : String(value);

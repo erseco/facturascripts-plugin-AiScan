@@ -21,6 +21,7 @@
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
 use FacturaScripts\Core\Lib\ExtendedController\PanelController;
+use FacturaScripts\Core\Tools;
 
 class AiScanConfig extends PanelController
 {
@@ -42,6 +43,17 @@ class AiScanConfig extends PanelController
     {
         $this->addEditView($viewName, 'Settings', 'aiscan-settings', 'fa-solid fa-gear');
         $this->views[$viewName]->disableColumn('name', false, false);
+
+        $defaultProvider = $this->views[$viewName]->columnForName('default-provider');
+        if ($defaultProvider) {
+            $defaultProvider->widget->setValuesFromArray([
+                ['value' => 'openai', 'title' => Tools::lang()->trans('aiscan-provider-openai')],
+                ['value' => 'gemini', 'title' => Tools::lang()->trans('aiscan-provider-gemini')],
+                ['value' => 'mistral', 'title' => Tools::lang()->trans('aiscan-provider-mistral')],
+                ['value' => 'openai-compatible', 'title' => Tools::lang()->trans('aiscan-provider-openai-compatible')],
+                ['value' => 'browser-prompt', 'title' => Tools::lang()->trans('aiscan-provider-browser-prompt')],
+            ], false, false);
+        }
     }
 
     protected function loadData($viewName, $view)
