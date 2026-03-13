@@ -255,12 +255,19 @@ const AiScan = (() => {
         div.className = 'mb-2';
 
         const badge = document.createElement('span');
-        badge.className = 'badge badge-' + (status === 'matched' ? 'success' : status === 'ambiguous' ? 'warning' : 'secondary');
-        badge.textContent = status === 'matched'
-            ? '✓ Matched: ' + (supplier.matched_name || '')
-            : status === 'ambiguous'
-                ? '⚠ Multiple matches found'
-                : '✗ Not found in system';
+        let badgeColor, badgeText;
+        if (status === 'matched') {
+            badgeColor = 'success';
+            badgeText = '✓ Matched: ' + (supplier.matched_name || '');
+        } else if (status === 'ambiguous') {
+            badgeColor = 'warning';
+            badgeText = '⚠ Multiple matches found';
+        } else {
+            badgeColor = 'secondary';
+            badgeText = '✗ Not found in system';
+        }
+        badge.className = 'badge badge-' + badgeColor;
+        badge.textContent = badgeText;
         div.appendChild(badge);
 
         if (status === 'ambiguous' && supplier.candidates) {

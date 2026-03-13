@@ -27,7 +27,7 @@ class AiScanConfig extends PanelController
     protected function createViewsConfig(string $viewName = 'AiScanConfig'): void
     {
         $this->addEditView($viewName, 'Settings', 'aiscan-settings', 'fa-solid fa-gear');
-        $this->views[$viewName]->disableColumn('name', false, 'false');
+        $this->views[$viewName]->disableColumn('name', false, false);
     }
 
     protected function loadData(string $viewName, $view): void
