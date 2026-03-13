@@ -20,19 +20,23 @@
 namespace FacturaScripts\Plugins\AiScan\Extension\Controller;
 
 use Closure;
+use FacturaScripts\Dinamic\Lib\AssetManager;
+use FacturaScripts\Core\Tools;
 
 class EditFacturaProveedor
 {
     public function createViews(): Closure
     {
         return function () {
+            $route = Tools::config('route');
+            AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
+            AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan.js');
             $this->addButton('EditFacturaProveedor', [
                 'action' => 'aiscan',
                 'color' => 'info',
                 'icon' => 'fa-solid fa-file-invoice',
                 'label' => 'scan-invoice',
                 'type' => 'modal',
-                'target' => 'modal-aiscan',
             ]);
         };
     }

@@ -1,57 +1,41 @@
-# Quick Start Guide
+# Quick Start
 
 ## 1. Start FacturaScripts
 
 ```bash
-make up
+make upd
 ```
 
-Wait for the containers to start (about 30 seconds).
+## 2. Open the app
 
-## 2. Access FacturaScripts
+Go to `http://localhost:8080` and log in with:
 
-Open your browser and go to:
-```
-http://localhost:8080
-```
-
-Login with:
 - **Username:** `admin`
 - **Password:** `admin`
 
-## 3. Enable the Plugin
+## 3. Enable AiScan
 
-Go to **Admin Panel → Plugins** and enable **PluginTemplate**.
+Enable the plugin from **Admin Panel → Plugins**.
 
-Or run:
-```bash
-make enable-plugin
-```
+## 4. Configure an AI provider
 
-## 4. Access the Example Pages
+Open **AiScan Configuration** and set at least one provider credential:
 
-After enabling the plugin, you'll see new menu items:
+- OpenAI
+- Google Gemini
+- Mistral
+- OpenAI-compatible endpoint
 
-- **Example Controller** - A basic controller example
-- **Example Models** - A list view with CRUD operations
+## 5. Scan a supplier invoice
 
-## 5. Make Changes
+1. Open a purchase invoice.
+2. Click **Scan Invoice**.
+3. Upload a PDF or image invoice.
+4. Review the extracted data.
+5. Save the purchase invoice and attached source file.
 
-Edit any file in the plugin directory. Changes are reflected immediately.
-
-After changing models or controllers, rebuild:
-```bash
-make rebuild
-```
-
-## 6. Stop FacturaScripts
+## 6. Stop the environment
 
 ```bash
 make down
 ```
-
-## Need Help?
-
-Run `make help` to see all available commands.
-
-Check the full [README.md](README.md) for detailed documentation.

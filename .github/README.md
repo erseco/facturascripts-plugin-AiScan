@@ -82,16 +82,16 @@ make up
 
 ## Customizing for Your Plugin
 
-When you rename your plugin from `PluginTemplate` to your actual plugin name, update these files:
+When you rename your plugin from the template name to your actual plugin name, update these files:
 
 1. **`.github/workflows/ci.yml`**
-   - Line 55-56: Change `PluginTemplate` to your plugin name
+   - Line 55-56: Change the template plugin name to your plugin name
 
 2. **`.github/workflows/release.yml`**
-   - Line 31 and 53: Change `PluginTemplate` to your plugin name
+   - Line 31 and 53: Change the template plugin name to your plugin name
 
 3. **`Test/main/install-plugins.txt`**
-   - Change `PluginTemplate` to your plugin name
+   - Change the template plugin name to your plugin name
 
 ## Troubleshooting
 

@@ -19,13 +19,20 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
+use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Model\Divisa;
 use FacturaScripts\Core\Model\FacturaProveedor;
-use FacturaScripts\Core\Model\LineaFacturaProveedor;
 use FacturaScripts\Core\Model\Proveedor;
 
 class InvoiceMapper
 {
+    public function __construct(
+        private readonly AttachmentService $attachmentService = new AttachmentService(),
+        private readonly ProductMatcher $productMatcher = new ProductMatcher(),
+        private readonly SupplierService $supplierService = new SupplierService()
+    ) {
+    }
+
     public function mapToInvoice(array $extractedData, ?int $invoiceId = null): array
     {
         $result = ['success' => false, 'invoice_id' => null, 'errors' => []];
@@ -45,11 +52,12 @@ class InvoiceMapper
             $supplierData = $extractedData['supplier'] ?? [];
             $lines = $extractedData['lines'] ?? [];
 
-            if (!empty($supplierData['matched_supplier_id'])) {
-                $supplier = new Proveedor();
-                if ($supplier->loadFromCode($supplierData['matched_supplier_id'])) {
-                    $invoice->setSubject($supplier);
-                }
+            $supplier = $this->supplierService->resolve($supplierData);
+            if ($supplier instanceof Proveedor) {
+                $invoice->setSubject($supplier);
+            } elseif (empty($invoice->codproveedor)) {
+                $result['errors'][] = 'Supplier could not be matched or created';
+                return $result;
             }
 
             if (!empty($invoiceData['number'])) {
@@ -71,9 +79,7 @@ class InvoiceMapper
                 }
             }
 
-            if (!empty($invoiceData['notes'])) {
-                $invoice->observaciones = $invoiceData['notes'];
-            }
+            $invoice->observaciones = $this->buildNotes($invoiceData);
 
             if (!$invoice->save()) {
                 $result['errors'][] = 'Failed to save invoice';
@@ -86,24 +92,28 @@ class InvoiceMapper
                 }
             }
 
-            foreach ($lines as $lineData) {
-                $line = new LineaFacturaProveedor();
-                $line->idfactura = $invoice->idfactura;
-                $line->descripcion = $lineData['description'] ?? '';
-                $line->cantidad = (float) ($lineData['quantity'] ?? 1);
-                $line->pvpunitario = (float) ($lineData['unit_price'] ?? 0);
+            $invoiceLines = [];
+            foreach ($this->prepareLines($lines, $invoiceData) as $lineData) {
+                $reference = $this->productMatcher->findReference($lineData);
+                $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+                $line->descripcion = trim((string) ($lineData['description'] ?? $line->descripcion));
+                $line->cantidad = max(0.00001, (float) ($lineData['quantity'] ?? 1));
+                $line->pvpunitario = (float) ($lineData['unit_price'] ?? $line->pvpunitario);
                 $line->dtopor = (float) ($lineData['discount'] ?? 0);
 
                 if (!empty($lineData['tax_rate'])) {
                     $line->iva = (float) $lineData['tax_rate'];
                 }
 
-                if (!$line->save()) {
-                    $result['errors'][] = 'Failed to save line: ' . $line->descripcion;
-                }
+                $invoiceLines[] = $line;
             }
 
-            $invoice->updateAmounts();
+            if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
+                $result['errors'][] = 'Failed to calculate invoice lines';
+                return $result;
+            }
+
+            $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
 
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
@@ -112,5 +122,37 @@ class InvoiceMapper
         }
 
         return $result;
+    }
+
+    private function buildNotes(array $invoiceData): string
+    {
+        $parts = [];
+        foreach (['summary', 'notes'] as $field) {
+            $value = trim((string) ($invoiceData[$field] ?? ''));
+            if (!empty($value)) {
+                $parts[] = $value;
+            }
+        }
+
+        return implode("\n\n", array_unique($parts));
+    }
+
+    private function prepareLines(array $lines, array $invoiceData): array
+    {
+        if (!empty($lines)) {
+            return $lines;
+        }
+
+        $subtotal = (float) ($invoiceData['subtotal'] ?? $invoiceData['total'] ?? 0);
+        $taxAmount = (float) ($invoiceData['tax_amount'] ?? 0);
+        $taxRate = $subtotal > 0 && $taxAmount > 0 ? round(($taxAmount / $subtotal) * 100, 2) : 0.0;
+
+        return [[
+            'description' => trim((string) ($invoiceData['summary'] ?? 'Scanned supplier invoice')),
+            'quantity' => 1,
+            'unit_price' => $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0),
+            'discount' => 0,
+            'tax_rate' => $taxRate,
+        ]];
     }
 }

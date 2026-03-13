@@ -64,15 +64,30 @@ class AiScanInvoice extends Controller
         try {
             switch ($action) {
                 case 'upload':
+                    if (false === $this->validateFormToken()) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Invalid request token']);
+                        break;
+                    }
                     $this->handleUpload();
                     break;
                 case 'analyze':
+                    if (false === $this->validateFormToken()) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Invalid request token']);
+                        break;
+                    }
                     $this->handleAnalyze();
                     break;
                 case 'match-supplier':
                     $this->handleMatchSupplier();
                     break;
                 case 'apply':
+                    if (false === $this->validateFormToken()) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Invalid request token']);
+                        break;
+                    }
                     $this->handleApply();
                     break;
                 default:
@@ -115,14 +130,14 @@ class AiScanInvoice extends Controller
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mimeType = $finfo->file($file['tmp_name']);
 
-        if (!in_array($mimeType, self::ALLOWED_MIME_TYPES)) {
+        if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
             http_response_code(415);
             echo json_encode(['error' => 'Unsupported file type: ' . $mimeType]);
             return;
         }
 
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($extension, self::ALLOWED_EXTENSIONS)) {
+        if (!in_array($extension, AiScanSettings::getAllowedExtensions(), true)) {
             http_response_code(415);
             echo json_encode(['error' => 'Unsupported file extension: ' . $extension]);
             return;
@@ -130,10 +145,13 @@ class AiScanInvoice extends Controller
 
         $tmpDir = FS_FOLDER . '/MyFiles/aiscan_tmp';
         if (!is_dir($tmpDir)) {
-            mkdir($tmpDir, 0755, true);
+            mkdir($tmpDir, 0700, true);
         }
 
-        $tmpFilename = uniqid('aiscan_') . '.' . $extension;
+        $safeBaseName = preg_replace('/[^a-zA-Z0-9_-]/', '-', pathinfo($file['name'], PATHINFO_FILENAME));
+        $safeBaseName = trim((string) $safeBaseName, '-');
+        $safeBaseName = substr($safeBaseName ?: 'invoice', 0, 40);
+        $tmpFilename = 'aiscan_' . $safeBaseName . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
         $tmpPath = $tmpDir . '/' . $tmpFilename;
 
         if (!move_uploaded_file($file['tmp_name'], $tmpPath)) {
@@ -145,10 +163,11 @@ class AiScanInvoice extends Controller
         echo json_encode([
             'success' => true,
             'tmp_file' => $tmpFilename,
-            'original_name' => $file['name'],
+            'original_name' => basename((string) $file['name']),
             'mime_type' => $mimeType,
             'size' => $file['size'],
             'auto_scan' => AiScanSettings::isAutoScanEnabled(),
+            'provider' => AiScanSettings::getDefaultProvider(),
         ]);
     }
 

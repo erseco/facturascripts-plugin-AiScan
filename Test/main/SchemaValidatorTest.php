@@ -35,6 +35,7 @@ final class SchemaValidatorTest extends TestCase
     {
         $errors = $this->validator->validate([]);
         $this->assertContains('Missing invoice section', $errors);
+        $this->assertContains('Missing top-level field: supplier', $errors);
     }
 
     public function testValidateReturnsMissingRequiredFieldErrors(): void
@@ -86,8 +87,29 @@ final class SchemaValidatorTest extends TestCase
         $data = $this->validator->normalize([
             'invoice' => [
                 'total' => '1.234,56',
+                'currency' => 'eur',
             ],
         ]);
         $this->assertEqualsWithDelta(1234.56, $data['invoice']['total'], 0.01);
+        $this->assertSame('EUR', $data['invoice']['currency']);
+    }
+
+    public function testValidateDetectsInvalidCurrencyAndLineDescription(): void
+    {
+        $errors = $this->validator->validate([
+            'supplier' => [],
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2025-01-01',
+                'currency' => 'EURO',
+                'total' => 10,
+            ],
+            'taxes' => [],
+            'lines' => [[]],
+            'meta' => [],
+        ]);
+
+        $this->assertContains('Currency must be a 3-letter ISO code', $errors);
+        $this->assertContains('Missing line description at index 0', $errors);
     }
 }

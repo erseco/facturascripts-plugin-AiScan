@@ -19,7 +19,9 @@
 
 namespace FacturaScripts\Plugins\AiScan;
 
+use FacturaScripts\Dinamic\Model\Settings;
 use FacturaScripts\Core\Template\InitClass;
+use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 
 class Init extends InitClass
 {
@@ -30,6 +32,24 @@ class Init extends InitClass
 
     public function update(): void
     {
+        $settings = new Settings();
+        $settings->loadFromCode('AiScan');
+        $settings->name = 'AiScan';
+
+        if (false === $settings->exists()) {
+            foreach (AiScanSettings::getDefaults() as $key => $value) {
+                $settings->$key = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+            }
+            $settings->save();
+            return;
+        }
+
+        foreach (AiScanSettings::getDefaults() as $key => $value) {
+            if (null === $settings->getProperty($key)) {
+                $settings->$key = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+            }
+        }
+        $settings->save();
     }
 
     public function uninstall(): void

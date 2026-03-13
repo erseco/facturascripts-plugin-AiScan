@@ -23,9 +23,24 @@ use FacturaScripts\Core\Tools;
 
 class AiScanSettings
 {
+    private const DEFAULTS = [
+        'enabled' => true,
+        'default_provider' => 'openai',
+        'max_upload_size_mb' => 10,
+        'allowed_extensions' => 'pdf,jpg,jpeg,png,webp',
+        'auto_scan' => false,
+        'debug_mode' => false,
+        'request_timeout' => 120,
+        'openai_model' => 'gpt-4o-mini',
+        'gemini_model' => 'gemini-1.5-flash',
+        'mistral_model' => 'mistral-small-latest',
+        'browser_prompt_enabled' => false,
+    ];
+
     public static function get(string $key, mixed $default = null): mixed
     {
-        return Tools::settings('AiScan', $key, $default);
+        $fallback = $default ?? self::DEFAULTS[$key] ?? null;
+        return Tools::settings('AiScan', $key, $fallback);
     }
 
     public static function isEnabled(): bool
@@ -57,5 +72,15 @@ class AiScanSettings
     public static function isDebugMode(): bool
     {
         return (bool) self::get('debug_mode', false);
+    }
+
+    public static function getRequestTimeout(): int
+    {
+        return max(10, (int) self::get('request_timeout', 120));
+    }
+
+    public static function getDefaults(): array
+    {
+        return self::DEFAULTS;
     }
 }

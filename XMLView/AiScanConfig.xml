@@ -1,8 +1,80 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <view>
-    <group name="general" valign="top">
-        <column name="enabled" numcolumns="3">
-            <widget type="checkbox" fieldname="value" onclick="" />
-        </column>
-    </group>
+    <columns>
+        <group name="general" title="general" icon="fa-solid fa-robot" numcolumns="12" valign="bottom">
+            <column name="name" display="none" order="0">
+                <widget type="text" fieldname="name" readonly="true" required="true"/>
+            </column>
+            <column name="enabled" order="100">
+                <widget type="checkbox" fieldname="enabled"/>
+            </column>
+            <column name="default-provider" numcolumns="4" order="110">
+                <widget type="select" fieldname="default_provider" required="true">
+                    <values title="OpenAI">openai</values>
+                    <values title="Google Gemini">gemini</values>
+                    <values title="Mistral">mistral</values>
+                    <values title="OpenAI compatible">openai-compatible</values>
+                    <values title="Browser Prompt API (experimental)">browser-prompt</values>
+                </widget>
+            </column>
+            <column name="max-upload-size-mb" numcolumns="2" order="120">
+                <widget type="number" fieldname="max_upload_size_mb" min="1" max="50" decimal="0" step="1" required="true"/>
+            </column>
+            <column name="request-timeout" numcolumns="2" order="130">
+                <widget type="number" fieldname="request_timeout" min="10" max="300" decimal="0" step="1" required="true"/>
+            </column>
+            <column name="allowed-extensions" numcolumns="4" order="140">
+                <widget type="text" fieldname="allowed_extensions"/>
+            </column>
+            <column name="auto-scan" order="150">
+                <widget type="checkbox" fieldname="auto_scan"/>
+            </column>
+            <column name="debug-mode" order="160">
+                <widget type="checkbox" fieldname="debug_mode"/>
+            </column>
+        </group>
+        <group name="openai" title="OpenAI" icon="fa-solid fa-circle-nodes" numcolumns="12">
+            <column name="openai-api-key" numcolumns="4" order="100">
+                <widget type="password" fieldname="openai_api_key"/>
+            </column>
+            <column name="openai-model" numcolumns="4" order="110">
+                <widget type="text" fieldname="openai_model"/>
+            </column>
+            <column name="openai-base-url" numcolumns="4" order="120">
+                <widget type="text" fieldname="openai_base_url"/>
+            </column>
+        </group>
+        <group name="gemini" title="Google Gemini" icon="fa-solid fa-wand-magic-sparkles" numcolumns="12">
+            <column name="gemini-api-key" numcolumns="6" order="100">
+                <widget type="password" fieldname="gemini_api_key"/>
+            </column>
+            <column name="gemini-model" numcolumns="6" order="110">
+                <widget type="text" fieldname="gemini_model"/>
+            </column>
+        </group>
+        <group name="mistral" title="Mistral" icon="fa-solid fa-wind" numcolumns="12">
+            <column name="mistral-api-key" numcolumns="6" order="100">
+                <widget type="password" fieldname="mistral_api_key"/>
+            </column>
+            <column name="mistral-model" numcolumns="6" order="110">
+                <widget type="text" fieldname="mistral_model"/>
+            </column>
+        </group>
+        <group name="compatible" title="OpenAI compatible" icon="fa-solid fa-plug" numcolumns="12">
+            <column name="custom-api-key" numcolumns="4" order="100">
+                <widget type="password" fieldname="custom_api_key"/>
+            </column>
+            <column name="custom-model" numcolumns="4" order="110">
+                <widget type="text" fieldname="custom_model"/>
+            </column>
+            <column name="custom-base-url" numcolumns="4" order="120">
+                <widget type="text" fieldname="custom_base_url"/>
+            </column>
+        </group>
+        <group name="experimental" title="experimental" icon="fa-solid fa-flask" numcolumns="12">
+            <column name="browser-prompt-enabled" order="100">
+                <widget type="checkbox" fieldname="browser_prompt_enabled"/>
+            </column>
+        </group>
+    </columns>
 </view>
