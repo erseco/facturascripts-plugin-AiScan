@@ -2,7 +2,7 @@
 
 /**
  * This file is part of AiScan plugin for FacturaScripts.
- * Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
+ * Copyright (C) 2026 Ernesto Serrano <info@ernesto.es>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as

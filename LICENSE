@@ -1,7 +1,7 @@
                    GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
- Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
@@ -36,38 +36,53 @@ based on the Application, and not on the Linked Version.
 
   The "Corresponding Application Code" for a Combined Work means the
 object code and/or source code for the Application, including any data
-and utilities needed for reproducing the Combined Work from the
+and utility programs needed for reproducing the Combined Work from the
 Application, but excluding the System Libraries of the Combined Work.
 
   1. Exception to Section 3 of the GNU GPL.
 
-  You may convey a covered work under the terms of sections 1 and 2
-of this License without being bound by section 3 of the GNU GPL.
+  You may convey a covered work under sections 3 and 4 of this License
+without being bound by section 3 of the GNU GPL.
 
-  2. Conveying Verbatim Copies.
+  2. Conveying Modified Versions.
 
-  You may convey verbatim copies of the Library's source code as you
-receive it, in any medium, provided that you conspicuously and
-appropriately publish on each copy an appropriate copyright notice and
-disclaimer of warranty; keep intact all the notices that refer to this
-License and to the absence of any warranty; and distribute a copy of
-this License along with the Library.
+  If you modify a copy of the Library, and, in your modifications, a
+facility refers to a function or data to be supplied by an Application
+that uses the facility (other than as an argument passed when the
+facility is invoked), then you may convey a copy of the modified
+version:
 
-  You may charge any price or no price for each copy, and you may offer
-support or warranty protection for a fee.
+   a) under this License, provided that you make a good faith effort to
+   ensure that, in the event an Application does not supply the
+   function or data, the facility still operates, and performs
+   whatever part of its purpose remains meaningful, or
 
-  3. Conveying Modified Versions.
+   b) under the GNU GPL, with none of the additional permissions of
+   this License applicable to that copy.
 
-  You may convey a copy of the Library under the terms of section 2
-above, and you may also convey a "work based on the Library" under the
-terms of section 4 below.
+  3. Object Code Incorporating Material from Library Header Files.
+
+  The object code form of an Application may incorporate material from
+a header file that is part of the Library.  You may convey such object
+code under terms of your choice, provided that, if the incorporated
+material is not limited to numerical parameters, data structure
+layouts and accessors, or small macros, inline functions and templates
+(ten or fewer lines in length), you do both of the following:
+
+   a) Give prominent notice with each copy of the object code that the
+   Library is used in it and that the Library and its use are
+   covered by this License.
+
+   b) Accompany the object code with a copy of the GNU GPL and this license
+   document.
 
   4. Combined Works.
 
   You may convey a Combined Work under terms of your choice that,
-taken together, effectively do not restrict modification of the portions
-of the Library contained in the Combined Work and reverse engineering
-for debugging such modifications, if you also do each of the following:
+taken together, effectively do not restrict modification of the
+portions of the Library contained in the Combined Work and reverse
+engineering for debugging such modifications, if you also do each of
+the following:
 
    a) Give prominent notice with each copy of the Combined Work that
    the Library is used in it and that the Library and its use are
@@ -98,9 +113,9 @@ for debugging such modifications, if you also do each of the following:
        of the Library that is interface-compatible with the Linked
        Version.
 
-   e) Provide Installation Information, but only if you are otherwise
-   required to provide such information under section 6 of the GNU
-   GPL, and only to the extent that such information is
+   e) Provide Installation Information, but only if you would otherwise
+   be required to provide such information under section 6 of the
+   GNU GPL, and only to the extent that such information is
    necessary to install and execute a modified version of the
    Combined Work produced by recombining or relinking the
    Application with a modified version of the Linked Version. (If

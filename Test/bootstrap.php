@@ -2,6 +2,8 @@
 
 /**
  * This file is part of AiScan plugin for FacturaScripts.
+ * Copyright (C) 2026 Ernesto Serrano <info@ernesto.es>
+ *
  * PHPUnit bootstrap file for testing
  */
 
