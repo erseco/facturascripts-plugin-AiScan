@@ -21,6 +21,7 @@
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\Proveedor;
@@ -42,7 +43,10 @@ class InvoiceMapper
             if ($invoiceId) {
                 $invoice = new FacturaProveedor();
                 if (!$invoice->loadFromCode($invoiceId)) {
-                    $result['errors'][] = 'Invoice not found: ' . $invoiceId;
+                    $result['errors'][] = Tools::lang()->trans(
+                        'aiscan-invoice-not-found',
+                        ['%invoiceId%' => (string) $invoiceId]
+                    );
                     return $result;
                 }
             } else {
@@ -57,7 +61,7 @@ class InvoiceMapper
             if ($supplier instanceof Proveedor) {
                 $invoice->setSubject($supplier);
             } elseif (empty($invoice->codproveedor)) {
-                $result['errors'][] = 'Supplier could not be matched or created';
+                $result['errors'][] = Tools::lang()->trans('aiscan-supplier-not-matched-or-created');
                 return $result;
             }
 
@@ -87,7 +91,7 @@ class InvoiceMapper
             $invoice->observaciones = $this->buildNotes($invoiceData);
 
             if (!$invoice->save()) {
-                $result['errors'][] = 'Failed to save invoice';
+                $result['errors'][] = Tools::lang()->trans('record-save-error');
                 return $result;
             }
 
@@ -114,7 +118,7 @@ class InvoiceMapper
             }
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
-                $result['errors'][] = 'Failed to calculate invoice lines';
+                $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
                 return $result;
             }
 
@@ -153,7 +157,9 @@ class InvoiceMapper
         $taxRate = $subtotal > 0 && $taxAmount > 0 ? round(($taxAmount / $subtotal) * 100, 2) : 0.0;
 
         return [[
-            'description' => trim((string) ($invoiceData['summary'] ?? 'Scanned supplier invoice')),
+            'description' => trim((string) (
+                $invoiceData['summary'] ?? Tools::lang()->trans('aiscan-scanned-supplier-invoice')
+            )),
             'quantity' => 1,
             'unit_price' => $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0),
             'discount' => 0,

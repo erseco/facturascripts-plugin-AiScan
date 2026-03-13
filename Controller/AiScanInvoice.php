@@ -54,7 +54,7 @@ class AiScanInvoice extends Controller
 
         if (!$this->permissions->allowUpdate) {
             http_response_code(403);
-            echo json_encode(['error' => 'Permission denied']);
+            echo json_encode(['error' => Tools::lang()->trans('permission-denied')]);
             return;
         }
 
@@ -84,7 +84,9 @@ class AiScanInvoice extends Controller
                     break;
                 default:
                     http_response_code(400);
-                    echo json_encode(['error' => 'Unknown action']);
+                    echo json_encode([
+                        'error' => Tools::lang()->trans('aiscan-unknown-action', ['%action%' => (string) $action]),
+                    ]);
             }
         } catch (\Exception $e) {
             http_response_code(500);
@@ -98,7 +100,7 @@ class AiScanInvoice extends Controller
     {
         if (!isset($_FILES['invoice_file'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'No file uploaded']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-no-file-uploaded')]);
             return;
         }
 
@@ -106,7 +108,9 @@ class AiScanInvoice extends Controller
 
         if ($file['error'] !== UPLOAD_ERR_OK) {
             http_response_code(400);
-            echo json_encode(['error' => 'Upload error: ' . $file['error']]);
+            echo json_encode([
+                'error' => Tools::lang()->trans('aiscan-upload-error', ['%code%' => (string) $file['error']]),
+            ]);
             return;
         }
 
@@ -114,7 +118,10 @@ class AiScanInvoice extends Controller
         if ($file['size'] > $maxSizeBytes) {
             http_response_code(413);
             echo json_encode([
-                'error' => 'File too large. Maximum size: ' . AiScanSettings::getMaxUploadSizeMb() . 'MB',
+                'error' => Tools::lang()->trans(
+                    'aiscan-file-too-large',
+                    ['%size%' => (string) AiScanSettings::getMaxUploadSizeMb()]
+                ),
             ]);
             return;
         }
@@ -124,14 +131,18 @@ class AiScanInvoice extends Controller
 
         if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
             http_response_code(415);
-            echo json_encode(['error' => 'Unsupported file type: ' . $mimeType]);
+            echo json_encode([
+                'error' => Tools::lang()->trans('aiscan-unsupported-file-type', ['%mimeType%' => (string) $mimeType]),
+            ]);
             return;
         }
 
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if (!in_array($extension, AiScanSettings::getAllowedExtensions(), true)) {
             http_response_code(415);
-            echo json_encode(['error' => 'Unsupported file extension: ' . $extension]);
+            echo json_encode([
+                'error' => Tools::lang()->trans('aiscan-unsupported-file-extension', ['%extension%' => $extension]),
+            ]);
             return;
         }
 
@@ -146,7 +157,7 @@ class AiScanInvoice extends Controller
 
         if (!move_uploaded_file($file['tmp_name'], $tmpPath)) {
             http_response_code(500);
-            echo json_encode(['error' => 'Failed to store uploaded file']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-failed-to-store-uploaded-file')]);
             return;
         }
 
@@ -178,7 +189,7 @@ class AiScanInvoice extends Controller
 
         if (empty($tmpFile)) {
             http_response_code(400);
-            echo json_encode(['error' => 'No file specified']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-no-file-specified')]);
             return;
         }
 
@@ -186,20 +197,20 @@ class AiScanInvoice extends Controller
         // Validate filename: only allow alphanumeric, underscore, hyphen, and dot
         if (!preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/', $tmpFile)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid file name']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-file-name')]);
             return;
         }
         $tmpPath = FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile;
 
         if (!file_exists($tmpPath)) {
             http_response_code(404);
-            echo json_encode(['error' => 'Temporary file not found']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-temporary-file-not-found')]);
             return;
         }
 
         if (!AiScanSettings::isEnabled()) {
             http_response_code(503);
-            echo json_encode(['error' => 'AiScan plugin is disabled']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-plugin-disabled')]);
             return;
         }
 
@@ -293,21 +304,21 @@ class AiScanInvoice extends Controller
 
         if (empty($tmpFile)) {
             http_response_code(400);
-            echo json_encode(['error' => 'No file specified']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-no-file-specified')]);
             return;
         }
 
         $tmpFile = basename($tmpFile);
         if (!preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/', $tmpFile)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid file name']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-file-name')]);
             return;
         }
         $tmpPath = FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile;
 
         if (!file_exists($tmpPath)) {
             http_response_code(404);
-            echo json_encode(['error' => 'Temporary file not found']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-temporary-file-not-found')]);
             return;
         }
 
@@ -317,7 +328,7 @@ class AiScanInvoice extends Controller
         if ($extension === 'pdf') {
             $text = $this->extractPdfTextForBrowser($tmpPath);
         } else {
-            $text = '[Image file - text extraction requires an AI provider]';
+            $text = Tools::lang()->trans('aiscan-image-text-extraction-requires-provider');
         }
 
         echo json_encode(['success' => true, 'text' => $text]);
@@ -363,7 +374,7 @@ class AiScanInvoice extends Controller
 
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid JSON payload']);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-json-payload')]);
             return;
         }
 

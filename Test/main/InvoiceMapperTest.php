@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use PHPUnit\Framework\TestCase;
 
@@ -126,7 +127,7 @@ final class InvoiceMapperTest extends TestCase
     {
         $result = $this->callPrepareLines([], ['total' => 10]);
         $this->assertSame(
-            'Scanned supplier invoice',
+            Tools::lang()->trans('aiscan-scanned-supplier-invoice'),
             $result[0]['description']
         );
     }

@@ -21,6 +21,7 @@
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Session;
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Model\AttachedFile;
 use FacturaScripts\Dinamic\Model\AttachedFileRelation;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
@@ -58,7 +59,7 @@ class AttachmentService
         $relation->modelid = (int) $invoice->idfactura;
         $relation->modelcode = (string) $invoice->idfactura;
         $relation->nick = Session::get('user')?->nick ?? $invoice->nick;
-        $relation->observations = 'Scanned source invoice';
+        $relation->observations = Tools::lang()->trans('aiscan-scanned-source-invoice');
 
         if (false === $relation->save()) {
             $attachedFile->delete();
