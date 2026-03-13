@@ -148,13 +148,29 @@ PROMPT;
 
     private function extractPdfText(string $filePath): string
     {
-        if (!is_executable('/usr/bin/pdftotext') && !shell_exec('which pdftotext 2>/dev/null')) {
+        // Check for pdftotext in known locations to avoid shell_exec for availability check
+        $pdftotextBin = null;
+        foreach (['/usr/bin/pdftotext', '/usr/local/bin/pdftotext'] as $candidate) {
+            if (is_executable($candidate)) {
+                $pdftotextBin = $candidate;
+                break;
+            }
+        }
+
+        if ($pdftotextBin === null) {
+            return '';
+        }
+
+        // Validate file is within expected temp directory to prevent path traversal
+        $realPath = realpath($filePath);
+        $expectedDir = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp');
+        if ($realPath === false || $expectedDir === false || strpos($realPath, $expectedDir) !== 0) {
             return '';
         }
 
         $output = [];
         $returnCode = 0;
-        exec('pdftotext ' . escapeshellarg($filePath) . ' - 2>/dev/null', $output, $returnCode);
+        exec($pdftotextBin . ' ' . escapeshellarg($realPath) . ' - 2>/dev/null', $output, $returnCode);
         if ($returnCode === 0 && !empty($output)) {
             return implode("\n", $output);
         }

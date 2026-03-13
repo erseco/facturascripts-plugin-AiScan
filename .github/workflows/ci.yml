@@ -47,7 +47,8 @@ jobs:
         run: |
           echo "📦 Copying plugin files to container..."
           docker compose exec -T facturascripts mkdir -p /var/www/html/Plugins/AiScan
-          docker cp . facturascripts-plugin-aiscan-facturascripts-1:/var/www/html/Plugins/AiScan/
+          CONTAINER_ID=$(docker compose ps -q facturascripts)
+          docker cp . "${CONTAINER_ID}":/var/www/html/Plugins/AiScan/
 
           echo "📋 Fixing permissions..."
           docker compose exec -T facturascripts chown -R nobody:nobody /var/www/html/Plugins/AiScan || true

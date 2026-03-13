@@ -10,6 +10,7 @@ use FacturaScripts\Core\Template\Controller;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
+use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 
 class AiScanInvoice extends Controller
@@ -57,6 +58,9 @@ class AiScanInvoice extends Controller
                     break;
                 case 'match-supplier':
                     $this->handleMatchSupplier();
+                    break;
+                case 'apply':
+                    $this->handleApply();
                     break;
                 default:
                     http_response_code(400);
@@ -147,6 +151,12 @@ class AiScanInvoice extends Controller
         }
 
         $tmpFile = basename($tmpFile);
+        // Validate filename: only allow alphanumeric, underscore, hyphen, and dot
+        if (!preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/', $tmpFile)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid file name']);
+            return;
+        }
         $tmpPath = FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile;
 
         if (!file_exists($tmpPath)) {
@@ -205,5 +215,31 @@ class AiScanInvoice extends Controller
         }
 
         echo json_encode($response);
+    }
+
+    private function handleApply(): void
+    {
+        $invoiceId = $this->request->get('invoice_id', '');
+        $invoiceId = $invoiceId !== '' ? (int) $invoiceId : null;
+
+        $body = file_get_contents('php://input');
+        $data = json_decode($body, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid JSON payload']);
+            return;
+        }
+
+        $mapper = new InvoiceMapper();
+        $result = $mapper->mapToInvoice($data, $invoiceId);
+
+        if (!$result['success']) {
+            http_response_code(422);
+            echo json_encode(['error' => implode('; ', $result['errors'])]);
+            return;
+        }
+
+        echo json_encode(['success' => true, 'invoice_id' => $result['invoice_id']]);
     }
 }

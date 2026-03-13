@@ -10,6 +10,9 @@ class SchemaValidator
 {
     private const REQUIRED_INVOICE_FIELDS = ['number', 'issue_date', 'total'];
 
+    // Regex to detect European number format (e.g. 1.234,56)
+    private const EUROPEAN_NUMBER_PATTERN = '/^\d{1,3}(\.\d{3})+(,\d+)?$/';
+
     public function validate(array $data): array
     {
         $errors = [];
@@ -110,7 +113,7 @@ class SchemaValidator
 
         $str = (string) $value;
         // Handle European format: 1.234,56 → 1234.56
-        if (preg_match('/^\d{1,3}(\.\d{3})+(,\d+)?$/', $str)) {
+        if (preg_match(self::EUROPEAN_NUMBER_PATTERN, $str)) {
             $str = str_replace('.', '', $str);
             $str = str_replace(',', '.', $str);
         } else {

@@ -11,6 +11,8 @@ use FacturaScripts\Core\Model\Proveedor;
 
 class SupplierMatcher
 {
+    // Legal form suffixes to strip for normalized name matching
+    private const LEGAL_FORM_PATTERN = '/\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\b/i';
     public function findMatch(array $supplierData): array
     {
         $result = [
@@ -59,7 +61,7 @@ class SupplierMatcher
 
     private function normalizeName(string $name): string
     {
-        $name = preg_replace('/\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\b/i', '', $name);
+        $name = preg_replace(self::LEGAL_FORM_PATTERN, '', $name);
         return trim($name);
     }
 }

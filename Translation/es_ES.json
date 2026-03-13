@@ -1,6 +1,6 @@
 {
     "aiscan-config": "Configuración AiScan",
-    "aiscan-filename-required": "El nombre de archivo es requerido",
+    "aiscan-filename-required": "El nombre de archivo es obligatorio",
     "aiscan-invoice": "Escanear Factura",
     "aiscan-settings": "Configuración AiScan",
     "scan-invoice": "Escanear Factura"
