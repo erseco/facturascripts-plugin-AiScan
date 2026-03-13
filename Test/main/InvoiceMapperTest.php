@@ -154,6 +154,28 @@ final class InvoiceMapperTest extends TestCase
         $this->assertEqualsWithDelta(0.0, $result[0]['unit_price'], 0.01);
     }
 
+    public function testValidateInvoiceDataRequiresWarehouseForNewInvoice(): void
+    {
+        $result = $this->callValidateInvoiceData([], null);
+
+        $this->assertSame([Tools::lang()->trans('aiscan-warehouse-required')], $result);
+    }
+
+    public function testValidateInvoiceDataAllowsWarehouseForNewInvoice(): void
+    {
+        $result = $this->callValidateInvoiceData(['warehouse_code' => '  MAIN  '], null);
+
+        $this->assertSame([], $result);
+        $this->assertSame('MAIN', $this->callGetWarehouseCode(['warehouse_code' => '  MAIN  ']));
+    }
+
+    public function testValidateInvoiceDataDoesNotRequireWarehouseForExistingInvoice(): void
+    {
+        $result = $this->callValidateInvoiceData([], 12);
+
+        $this->assertSame([], $result);
+    }
+
     // ── helpers ──────────────────────────────────────────────
 
     private function callBuildNotes(array $invoiceData): string
@@ -168,5 +190,19 @@ final class InvoiceMapperTest extends TestCase
         $method = new \ReflectionMethod(InvoiceMapper::class, 'prepareLines');
         $method->setAccessible(true);
         return $method->invoke($this->mapper, $lines, $invoiceData);
+    }
+
+    private function callValidateInvoiceData(array $invoiceData, ?int $invoiceId): array
+    {
+        $method = new \ReflectionMethod(InvoiceMapper::class, 'validateInvoiceData');
+        $method->setAccessible(true);
+        return $method->invoke($this->mapper, $invoiceData, $invoiceId);
+    }
+
+    private function callGetWarehouseCode(array $invoiceData): string
+    {
+        $method = new \ReflectionMethod(InvoiceMapper::class, 'getWarehouseCode');
+        $method->setAccessible(true);
+        return $method->invoke($this->mapper, $invoiceData);
     }
 }

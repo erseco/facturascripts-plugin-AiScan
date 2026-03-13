@@ -932,6 +932,7 @@
         const review = document.getElementById(selectors.review);
         const invoice = data.invoice || {};
         const supplier = data.supplier || {};
+        const requiresWarehouse = !flow.getSaveInvoiceId(getCurrentFileEntry());
         const taxes = Array.isArray(data.taxes) ? data.taxes : [];
         const lines = Array.isArray(data.lines) ? data.lines : [];
         const validationErrors = Array.isArray(data._validation_errors) ? data._validation_errors : [];
@@ -969,6 +970,15 @@
             ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
             ${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
             ${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date', null, confidence.due_date)}
+            ${requiresWarehouse ? buildInput(
+                trans('aiscan-warehouse'),
+                'invoice_warehouse_code',
+                invoice.warehouse_code || '',
+                'text',
+                null,
+                null,
+                true
+            ) : ''}
             ${buildInput(trans('currency'), 'invoice_currency', invoice.currency || 'EUR')}
             ${buildInput(trans('subtotal'), 'invoice_subtotal', invoice.subtotal ?? '', 'number', '0.01')}
             ${buildInput(trans('tax-amount'), 'invoice_tax_amount', invoice.tax_amount ?? '', 'number', '0.01')}
@@ -1005,12 +1015,12 @@
         return section;
     }
 
-    function buildInput(label, id, value, type = 'text', step = null, confidence = null) {
+    function buildInput(label, id, value, type = 'text', step = null, confidence = null, required = false) {
         const badge = confidence != null ? ` <span class="badge ${confidence >= 0.7 ? 'text-bg-success' : confidence >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}" title="${escapeAttribute(trans('confidence'))}">${Math.round(confidence * 100)}%</span>` : '';
         return `
             <div class="mb-2">
                 <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}${badge}</label>
-                <input class="form-control form-control-sm" id="${id}" type="${type}" ${step ? `step="${step}"` : ''} value="${escapeAttribute(value)}">
+                <input class="form-control form-control-sm" id="${id}" type="${type}" ${step ? `step="${step}"` : ''} ${required ? 'required aria-required="true"' : ''} value="${escapeAttribute(value)}">
             </div>
         `;
     }
@@ -1213,6 +1223,7 @@
         data.invoice.issue_date = readValue('invoice_issue_date');
         data.invoice.due_date = readValue('invoice_due_date');
         data.invoice.currency = readValue('invoice_currency');
+        data.invoice.warehouse_code = readValue('invoice_warehouse_code').trim();
         data.invoice.subtotal = parseFloat(readValue('invoice_subtotal') || 0);
         data.invoice.tax_amount = parseFloat(readValue('invoice_tax_amount') || 0);
         data.invoice.total = parseFloat(readValue('invoice_total') || 0);
@@ -1275,6 +1286,11 @@
 
         const data = collectFormData(entry.extractedData, {confirmCreateSupplier: true});
         if (!data) {
+            return;
+        }
+
+        if (!flow.getSaveInvoiceId(entry) && !data.invoice.warehouse_code) {
+            setStatus(trans('aiscan-warehouse-required'), 'danger');
             return;
         }
 

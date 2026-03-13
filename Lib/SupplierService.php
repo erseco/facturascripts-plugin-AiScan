@@ -24,17 +24,21 @@ use FacturaScripts\Dinamic\Model\Proveedor;
 
 class SupplierService
 {
+    public function __construct(
+        private ?SupplierMatcher $matcher = null
+    ) {
+    }
+
     public function resolve(array &$supplierData): ?Proveedor
     {
         if (!empty($supplierData['matched_supplier_id'])) {
-            $supplier = new Proveedor();
-            if ($supplier->loadFromCode($supplierData['matched_supplier_id'])) {
+            $supplier = $this->loadSupplierById((string) $supplierData['matched_supplier_id']);
+            if ($supplier instanceof Proveedor) {
                 return $supplier;
             }
         }
 
-        $matcher = new SupplierMatcher();
-        $match = $matcher->findMatch($supplierData);
+        $match = $this->getMatcher()->findMatch($supplierData);
         if ($match['supplier']) {
             $supplierData['matched_supplier_id'] = $match['supplier']->codproveedor;
             return $match['supplier'];
@@ -44,6 +48,25 @@ class SupplierService
             return null;
         }
 
+        $supplier = $this->createSupplier($supplierData);
+        if (!($supplier instanceof Proveedor)) {
+            return null;
+        }
+
+        $supplierData['matched_supplier_id'] = $supplier->codproveedor;
+        $supplierData['match_status'] = 'created';
+        $supplierData['matched_name'] = $supplier->nombre;
+        return $supplier;
+    }
+
+    protected function loadSupplierById(string $supplierId): ?Proveedor
+    {
+        $supplier = new Proveedor();
+        return $supplier->loadFromCode($supplierId) ? $supplier : null;
+    }
+
+    protected function createSupplier(array $supplierData): ?Proveedor
+    {
         $supplier = new Proveedor();
         $supplier->nombre = trim((string) ($supplierData['name'] ?? ''));
         $supplier->razonsocial = $supplier->nombre;
@@ -57,9 +80,15 @@ class SupplierService
             return null;
         }
 
-        $supplierData['matched_supplier_id'] = $supplier->codproveedor;
-        $supplierData['match_status'] = 'created';
-        $supplierData['matched_name'] = $supplier->nombre;
         return $supplier;
+    }
+
+    private function getMatcher(): SupplierMatcher
+    {
+        if (null === $this->matcher) {
+            $this->matcher = new SupplierMatcher();
+        }
+
+        return $this->matcher;
     }
 }
