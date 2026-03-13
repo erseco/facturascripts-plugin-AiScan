@@ -29,14 +29,13 @@ use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 
 class AiScanInvoice extends Controller
 {
-    private const ALLOWED_MIME_TYPES = [
-        'application/pdf',
-        'image/jpeg',
-        'image/png',
-        'image/webp',
+    private const EXTENSION_MIME_TYPES = [
+        'jpeg' => 'image/jpeg',
+        'jpg' => 'image/jpeg',
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
     ];
-
-    private const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
 
     public function getPageData(): array
     {
@@ -98,52 +97,105 @@ class AiScanInvoice extends Controller
 
     private function handleUpload(): void
     {
-        if (!isset($_FILES['invoice_file'])) {
+        $uploadedFiles = $this->getUploadedFiles();
+        if (empty($uploadedFiles)) {
             http_response_code(400);
             echo json_encode(['error' => Tools::lang()->trans('aiscan-no-file-uploaded')]);
             return;
         }
 
-        $file = $_FILES['invoice_file'];
+        $storedFiles = [];
+        $errors = [];
 
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            http_response_code(400);
+        foreach ($uploadedFiles as $index => $file) {
+            try {
+                $storedFiles[] = $this->storeUploadedFile($file, $index);
+            } catch (\RuntimeException $e) {
+                $errors[] = [
+                    'client_index' => $index,
+                    'error' => $e->getMessage(),
+                    'name' => basename((string) ($file['name'] ?? '')),
+                ];
+            }
+        }
+
+        if (empty($storedFiles)) {
+            http_response_code(422);
             echo json_encode([
-                'error' => Tools::lang()->trans('aiscan-upload-error', ['%code%' => (string) $file['error']]),
+                'error' => $errors[0]['error'] ?? Tools::lang()->trans('aiscan-no-file-uploaded'),
+                'errors' => $errors,
             ]);
             return;
+        }
+
+        $service = new ExtractionService();
+        echo json_encode($this->buildUploadResponse($storedFiles, $errors, $service));
+    }
+
+    private function getUploadedFiles(): array
+    {
+        if (isset($_FILES['invoice_files'])) {
+            return $this->normalizeUploadedFiles($_FILES['invoice_files']);
+        }
+
+        if (isset($_FILES['invoice_file'])) {
+            return $this->normalizeUploadedFiles($_FILES['invoice_file']);
+        }
+
+        return [];
+    }
+
+    private function normalizeUploadedFiles(array $files): array
+    {
+        if (!isset($files['name']) || !is_array($files['name'])) {
+            return [$files];
+        }
+
+        $normalized = [];
+        $count = count($files['name']);
+        for ($index = 0; $index < $count; ++$index) {
+            $normalized[] = [
+                'error' => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                'name' => $files['name'][$index] ?? '',
+                'size' => $files['size'][$index] ?? 0,
+                'tmp_name' => $files['tmp_name'][$index] ?? '',
+                'type' => $files['type'][$index] ?? '',
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private function storeUploadedFile(array $file, int $clientIndex): array
+    {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException(
+                Tools::lang()->trans('aiscan-upload-error', ['%code%' => (string) $file['error']])
+            );
         }
 
         $maxSizeBytes = AiScanSettings::getMaxUploadSizeMb() * 1024 * 1024;
-        if ($file['size'] > $maxSizeBytes) {
-            http_response_code(413);
-            echo json_encode([
-                'error' => Tools::lang()->trans(
+        if ((int) $file['size'] > $maxSizeBytes) {
+            throw new \RuntimeException(
+                Tools::lang()->trans(
                     'aiscan-file-too-large',
                     ['%size%' => (string) AiScanSettings::getMaxUploadSizeMb()]
-                ),
-            ]);
-            return;
+                )
+            );
         }
 
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mimeType = $finfo->file($file['tmp_name']);
-
-        if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
-            http_response_code(415);
-            echo json_encode([
-                'error' => Tools::lang()->trans('aiscan-unsupported-file-type', ['%mimeType%' => (string) $mimeType]),
-            ]);
-            return;
-        }
-
-        $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
         if (!in_array($extension, AiScanSettings::getAllowedExtensions(), true)) {
-            http_response_code(415);
-            echo json_encode([
-                'error' => Tools::lang()->trans('aiscan-unsupported-file-extension', ['%extension%' => $extension]),
-            ]);
-            return;
+            throw new \RuntimeException(
+                Tools::lang()->trans('aiscan-unsupported-file-extension', ['%extension%' => $extension])
+            );
+        }
+
+        $mimeType = $this->resolveMimeType((string) $file['tmp_name'], $extension);
+        if (!in_array($mimeType, array_values(self::EXTENSION_MIME_TYPES), true)) {
+            throw new \RuntimeException(
+                Tools::lang()->trans('aiscan-unsupported-file-type', ['%mimeType%' => (string) $mimeType])
+            );
         }
 
         $tmpDir = FS_FOLDER . '/MyFiles/aiscan_tmp';
@@ -155,24 +207,48 @@ class AiScanInvoice extends Controller
         $tmpFilename = 'aiscan_' . $safeBaseName . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
         $tmpPath = $tmpDir . '/' . $tmpFilename;
 
-        if (!move_uploaded_file($file['tmp_name'], $tmpPath)) {
-            http_response_code(500);
-            echo json_encode(['error' => Tools::lang()->trans('aiscan-failed-to-store-uploaded-file')]);
-            return;
+        if (!move_uploaded_file((string) $file['tmp_name'], $tmpPath)) {
+            throw new \RuntimeException(Tools::lang()->trans('aiscan-failed-to-store-uploaded-file'));
         }
 
-        $service = new ExtractionService();
-        echo json_encode([
-            'success' => true,
-            'tmp_file' => $tmpFilename,
-            'original_name' => basename((string) $file['name']),
+        return [
+            'client_index' => $clientIndex,
             'mime_type' => $mimeType,
-            'size' => $file['size'],
+            'original_name' => basename((string) $file['name']),
+            'size' => (int) $file['size'],
+            'tmp_file' => $tmpFilename,
+        ];
+    }
+
+    private function resolveMimeType(string $tmpName, string $extension): string
+    {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = (string) $finfo->file($tmpName);
+
+        if ($mimeType === '' || $mimeType === 'application/octet-stream') {
+            return self::EXTENSION_MIME_TYPES[$extension] ?? $mimeType;
+        }
+
+        return $mimeType;
+    }
+
+    private function buildUploadResponse(array $storedFiles, array $errors, ExtractionService $service): array
+    {
+        $response = [
+            'success' => true,
+            'files' => $storedFiles,
+            'errors' => $errors,
             'auto_scan' => AiScanSettings::isAutoScanEnabled(),
             'provider' => AiScanSettings::getDefaultProvider(),
             'available_providers' => $service->getAvailableProviderNames(),
             'extraction_prompt' => ExtractionService::getSystemPrompt(),
-        ]);
+        ];
+
+        if (count($storedFiles) === 1) {
+            $response = array_merge($response, $storedFiles[0]);
+        }
+
+        return $response;
     }
 
     private function sanitizeBaseFilename(string $filename): string

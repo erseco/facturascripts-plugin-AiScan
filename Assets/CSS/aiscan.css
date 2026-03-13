@@ -127,3 +127,7 @@
     min-height: 0;
     overflow-y: auto;
 }
+
+.aiscan-modal #aiscan-wizard-progress {
+    min-width: 84px;
+}
