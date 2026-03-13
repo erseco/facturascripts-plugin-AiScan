@@ -50,6 +50,26 @@ final class AiScanInvoiceControllerTest extends TestCase
         $this->assertSame('image/png', $result[1]['type']);
     }
 
+    public function testResolveMimeTypeFallsBackToExtensionForOctetStream(): void
+    {
+        $controller = $this->buildController();
+        $tmpFile = tempnam(sys_get_temp_dir(), 'aiscan-octet-');
+        if (false === $tmpFile) {
+            self::fail('Failed to create temporary file for MIME fallback test.');
+        }
+
+        file_put_contents($tmpFile, random_bytes(32));
+
+        try {
+            $result = $this->callResolveMimeType($controller, $tmpFile, 'pdf');
+            $this->assertSame('application/pdf', $result);
+        } finally {
+            if (is_file($tmpFile)) {
+                unlink($tmpFile);
+            }
+        }
+    }
+
     private function buildController(): AiScanInvoice
     {
         $reflection = new \ReflectionClass(AiScanInvoice::class);
@@ -61,5 +81,12 @@ final class AiScanInvoiceControllerTest extends TestCase
         $method = new \ReflectionMethod(AiScanInvoice::class, 'normalizeUploadedFiles');
         $method->setAccessible(true);
         return $method->invoke($controller, $files);
+    }
+
+    private function callResolveMimeType(AiScanInvoice $controller, string $tmpName, string $extension): string
+    {
+        $method = new \ReflectionMethod(AiScanInvoice::class, 'resolveMimeType');
+        $method->setAccessible(true);
+        return $method->invoke($controller, $tmpName, $extension);
     }
 }

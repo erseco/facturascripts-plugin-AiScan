@@ -29,14 +29,13 @@ use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 
 class AiScanInvoice extends Controller
 {
-    private const ALLOWED_MIME_TYPES = [
-        'application/pdf',
-        'image/jpeg',
-        'image/png',
-        'image/webp',
+    private const EXTENSION_MIME_TYPES = [
+        'jpeg' => 'image/jpeg',
+        'jpg' => 'image/jpeg',
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
     ];
-
-    private const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
 
     public function getPageData(): array
     {
@@ -185,19 +184,17 @@ class AiScanInvoice extends Controller
             );
         }
 
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mimeType = $finfo->file((string) $file['tmp_name']);
-
-        if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
-            throw new \RuntimeException(
-                Tools::lang()->trans('aiscan-unsupported-file-type', ['%mimeType%' => (string) $mimeType])
-            );
-        }
-
         $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
         if (!in_array($extension, AiScanSettings::getAllowedExtensions(), true)) {
             throw new \RuntimeException(
                 Tools::lang()->trans('aiscan-unsupported-file-extension', ['%extension%' => $extension])
+            );
+        }
+
+        $mimeType = $this->resolveMimeType((string) $file['tmp_name'], $extension);
+        if (!in_array($mimeType, array_values(self::EXTENSION_MIME_TYPES), true)) {
+            throw new \RuntimeException(
+                Tools::lang()->trans('aiscan-unsupported-file-type', ['%mimeType%' => (string) $mimeType])
             );
         }
 
@@ -221,6 +218,18 @@ class AiScanInvoice extends Controller
             'size' => (int) $file['size'],
             'tmp_file' => $tmpFilename,
         ];
+    }
+
+    private function resolveMimeType(string $tmpName, string $extension): string
+    {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = (string) $finfo->file($tmpName);
+
+        if ($mimeType === '' || $mimeType === 'application/octet-stream') {
+            return self::EXTENSION_MIME_TYPES[$extension] ?? $mimeType;
+        }
+
+        return $mimeType;
     }
 
     private function buildUploadResponse(array $storedFiles, array $errors, ExtractionService $service): array
