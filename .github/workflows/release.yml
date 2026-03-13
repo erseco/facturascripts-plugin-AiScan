@@ -30,22 +30,34 @@ jobs:
           # Create ZIP package excluding development files
           zip -r "dist/AiScan-${VERSION}.zip" . \
             -x "*.git*" \
-            -x "*Test/*" \
-            -x "*examples/*" \
-            -x "*dist/*" \
-            -x "*vendor/*" \
-            -x "*node_modules/*" \
+            -x "*.aider*" \
+            -x "*.claude/*" \
             -x "*.DS_Store" \
-            -x "*Makefile" \
-            -x "*docker-compose.yml" \
-            -x "*QUICKSTART.md" \
-            -x "*README.md" \
+            -x "*.editorconfig" \
+            -x "*.env" \
+            -x "*.env.*" \
+            -x "*.php-cs-fixer.php" \
+            -x "*.php-cs-fixer.cache" \
+            -x "*.phpunit.result.cache" \
+            -x "*.playwright-mcp/*" \
+            -x "*CLAUDE.md" \
             -x "*composer.json" \
             -x "*composer.lock" \
+            -x "*dist/*" \
+            -x "*docker-compose.yml" \
+            -x "*examples/*" \
+            -x "*Makefile" \
+            -x "*node_modules/*" \
+            -x "*package.json" \
+            -x "*package-lock.json" \
+            -x "*phpcs.xml" \
             -x "*phpunit.xml" \
-            -x "*.aider*" \
-            -x "*.editorconfig" \
-            -x "*.env*"
+            -x "*phpunit-plugins.xml" \
+            -x "*QUICKSTART.md" \
+            -x "*README.md" \
+            -x "*Test/*" \
+            -x "*tests/*" \
+            -x "*vendor/*"
 
       - name: Upload ZIP to release
         uses: softprops/action-gh-release@v2
