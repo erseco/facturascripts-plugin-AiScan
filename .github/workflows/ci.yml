@@ -107,6 +107,10 @@ jobs:
           tools: composer
           coverage: none
 
+      - name: Run JavaScript flow tests
+        working-directory: plugin
+        run: node --test Test/js/*.test.js
+
       - name: Download FacturaScripts
         run: |
           git clone --depth=1 https://github.com/NeoRazorX/facturascripts.git facturascripts
