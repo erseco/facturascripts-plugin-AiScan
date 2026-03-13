@@ -21,6 +21,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 class SchemaValidator
 {
+    private const REQUIRED_TOP_LEVEL_FIELDS = ['supplier', 'invoice', 'taxes', 'lines', 'meta'];
     private const REQUIRED_INVOICE_FIELDS = ['number', 'issue_date', 'total'];
 
     // Regex to detect European number format (e.g. 1.234,56)
@@ -30,7 +31,13 @@ class SchemaValidator
     {
         $errors = [];
 
-        if (!isset($data['invoice'])) {
+        foreach (self::REQUIRED_TOP_LEVEL_FIELDS as $field) {
+            if (!array_key_exists($field, $data)) {
+                $errors[] = 'Missing top-level field: ' . $field;
+            }
+        }
+
+        if (!isset($data['invoice']) || false === is_array($data['invoice'])) {
             $errors[] = 'Missing invoice section';
             return $errors;
         }
@@ -39,6 +46,32 @@ class SchemaValidator
             if (empty($data['invoice'][$field])) {
                 $errors[] = 'Missing required invoice field: ' . $field;
             }
+        }
+
+        if (isset($data['taxes']) && false === is_array($data['taxes'])) {
+            $errors[] = 'Taxes must be an array';
+        }
+
+        if (isset($data['lines']) && false === is_array($data['lines'])) {
+            $errors[] = 'Lines must be an array';
+        }
+
+        foreach ($data['lines'] ?? [] as $index => $line) {
+            if (empty($line['description'])) {
+                $errors[] = 'Missing line description at index ' . $index;
+            }
+        }
+
+        if (!empty($data['invoice']['issue_date']) && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['issue_date'])) {
+            $errors[] = 'Issue date must use YYYY-MM-DD format';
+        }
+
+        if (!empty($data['invoice']['due_date']) && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['due_date'])) {
+            $errors[] = 'Due date must use YYYY-MM-DD format';
+        }
+
+        if (!empty($data['invoice']['currency']) && false === $this->isValidCurrencyCode($data['invoice']['currency'])) {
+            $errors[] = 'Currency must be a 3-letter ISO code';
         }
 
         if (
@@ -64,6 +97,12 @@ class SchemaValidator
 
     public function normalize(array $data): array
     {
+        $data['supplier'] = is_array($data['supplier'] ?? null) ? $data['supplier'] : [];
+        $data['invoice'] = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
+        $data['taxes'] = is_array($data['taxes'] ?? null) ? $data['taxes'] : [];
+        $data['lines'] = is_array($data['lines'] ?? null) ? $data['lines'] : [];
+        $data['meta'] = is_array($data['meta'] ?? null) ? $data['meta'] : [];
+
         if (!empty($data['invoice']['issue_date'])) {
             $data['invoice']['issue_date'] = $this->normalizeDate($data['invoice']['issue_date']);
         }
@@ -75,6 +114,10 @@ class SchemaValidator
             if (isset($data['invoice'][$field])) {
                 $data['invoice'][$field] = $this->normalizeDecimal($data['invoice'][$field]);
             }
+        }
+
+        if (!empty($data['invoice']['currency'])) {
+            $data['invoice']['currency'] = strtoupper(trim((string) $data['invoice']['currency']));
         }
 
         if (isset($data['lines']) && is_array($data['lines'])) {
@@ -133,5 +176,20 @@ class SchemaValidator
             $str = str_replace(',', '.', $str);
         }
         return (float) $str;
+    }
+
+    private function isValidCurrencyCode(string $currency): bool
+    {
+        if (1 !== preg_match('/^[A-Z]{3}$/', $currency)) {
+            return false;
+        }
+
+        if (false === class_exists(\ResourceBundle::class)) {
+            return true;
+        }
+
+        $bundle = \ResourceBundle::create('en', 'ICUDATA-curr');
+        $value = $bundle instanceof \ResourceBundle ? $bundle->get($currency) : false;
+        return false !== $value && null !== $value;
     }
 }

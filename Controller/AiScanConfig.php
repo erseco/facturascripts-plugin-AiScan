@@ -43,7 +43,7 @@ class AiScanConfig extends PanelController
         $this->views[$viewName]->disableColumn('name', false, false);
     }
 
-    protected function loadData(string $viewName, $view): void
+    protected function loadData($viewName, $view)
     {
         if ($viewName === 'AiScanConfig') {
             $view->loadData('AiScan');

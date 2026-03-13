@@ -20,19 +20,26 @@
 namespace FacturaScripts\Plugins\AiScan\Extension\Controller;
 
 use Closure;
+use FacturaScripts\Dinamic\Lib\AssetManager;
+use FacturaScripts\Core\Tools;
 
 class EditFacturaProveedor
 {
     public function createViews(): Closure
     {
         return function () {
-            $this->addButton('EditFacturaProveedor', [
+            $route = Tools::config('route');
+            $viewName = $this->getMainViewName();
+            AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
+            AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan.js');
+            $this->addButton($viewName, [
                 'action' => 'aiscan',
                 'color' => 'info',
                 'icon' => 'fa-solid fa-file-invoice',
                 'label' => 'scan-invoice',
+                'row' => true,
                 'type' => 'modal',
-                'target' => 'modal-aiscan',
+                'target' => 'modalaiscan',
             ]);
         };
     }
@@ -40,11 +47,13 @@ class EditFacturaProveedor
     public function loadData(): Closure
     {
         return function (string $viewName, $view) {
-            if ($viewName === 'EditFacturaProveedor') {
-                $invoiceId = $view->model->primaryColumnValue();
-                if ($invoiceId !== null) {
-                    $this->setSettings('EditFacturaProveedor', 'aiscan_invoice_id', $invoiceId);
-                }
+            if ($viewName !== $this->getMainViewName()) {
+                return;
+            }
+
+            $invoiceId = $view->model->primaryColumnValue();
+            if ($invoiceId !== null) {
+                $this->setSettings($viewName, 'aiscan_invoice_id', $invoiceId);
             }
         };
     }
