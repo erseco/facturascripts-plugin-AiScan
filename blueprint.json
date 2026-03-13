@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "title": "AiScan",
+    "author": "erseco",
+    "description": "Run AiScan in FacturaScripts Playground"
+  },
+  "plugins": [
+    "https://github.com/erseco/facturascripts-plugin-AiScan/archive/refs/heads/main.zip"
+  ]
+}
