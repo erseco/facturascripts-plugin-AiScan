@@ -176,6 +176,20 @@ final class InvoiceMapperTest extends TestCase
         $this->assertSame([], $result);
     }
 
+    public function testResolveLineReferencePrefersManualSelection(): void
+    {
+        $method = new \ReflectionMethod(InvoiceMapper::class, 'resolveLineReference');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->mapper, [
+            'description' => 'Widget',
+            'selected_reference' => 'MANUAL-01',
+            'sku' => 'AUTO-01',
+        ]);
+
+        $this->assertSame('MANUAL-01', $result);
+    }
+
     // ── helpers ──────────────────────────────────────────────
 
     private function callBuildNotes(array $invoiceData): string

@@ -39,7 +39,6 @@ final class AiScanSettingsTest extends TestCase
         $this->assertArrayHasKey('default_provider', $defaults);
         $this->assertArrayHasKey('max_upload_size_mb', $defaults);
         $this->assertArrayHasKey('allowed_extensions', $defaults);
-        $this->assertArrayHasKey('auto_scan', $defaults);
         $this->assertArrayHasKey('debug_mode', $defaults);
         $this->assertArrayHasKey('request_timeout', $defaults);
         $this->assertArrayHasKey('openai_model', $defaults);
@@ -64,12 +63,6 @@ final class AiScanSettingsTest extends TestCase
     {
         $defaults = AiScanSettings::getDefaults();
         $this->assertTrue($defaults['enabled']);
-    }
-
-    public function testDefaultAutoScanIsFalse(): void
-    {
-        $defaults = AiScanSettings::getDefaults();
-        $this->assertFalse($defaults['auto_scan']);
     }
 
     public function testDefaultTimeoutIs120(): void
@@ -115,12 +108,6 @@ final class AiScanSettingsTest extends TestCase
         $result = AiScanSettings::getRequestTimeout();
         $this->assertIsInt($result);
         $this->assertGreaterThanOrEqual(10, $result);
-    }
-
-    public function testIsAutoScanEnabledReturnsBool(): void
-    {
-        $result = AiScanSettings::isAutoScanEnabled();
-        $this->assertIsBool($result);
     }
 
     public function testIsDebugModeReturnsBool(): void

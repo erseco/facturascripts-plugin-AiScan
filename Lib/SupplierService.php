@@ -59,6 +59,17 @@ class SupplierService
         return $supplier;
     }
 
+    public function create(array $supplierData): ?Proveedor
+    {
+        return $this->createSupplier($supplierData);
+    }
+
+    public function createOrResolve(array &$supplierData): ?Proveedor
+    {
+        $supplierData['create_if_missing'] = true;
+        return $this->resolve($supplierData);
+    }
+
     protected function loadSupplierById(string $supplierId): ?Proveedor
     {
         $supplier = new Proveedor();

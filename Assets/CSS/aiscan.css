@@ -8,126 +8,161 @@
  * License, or (at your option) any later version.
  */
 
-.aiscan-modal .modal-dialog {
-    max-width: 1200px;
+body.aiscan-page-ready {
+    padding-right: 460px;
+    --aiscan-top-offset: 0px;
+    transition: padding-right 0.2s ease;
 }
 
-.aiscan-modal .modal-body {
-    padding: 0;
-}
-
-/* Split pane layout */
-.aiscan-split {
+.aiscan-drawer {
+    position: fixed;
+    top: var(--aiscan-top-offset);
+    right: 0;
+    bottom: 0;
+    width: 460px;
+    z-index: 1040;
     display: flex;
-    height: 75vh;
-    min-height: 400px;
+    background: #fff;
+    border-left: 1px solid var(--bs-border-color);
+    box-shadow: -8px 0 24px rgba(15, 23, 42, 0.08);
 }
 
-.aiscan-split-left {
-    flex: 0 0 55%;
-    min-width: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.aiscan-split-left > .card {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
-
-.aiscan-split-left > .card > .card-body {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.aiscan-split-right {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.aiscan-split-right > .card {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
-
-.aiscan-split-handle {
-    flex: 0 0 6px;
-    background: var(--bs-border-color);
+.aiscan-drawer-handle {
+    width: 8px;
     cursor: col-resize;
+    background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
+    border-left: 1px solid rgba(15, 23, 42, 0.06);
+    border-right: 1px solid rgba(15, 23, 42, 0.06);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s;
 }
 
-.aiscan-split-handle:hover,
-.aiscan-split-handle:active {
-    background: var(--bs-primary);
-}
-
-.aiscan-split-handle-grip {
+.aiscan-drawer-handle span {
     width: 2px;
-    height: 32px;
-    border-left: 1px solid rgba(0, 0, 0, 0.25);
-    border-right: 1px solid rgba(0, 0, 0, 0.25);
+    height: 48px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.45);
 }
 
-.aiscan-split-handle:hover .aiscan-split-handle-grip,
-.aiscan-split-handle:active .aiscan-split-handle-grip {
-    border-color: rgba(255, 255, 255, 0.6);
+.aiscan-drawer-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
-/* Block iframe pointer events during drag */
-.aiscan-split-dragging iframe {
-    pointer-events: none;
+.aiscan-drawer-header,
+.aiscan-drawer-toolbar {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
 }
 
-/* Drop area */
-.aiscan-drop-area {
-    border: 2px dashed var(--bs-border-color);
-    border-radius: 0.5rem;
-    cursor: pointer;
-    height: 100%;
-    min-height: 300px;
-    transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+.aiscan-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: flex-start;
 }
 
-.aiscan-drop-area.aiscan-drag-over {
-    background: rgba(13, 110, 253, 0.08);
-    border-color: var(--bs-primary);
+.aiscan-drawer-title {
+    font-size: 1.05rem;
+    font-weight: 700;
 }
 
-/* Preview */
-.aiscan-preview-area {
-    height: 100%;
+.aiscan-drawer-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.aiscan-drawer-preview {
+    flex: 1;
+    min-height: 280px;
     overflow: hidden;
+    position: relative;
+    background: #f8fafc;
 }
 
 .aiscan-preview-area iframe,
-.aiscan-preview-area img {
-    border: 0;
-    display: block;
-    height: 100%;
-    object-fit: contain;
+.aiscan-preview-area img,
+.aiscan-drawer-preview iframe,
+.aiscan-drawer-preview img {
     width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+    object-fit: contain;
 }
 
-/* Sidebar */
-.aiscan-sidebar {
-    flex: 1;
-    min-height: 0;
+.aiscan-drawer-summary,
+.aiscan-drawer-status {
+    padding: 0.75rem 1rem;
+}
+
+.aiscan-drawer-status {
+    padding-top: 0;
+}
+
+.aiscan-drop-area {
+    height: 100%;
+    min-height: 280px;
+    border: 2px dashed #93c5fd;
+    margin: 0.75rem;
+    border-radius: 1rem;
+    background: rgba(59, 130, 246, 0.04);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.aiscan-drop-area.aiscan-drag-over {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: #2563eb;
+}
+
+.aiscan-search-results {
+    max-height: 180px;
     overflow-y: auto;
 }
 
-.aiscan-modal #aiscan-wizard-progress {
-    min-width: 84px;
+.aiscan-page-line:last-child {
+    border-bottom: 0 !important;
+}
+
+.aiscan-page-line textarea.form-control {
+    min-height: 54px;
+}
+
+body.aiscan-drawer-resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+body.aiscan-drawer-resizing iframe {
+    pointer-events: none;
+}
+
+@media (max-width: 1199.98px) {
+    body.aiscan-page-ready {
+        padding-right: 0;
+    }
+
+    .aiscan-drawer {
+        width: 100%;
+        max-width: none;
+        top: auto;
+        height: 50vh;
+        border-left: 0;
+        border-top: 1px solid var(--bs-border-color);
+        box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .aiscan-drawer-handle {
+        display: none;
+    }
+
+    .aiscan-drawer-preview {
+        min-height: 180px;
+    }
 }

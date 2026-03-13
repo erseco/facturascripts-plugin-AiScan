@@ -28,6 +28,31 @@ class ProductMatcher
     private const AUTO_MATCH_MIN_SCORE = 140;
     private const SCORE_DELTA = 15;
 
+    public function search(string $query, int $limit = 20): array
+    {
+        $normalizedQuery = $this->normalizeText($query);
+        $normalizedSku = $this->normalizeCode($query);
+        if ($normalizedQuery === '' && $normalizedSku === '') {
+            return [];
+        }
+
+        $candidates = [];
+        if ($normalizedSku !== '') {
+            $candidates = array_merge($candidates, $this->findVariantsBySku($query, $limit));
+        }
+        if ($normalizedQuery !== '') {
+            $candidates = array_merge($candidates, $this->findVariantsByDescription($query));
+        }
+
+        $ranked = $this->rankCandidates($candidates, $normalizedQuery, $normalizedSku);
+        $ranked = array_slice($ranked, 0, $limit);
+
+        return array_values(array_filter(array_map(
+            static fn (array $item) => $item['candidate'] ?? null,
+            $ranked
+        )));
+    }
+
     public function findReference(array $lineData): ?string
     {
         $normalizedSku = $this->normalizeCode((string) ($lineData['sku'] ?? ''));
@@ -105,6 +130,7 @@ class ProductMatcher
             }
 
             $ranked[] = [
+                'candidate' => $candidate,
                 'reference' => $candidate->code ?? $candidate->referencia ?? null,
                 'score' => $score,
             ];

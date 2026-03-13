@@ -20,7 +20,7 @@ final class ProductMatcherTest extends TestCase
 {
     public function testMatchesProductByNormalizedSkuBeforeFallback(): void
     {
-        $matcher = new class extends ProductMatcher {
+        $matcher = new class () extends ProductMatcher {
             public array $calls = [];
 
             protected function findVariantsBySku(string $sku, int $limit = 20): array
@@ -47,7 +47,7 @@ final class ProductMatcherTest extends TestCase
 
     public function testMatchesProductByExactDescription(): void
     {
-        $matcher = new class extends ProductMatcher {
+        $matcher = new class () extends ProductMatcher {
             protected function findVariantsBySku(string $sku, int $limit = 20): array
             {
                 return [];
@@ -69,7 +69,7 @@ final class ProductMatcherTest extends TestCase
 
     public function testReturnsNullWhenProductMatchIsAmbiguous(): void
     {
-        $matcher = new class extends ProductMatcher {
+        $matcher = new class () extends ProductMatcher {
             protected function findVariantsBySku(string $sku, int $limit = 20): array
             {
                 return [];
@@ -94,7 +94,7 @@ final class ProductMatcherTest extends TestCase
 
     public function testReturnsNullWhenNoProductMatches(): void
     {
-        $matcher = new class extends ProductMatcher {
+        $matcher = new class () extends ProductMatcher {
             protected function findVariantsBySku(string $sku, int $limit = 20): array
             {
                 return [];
@@ -114,9 +114,32 @@ final class ProductMatcherTest extends TestCase
         $this->assertNull($reference);
     }
 
+    public function testSearchReturnsRankedCandidates(): void
+    {
+        $matcher = new class () extends ProductMatcher {
+            protected function findVariantsBySku(string $sku, int $limit = 20): array
+            {
+                return [
+                    (object) ['referencia' => 'PRO-01', 'descripcion' => 'Widget Pro'],
+                    (object) ['referencia' => 'BASIC-01', 'descripcion' => 'Basic Widget'],
+                ];
+            }
+
+            protected function findVariantsByDescription(string $description): array
+            {
+                return [];
+            }
+        };
+
+        $results = $matcher->search('PRO-01');
+
+        $this->assertCount(2, $results);
+        $this->assertSame('PRO-01', $results[0]->referencia);
+    }
+
     public function testSkuSearchBuildsExpectedWhereClauses(): void
     {
-        $matcher = new class extends ProductMatcher {
+        $matcher = new class () extends ProductMatcher {
             public array $queries = [];
 
             public function inspectSkuSearch(string $sku): void

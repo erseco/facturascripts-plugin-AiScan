@@ -12,34 +12,206 @@
 
 (() => {
     const state = {
-        invoiceId: null,
-        files: [],
-        currentFileIndex: 0,
         availableProviders: [],
-        defaultProvider: null,
         browserPromptSupported: false,
+        currentFileIndex: 0,
+        defaultProvider: null,
         extractionPrompt: null,
+        files: [],
+        initialLinesMarkup: null,
+        initialObservations: '',
+        initialProviderHtml: '',
+        invoiceId: null,
     };
 
     const selectors = {
-        modalId: 'modalaiscan',
-        acceptBtn: 'aiscan-accept-btn',
+        clearBtn: 'aiscan-clear-btn',
+        drawerId: 'aiscan-drawer',
         fileInput: 'aiscan-file-input',
         linesBody: 'aiscan-lines-body',
         previewArea: 'aiscan-preview-area',
         providerSelect: 'aiscan-provider-select',
-        review: 'aiscan-review',
         scanBtn: 'aiscan-scan-btn',
         status: 'aiscan-status',
-        clearBtn: 'aiscan-clear-btn',
-        toolbar: 'aiscan-toolbar',
+        summary: 'aiscan-summary',
         wizardBackBtn: 'aiscan-back-btn',
         wizardNextBtn: 'aiscan-next-btn',
-        wizardNav: 'aiscan-wizard-nav',
         wizardProgress: 'aiscan-wizard-progress',
     };
 
     const flow = window.AiScanFlow || createFlowFallback();
+    const FALLBACK_PROMPT = 'You are an invoice extraction engine. Extract data from the provided invoice and return ONLY valid JSON with supplier, invoice, taxes, lines, confidence and warnings fields. Never invent values, use null for unknown fields.';
+    const FALLBACK_TRANSLATIONS = {
+        en: {
+            accept: 'Accept',
+            close: 'Close',
+            confidence: 'Confidence',
+            details: 'Details',
+            'payment-method': 'Payment method',
+            reference: 'Reference',
+            series: 'Series',
+            supplier: 'Supplier',
+            quantity: 'Quantity',
+            price: 'Price',
+            discount: 'Discount',
+            tax: 'Tax',
+            description: 'Description',
+            date: 'Date',
+            search: 'Search',
+            number: 'Number',
+            subtotal: 'Subtotal',
+            total: 'Total',
+            expiration: 'Expiration',
+            currency: 'Currency',
+            summary: 'Summary',
+            address: 'Address',
+            email: 'Email',
+            phone: 'Phone',
+            name: 'Name',
+            'tax-id': 'Tax ID',
+            'aiscan-analyze': 'Analyze',
+            'aiscan-analysis-completed': 'Analysis completed (%provider%).',
+            'aiscan-analysis-started': 'Analyzing invoice with %provider%...',
+            'aiscan-analyzing-browser-ai': 'Analyzing with Browser AI...',
+            'aiscan-browser-ai-error': 'Browser AI error: %message%',
+            'aiscan-browser-prompt-not-available': 'Browser Prompt API is not available in this browser.',
+            'aiscan-clear-file': 'Remove file',
+            'aiscan-delete-line': 'Delete line',
+            'aiscan-document': 'Document',
+            'aiscan-document-and-image-drop': 'Drop a PDF or image here',
+            'aiscan-document-preview': 'Invoice preview',
+            'aiscan-drag-to-resize': 'Drag to resize',
+            'aiscan-drop-or-click': 'or click to select files',
+            'aiscan-drawer-title': 'AiScan',
+            'aiscan-file-progress': 'File %current% of %total%',
+            'aiscan-file-uploaded-select-provider': 'File uploaded. Select a provider and click Analyze.',
+            'aiscan-finish': 'Finish',
+            'aiscan-initial-drawer-message': 'Upload a document and AiScan will map supplier, header and lines onto this page.',
+            'aiscan-invoice-saved-successfully': 'Invoice saved successfully.',
+            'aiscan-line-items': 'Line items',
+            'aiscan-loading-provider': 'Loading...',
+            'aiscan-matched-with': 'Matched with: %name%',
+            'aiscan-next': 'Next',
+            'aiscan-no-document-selected': 'No document selected.',
+            'aiscan-no-file-uploaded': 'No file uploaded.',
+            'aiscan-no-results': 'No results',
+            'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
+            'aiscan-provider-gemini': 'Google Gemini',
+            'aiscan-provider-label-browser-prompt': 'Browser AI',
+            'aiscan-provider-mistral': 'Mistral',
+            'aiscan-provider-openai': 'OpenAI',
+            'aiscan-provider-openai-compatible': 'OpenAI compatible',
+            'aiscan-save': 'Save',
+            'aiscan-save-and-next': 'Save and next',
+            'aiscan-saving-invoice': 'Saving purchase invoice...',
+            'aiscan-scanned-supplier-invoice': 'Scanned supplier invoice',
+            'aiscan-supplier-ambiguous': 'Multiple supplier matches found. Select the correct supplier.',
+            'aiscan-supplier-created': 'Supplier created and selected.',
+            'aiscan-supplier-inline-help': 'Supplier not found. Select one normally or create a new supplier with these extracted data.',
+            'aiscan-supplier-name-required': 'Supplier name is required.',
+            'aiscan-supplier-unresolved': 'Supplier not found',
+            'aiscan-uploading-file': 'Uploading file...',
+            'aiscan-use-cloud-provider-for-image': 'Browser AI cannot analyze images. Please select a cloud provider.',
+            'aiscan-use-cloud-provider-for-pdf': 'Could not extract text from this PDF. Please select a cloud provider.',
+            'aiscan-validation-warnings': 'Warnings',
+            'aiscan-warehouse': 'Warehouse',
+            'aiscan-warehouse-required': 'Warehouse is required to create a new purchase invoice.',
+            'aiscan-create-supplier': 'Create supplier',
+            'scan-invoice': 'Scan Invoice',
+        },
+        es: {
+            accept: 'Aceptar',
+            close: 'Cerrar',
+            confidence: 'Confianza',
+            details: 'Detalle',
+            'payment-method': 'Forma de pago',
+            reference: 'Referencia',
+            series: 'Serie',
+            supplier: 'Proveedor',
+            quantity: 'Cantidad',
+            price: 'Precio',
+            discount: 'Descuento',
+            tax: 'Impuesto',
+            description: 'Descripción',
+            date: 'Fecha',
+            search: 'Buscar',
+            number: 'Número',
+            subtotal: 'Subtotal',
+            total: 'Total',
+            expiration: 'Vencimiento',
+            currency: 'Divisa',
+            summary: 'Resumen',
+            address: 'Dirección',
+            email: 'Email',
+            phone: 'Teléfono',
+            name: 'Nombre',
+            'tax-id': 'CIF/NIF',
+            'aiscan-analyze': 'Analizar',
+            'aiscan-analysis-completed': 'Análisis completado (%provider%).',
+            'aiscan-analysis-started': 'Analizando factura con %provider%...',
+            'aiscan-analyzing-browser-ai': 'Analizando con Browser AI...',
+            'aiscan-browser-ai-error': 'Error de Browser AI: %message%',
+            'aiscan-browser-prompt-not-available': 'La API Browser Prompt no está disponible en este navegador.',
+            'aiscan-clear-file': 'Quitar archivo',
+            'aiscan-delete-line': 'Eliminar línea',
+            'aiscan-document': 'Documento',
+            'aiscan-document-and-image-drop': 'Suelta aquí un PDF o una imagen',
+            'aiscan-document-preview': 'Vista previa de la factura',
+            'aiscan-drag-to-resize': 'Arrastra para redimensionar',
+            'aiscan-drop-or-click': 'o haz clic para seleccionar archivos',
+            'aiscan-drawer-title': 'AiScan',
+            'aiscan-file-progress': 'Archivo %current% de %total%',
+            'aiscan-file-uploaded-select-provider': 'Archivo subido. Selecciona un proveedor y pulsa Analizar.',
+            'aiscan-finish': 'Finalizar',
+            'aiscan-initial-drawer-message': 'Sube un documento y AiScan rellenará proveedor, cabecera y líneas en esta página.',
+            'aiscan-invoice-saved-successfully': 'Factura guardada correctamente.',
+            'aiscan-line-items': 'Líneas',
+            'aiscan-loading-provider': 'Cargando...',
+            'aiscan-matched-with': 'Coincide con: %name%',
+            'aiscan-next': 'Siguiente',
+            'aiscan-no-document-selected': 'No hay documento seleccionado.',
+            'aiscan-no-file-uploaded': 'No se ha subido ningún archivo.',
+            'aiscan-no-results': 'Sin resultados',
+            'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
+            'aiscan-provider-gemini': 'Google Gemini',
+            'aiscan-provider-label-browser-prompt': 'Browser AI',
+            'aiscan-provider-mistral': 'Mistral',
+            'aiscan-provider-openai': 'OpenAI',
+            'aiscan-provider-openai-compatible': 'OpenAI compatible',
+            'aiscan-save': 'Guardar',
+            'aiscan-save-and-next': 'Guardar y siguiente',
+            'aiscan-saving-invoice': 'Guardando factura de proveedor...',
+            'aiscan-scanned-supplier-invoice': 'Factura de proveedor escaneada',
+            'aiscan-supplier-ambiguous': 'Se han encontrado varios proveedores coincidentes. Selecciona el correcto.',
+            'aiscan-supplier-created': 'Proveedor creado y seleccionado.',
+            'aiscan-supplier-inline-help': 'Proveedor no localizado. Selecciónalo normalmente o crea uno con estos datos extraídos.',
+            'aiscan-supplier-name-required': 'El nombre del proveedor es obligatorio.',
+            'aiscan-supplier-unresolved': 'Proveedor no localizado',
+            'aiscan-uploading-file': 'Subiendo archivo...',
+            'aiscan-use-cloud-provider-for-image': 'Browser AI no puede analizar imágenes. Selecciona un proveedor en la nube.',
+            'aiscan-use-cloud-provider-for-pdf': 'No se pudo extraer texto de este PDF. Selecciona un proveedor en la nube.',
+            'aiscan-validation-warnings': 'Avisos',
+            'aiscan-warehouse': 'Almacén',
+            'aiscan-warehouse-required': 'El almacén es obligatorio para crear una nueva factura de proveedor.',
+            'aiscan-create-supplier': 'Crear proveedor',
+            'scan-invoice': 'Escanear Factura',
+        },
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!isEditFacturaProveedorPage()) {
+            return;
+        }
+
+        rememberInitialPageState();
+        suppressInitialSupplierModal();
+        checkBrowserPromptSupport();
+        ensureDrawer();
+        syncDrawerOffset();
+        bindDrawerEvents();
+        hookNativeSave();
+        renderCurrentFile();
+    });
 
     function createFlowFallback() {
         function cloneValue(value) {
@@ -116,111 +288,14 @@
         };
     }
 
-    // Fallback prompt for Browser AI when server prompt is not available
-    const FALLBACK_PROMPT = 'You are an invoice extraction engine. Extract data from the provided invoice and return ONLY valid JSON with supplier, invoice, taxes, lines, confidence and warnings fields. Never invent values, use null for unknown fields.';
+    function isEditFacturaProveedorPage() {
+        const path = window.location.pathname || '';
+        if (path.includes('EditFacturaProveedor')) {
+            return true;
+        }
 
-    const FALLBACK_TRANSLATIONS = {
-        en: {
-            'aiscan-analyze': 'Analyze',
-            'aiscan-analysis-completed': 'Analysis completed (%provider%).',
-            'aiscan-analysis-started': 'Analyzing invoice with %provider%...',
-            'aiscan-analyzing-browser-ai': 'Analyzing with Browser AI (this may take a moment)...',
-            'aiscan-browser-ai-error': 'Browser AI error: %message%',
-            'aiscan-browser-prompt-not-available': 'Browser Prompt API is not available in this browser.',
-            'aiscan-back': 'Back',
-            'aiscan-clear-file': 'Remove file',
-            'aiscan-create-new-supplier-confirm': 'Supplier not found. Do you want AiScan to create a new supplier with the extracted data?',
-            'aiscan-create-or-update-invoice': 'Create / update invoice',
-            'aiscan-delete-line': 'Delete line',
-            'aiscan-document': 'Document',
-            'aiscan-document-and-image-drop': 'Drop a PDF or image here',
-            'aiscan-document-preview': 'Invoice preview',
-            'aiscan-document-type': 'Document type',
-            'aiscan-drag-to-resize': 'Drag to resize',
-            'aiscan-drop-or-click': 'or click to select files',
-            'aiscan-file-progress': 'File %current% of %total%',
-            'aiscan-file-uploaded-select-provider': 'File uploaded. Select a provider and click Analyze.',
-            'aiscan-finish': 'Finish',
-            'aiscan-initial-review-message': 'Upload a document and analyze it to review supplier, invoice and line data.',
-            'aiscan-invoice-saved-successfully': 'Invoice saved successfully.',
-            'aiscan-line-items': 'Line items',
-            'aiscan-loading-provider': 'Loading...',
-            'aiscan-matched-with': 'Matched with: %name%',
-            'aiscan-next': 'Next',
-            'aiscan-no-results': 'No results',
-            'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
-            'aiscan-provider-gemini': 'Google Gemini',
-            'aiscan-provider-label-browser-prompt': 'Browser AI',
-            'aiscan-provider-mistral': 'Mistral',
-            'aiscan-provider-openai': 'OpenAI',
-            'aiscan-provider-openai-compatible': 'OpenAI compatible',
-            'aiscan-review-extracted-data': 'Review extracted data',
-            'aiscan-save': 'Save',
-            'aiscan-save-and-next': 'Save and next',
-            'aiscan-saving-invoice': 'Saving purchase invoice...',
-            'aiscan-scanned-supplier-invoice': 'Scanned supplier invoice',
-            'aiscan-selected-supplier': 'Selected: %name% (%taxId%)',
-            'aiscan-supplier-ambiguous': 'Multiple supplier matches found. Select the correct supplier.',
-            'aiscan-supplier-created-on-save': 'A new supplier will be created when you save the invoice.',
-            'aiscan-supplier-not-found-on-save': 'No supplier match found. You can create one during save.',
-            'aiscan-uploading-file': 'Uploading file...',
-            'aiscan-use-cloud-provider-for-image': 'Browser AI cannot analyze images. Please select a cloud provider (OpenAI, Gemini, etc.).',
-            'aiscan-use-cloud-provider-for-pdf': 'Could not extract text from this PDF. Please select a cloud provider for analysis.',
-            'aiscan-validation-warnings': 'Warnings',
-            'confidence': 'Confidence',
-            'scan-invoice': 'Scan Invoice',
-        },
-        es: {
-            'aiscan-analyze': 'Analizar',
-            'aiscan-analysis-completed': 'Analisis completado (%provider%).',
-            'aiscan-analysis-started': 'Analizando factura con %provider%...',
-            'aiscan-analyzing-browser-ai': 'Analizando con Browser AI (esto puede tardar un momento)...',
-            'aiscan-browser-ai-error': 'Error de Browser AI: %message%',
-            'aiscan-browser-prompt-not-available': 'La API Browser Prompt no está disponible en este navegador.',
-            'aiscan-back': 'Anterior',
-            'aiscan-clear-file': 'Quitar archivo',
-            'aiscan-create-new-supplier-confirm': 'No se ha encontrado el proveedor. ¿Quieres que AiScan cree uno nuevo con los datos extraídos?',
-            'aiscan-create-or-update-invoice': 'Crear / actualizar factura',
-            'aiscan-delete-line': 'Eliminar linea',
-            'aiscan-document': 'Documento',
-            'aiscan-document-and-image-drop': 'Suelta aqui un PDF o una imagen',
-            'aiscan-document-preview': 'Vista previa de la factura',
-            'aiscan-document-type': 'Tipo de documento',
-            'aiscan-drag-to-resize': 'Arrastra para redimensionar',
-            'aiscan-drop-or-click': 'o haz clic para seleccionar archivos',
-            'aiscan-file-progress': 'Archivo %current% de %total%',
-            'aiscan-file-uploaded-select-provider': 'Archivo subido. Selecciona un proveedor y pulsa Analizar.',
-            'aiscan-finish': 'Finalizar',
-            'aiscan-initial-review-message': 'Sube un documento y analízalo para revisar proveedor, factura y líneas.',
-            'aiscan-invoice-saved-successfully': 'Factura guardada correctamente.',
-            'aiscan-line-items': 'Lineas',
-            'aiscan-loading-provider': 'Cargando...',
-            'aiscan-matched-with': 'Coincide con: %name%',
-            'aiscan-next': 'Siguiente',
-            'aiscan-no-results': 'Sin resultados',
-            'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
-            'aiscan-provider-gemini': 'Google Gemini',
-            'aiscan-provider-label-browser-prompt': 'Browser AI',
-            'aiscan-provider-mistral': 'Mistral',
-            'aiscan-provider-openai': 'OpenAI',
-            'aiscan-provider-openai-compatible': 'OpenAI compatible',
-            'aiscan-review-extracted-data': 'Revisar datos extraídos',
-            'aiscan-save': 'Guardar',
-            'aiscan-save-and-next': 'Guardar y siguiente',
-            'aiscan-saving-invoice': 'Guardando factura de proveedor...',
-            'aiscan-scanned-supplier-invoice': 'Factura de proveedor escaneada',
-            'aiscan-selected-supplier': 'Seleccionado: %name% (%taxId%)',
-            'aiscan-supplier-ambiguous': 'Se han encontrado varios proveedores coincidentes. Selecciona el correcto.',
-            'aiscan-supplier-created-on-save': 'Se creara un nuevo proveedor al guardar la factura.',
-            'aiscan-supplier-not-found-on-save': 'No se ha encontrado coincidencia de proveedor. Puedes crear uno al guardar.',
-            'aiscan-uploading-file': 'Subiendo archivo...',
-            'aiscan-use-cloud-provider-for-image': 'Browser AI no puede analizar imagenes. Selecciona un proveedor en la nube (OpenAI, Gemini, etc.).',
-            'aiscan-use-cloud-provider-for-pdf': 'No se pudo extraer texto de este PDF. Selecciona un proveedor en la nube para analizarlo.',
-            'aiscan-validation-warnings': 'Avisos',
-            'confidence': 'Confianza',
-            'scan-invoice': 'Escanear Factura',
-        },
-    };
+        return Boolean(document.querySelector('input[name="codproveedor"]') || document.getElementById('findSupplierModal'));
+    }
 
     function currentLang() {
         const lang = (
@@ -263,32 +338,33 @@
         return labels[provider] || provider || trans('aiscan-loading-provider');
     }
 
-    function dropAreaHtml() {
-        return `
-            <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
-                <div>
-                    <div class="fs-3 mb-2 text-muted"><i class="fa-solid fa-file-arrow-up"></i></div>
-                    <div>${escapeHtml(trans('aiscan-document-and-image-drop'))}</div>
-                    <div class="small text-muted mt-1">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
-                </div>
-            </div>
-        `;
+    function rememberInitialPageState() {
+        state.invoiceId = getInvoiceId();
+        state.initialLinesMarkup = document.getElementById('purchasesFormLines')?.innerHTML || '';
+        state.initialObservations = document.querySelector('textarea[name="observaciones"]')?.value || '';
+        state.initialProviderHtml = getProviderField()?.column?.innerHTML || '';
     }
 
-    function setInitialReviewMessage() {
-        const review = document.getElementById(selectors.review);
-        if (!review) {
-            return;
-        }
+    function suppressInitialSupplierModal() {
+        const hide = () => {
+            const modalEl = document.getElementById('findSupplierModal');
+            if (!modalEl) {
+                return;
+            }
 
-        review.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>`;
+            if (window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }
+
+            modalEl.classList.remove('show');
+            modalEl.style.display = 'none';
+            document.body.classList.remove('modal-open');
+            document.querySelectorAll('.modal-backdrop').forEach((node) => node.remove());
+        };
+
+        window.setTimeout(hide, 0);
+        window.setTimeout(hide, 300);
     }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        checkBrowserPromptSupport();
-        ensureModal();
-        bindModalEvents();
-    });
 
     async function checkBrowserPromptSupport() {
         try {
@@ -304,287 +380,195 @@
         }
     }
 
-    function ensureModal() {
-        if (document.getElementById(selectors.modalId)) {
+    function ensureDrawer() {
+        if (document.getElementById(selectors.drawerId)) {
             return;
         }
 
+        document.body.classList.add('aiscan-page-ready');
         document.body.insertAdjacentHTML('beforeend', `
-            <div class="modal fade aiscan-modal" id="${selectors.modalId}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title"><i class="fa-solid fa-file-invoice me-2"></i>${escapeHtml(trans('scan-invoice'))}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="${escapeAttribute(trans('close'))}"></button>
+            <aside id="${selectors.drawerId}" class="aiscan-drawer">
+                <div class="aiscan-drawer-handle" id="aiscan-drawer-handle" title="${escapeAttribute(trans('aiscan-drag-to-resize'))}">
+                    <span></span>
+                </div>
+                <div class="aiscan-drawer-panel">
+                    <div class="aiscan-drawer-header">
+                        <div>
+                            <div class="aiscan-drawer-title">${escapeHtml(trans('aiscan-drawer-title'))}</div>
+                            <div class="small text-muted" id="${selectors.wizardProgress}"></div>
                         </div>
-                        <div class="modal-body p-0">
-                            <div class="aiscan-split" id="aiscan-split">
-                                <div class="aiscan-split-left" id="aiscan-split-left">
-                                    <div class="card h-100 border-0 rounded-0">
-                                        <div class="card-header d-flex justify-content-between align-items-center py-2 rounded-0">
-                                            <span>${escapeHtml(trans('aiscan-document'))}</span>
-                                            <div class="d-flex align-items-center gap-2" id="${selectors.toolbar}" style="display:none!important">
-                                                <select class="form-select form-select-sm" id="${selectors.providerSelect}" style="width:auto;min-width:140px"></select>
-                                                <button type="button" class="btn btn-primary btn-sm text-nowrap" id="${selectors.scanBtn}" disabled>
-                                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i>${escapeHtml(trans('aiscan-analyze'))}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="card-body p-0 position-relative">
-                                            <input id="${selectors.fileInput}" type="file" class="d-none" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
-                                            <div class="aiscan-preview-area" id="${selectors.previewArea}">
-                                                ${dropAreaHtml()}
-                                            </div>
-                                            <button type="button" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 rounded-circle shadow-sm d-none" id="${selectors.clearBtn}" title="${escapeAttribute(trans('aiscan-clear-file'))}" style="z-index:2;width:32px;height:32px;padding:0">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </div>
-                                        <div class="card-footer py-2 rounded-0">
-                                            <div id="${selectors.status}" class="small"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="aiscan-split-handle" id="aiscan-split-handle" title="${escapeAttribute(trans('aiscan-drag-to-resize'))}"><div class="aiscan-split-handle-grip"></div></div>
-                                <div class="aiscan-split-right" id="aiscan-split-right">
-                                    <div class="card h-100 border-0 rounded-0">
-                                        <div class="card-header py-2 rounded-0">${escapeHtml(trans('aiscan-review-extracted-data'))}</div>
-                                        <div class="card-body aiscan-sidebar" id="${selectors.review}">
-                                            <p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>
-                                        </div>
-                                        <div class="card-footer py-2 rounded-0">
-                                            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                                                <div class="d-flex align-items-center gap-2 flex-wrap d-none" id="${selectors.wizardNav}">
-                                                    <span class="small text-muted" id="${selectors.wizardProgress}"></span>
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.wizardBackBtn}">
-                                                        <i class="fa-solid fa-arrow-left me-1"></i>${escapeHtml(trans('aiscan-back'))}
-                                                    </button>
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.wizardNextBtn}">
-                                                        ${escapeHtml(trans('aiscan-next'))}<i class="fa-solid fa-arrow-right ms-1"></i>
-                                                    </button>
-                                                </div>
-                                                <div class="ms-auto">
-                                                    <button type="button" class="btn btn-success btn-sm" id="${selectors.acceptBtn}" disabled>
-                                                        <i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-save'))}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select form-select-sm" id="${selectors.providerSelect}"></select>
+                            <button type="button" class="btn btn-primary btn-sm" id="${selectors.scanBtn}" disabled>
+                                <i class="fa-solid fa-wand-magic-sparkles me-1"></i>${escapeHtml(trans('aiscan-analyze'))}
+                            </button>
                         </div>
                     </div>
+                    <div class="aiscan-drawer-toolbar">
+                        <input id="${selectors.fileInput}" type="file" class="d-none" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="aiscan-upload-btn">
+                            <i class="fa-solid fa-file-arrow-up me-1"></i>${escapeHtml(trans('aiscan-document'))}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.clearBtn}" disabled>
+                            <i class="fa-solid fa-trash-can me-1"></i>${escapeHtml(trans('aiscan-clear-file'))}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.wizardBackBtn}" disabled>
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.wizardNextBtn}" disabled>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <div class="aiscan-drawer-preview" id="${selectors.previewArea}">${dropAreaHtml()}</div>
+                    <div class="aiscan-drawer-summary" id="${selectors.summary}">
+                        <p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-drawer-message'))}</p>
+                    </div>
+                    <div id="${selectors.status}" class="aiscan-drawer-status"></div>
                 </div>
-            </div>
+            </aside>
         `);
     }
 
-    function buildProviderSelect() {
-        const select = document.getElementById(selectors.providerSelect);
-        if (!select) {
-            return;
-        }
-        select.innerHTML = '';
-
-        const entry = getCurrentFileEntry();
-        const selectedProvider = entry?.selectedProvider || state.defaultProvider;
-        const providers = state.availableProviders || [];
-        providers.forEach((p) => {
-            const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = providerLabel(p);
-            if (p === selectedProvider) {
-                opt.selected = true;
-            }
-            select.appendChild(opt);
-        });
-
-        if (state.browserPromptSupported) {
-            const opt = document.createElement('option');
-            opt.value = 'browser-prompt';
-            opt.textContent = providerLabel('browser-prompt');
-            if (selectedProvider === 'browser-prompt') {
-                opt.selected = true;
-            }
-            select.appendChild(opt);
-        }
+    function dropAreaHtml() {
+        return `
+            <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
+                <div>
+                    <div class="fs-3 mb-2 text-muted"><i class="fa-solid fa-file-arrow-up"></i></div>
+                    <div>${escapeHtml(trans('aiscan-document-and-image-drop'))}</div>
+                    <div class="small text-muted mt-1">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
+                </div>
+            </div>
+        `;
     }
 
-    function bindModalEvents() {
-        const modal = document.getElementById(selectors.modalId);
+    function bindDrawerEvents() {
+        const drawer = document.getElementById(selectors.drawerId);
         const previewArea = document.getElementById(selectors.previewArea);
         const fileInput = document.getElementById(selectors.fileInput);
+        const uploadBtn = document.getElementById('aiscan-upload-btn');
         const providerSelect = document.getElementById(selectors.providerSelect);
         const scanBtn = document.getElementById(selectors.scanBtn);
-        const acceptBtn = document.getElementById(selectors.acceptBtn);
         const clearBtn = document.getElementById(selectors.clearBtn);
         const backBtn = document.getElementById(selectors.wizardBackBtn);
         const nextBtn = document.getElementById(selectors.wizardNextBtn);
 
-        modal.addEventListener('show.bs.modal', () => resetModal());
-        modal.addEventListener('hidden.bs.modal', () => resetModal());
+        bindDrawerResize(drawer);
 
-        previewArea.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            const dz = document.getElementById('aiscan-drop-zone');
-            if (dz) {
-                dz.classList.add('aiscan-drag-over');
-            }
-        });
-
-        previewArea.addEventListener('dragleave', (event) => {
-            const dz = document.getElementById('aiscan-drop-zone');
-            if (dz && !previewArea.contains(event.relatedTarget)) {
-                dz.classList.remove('aiscan-drag-over');
-            }
-        });
-
-        previewArea.addEventListener('drop', (event) => {
-            event.preventDefault();
-            const dz = document.getElementById('aiscan-drop-zone');
-            if (dz) {
-                dz.classList.remove('aiscan-drag-over');
-            }
-            if (event.dataTransfer.files.length > 0) {
-                handleFiles(event.dataTransfer.files);
-            }
-        });
-
+        uploadBtn.addEventListener('click', () => fileInput.click());
         previewArea.addEventListener('click', (event) => {
             if (document.getElementById('aiscan-drop-zone') && !event.target.closest('button')) {
                 fileInput.click();
             }
         });
-
+        previewArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            document.getElementById('aiscan-drop-zone')?.classList.add('aiscan-drag-over');
+        });
+        previewArea.addEventListener('dragleave', () => {
+            document.getElementById('aiscan-drop-zone')?.classList.remove('aiscan-drag-over');
+        });
+        previewArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            document.getElementById('aiscan-drop-zone')?.classList.remove('aiscan-drag-over');
+            if (event.dataTransfer.files.length > 0) {
+                handleFiles(event.dataTransfer.files);
+            }
+        });
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
                 handleFiles(fileInput.files);
             }
         });
-
-        clearBtn.addEventListener('click', (event) => {
-            event.stopPropagation();
-            clearFile();
-        });
-
         providerSelect.addEventListener('change', () => {
             const entry = getCurrentFileEntry();
             if (entry) {
                 entry.selectedProvider = providerSelect.value;
             }
         });
-
         scanBtn.addEventListener('click', () => {
-            const selected = document.getElementById(selectors.providerSelect)?.value || '';
+            const selected = providerSelect.value || '';
             if (selected === 'browser-prompt') {
                 analyzeWithBrowserPrompt();
             } else {
                 analyzeDocument(selected || undefined);
             }
         });
-
-        acceptBtn.addEventListener('click', acceptExtracted);
+        clearBtn.addEventListener('click', clearFile);
         backBtn.addEventListener('click', () => navigateToFile(state.currentFileIndex - 1));
         nextBtn.addEventListener('click', () => navigateToFile(state.currentFileIndex + 1));
 
-        bindSplitHandle();
+        document.addEventListener('click', handleGlobalClick);
+        document.addEventListener('input', handleGlobalInput);
+        document.addEventListener('keydown', handleGlobalKeydown);
+        window.addEventListener('resize', syncDrawerOffset);
     }
 
-    function bindSplitHandle() {
-        const handle = document.getElementById('aiscan-split-handle');
-        const split = document.getElementById('aiscan-split');
-        const left = document.getElementById('aiscan-split-left');
-        if (!handle || !split || !left) {
+    function syncDrawerOffset() {
+        const nav = document.querySelector('nav.navbar, .navbar.fixed-top, body > nav, header nav');
+        const topOffset = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
+        document.documentElement.style.setProperty('--aiscan-top-offset', `${Math.max(0, topOffset)}px`);
+    }
+
+    function hookNativeSave() {
+        const tryHook = () => {
+            if (typeof window.purchasesFormAction !== 'function') {
+                return false;
+            }
+
+            const original = window.purchasesFormAction;
+            window.purchasesFormAction = function (action, ...args) {
+                if (action === 'save-doc' && hasAiScanPendingData()) {
+                    saveCurrentDocument();
+                    return;
+                }
+
+                return original.call(this, action, ...args);
+            };
+
+            return true;
+        };
+
+        if (!tryHook()) {
+            window.setTimeout(tryHook, 500);
+            window.setTimeout(tryHook, 1500);
+        }
+    }
+
+    function hasAiScanPendingData() {
+        const entry = getCurrentFileEntry();
+        return Boolean(entry && entry.extractedData && !entry.isSaved && !entry.isSaving);
+    }
+
+    function bindDrawerResize(drawer) {
+        const handle = document.getElementById('aiscan-drawer-handle');
+        if (!handle || !drawer) {
             return;
         }
 
         let dragging = false;
-
-        handle.addEventListener('mousedown', (e) => {
-            e.preventDefault();
+        handle.addEventListener('mousedown', (event) => {
+            event.preventDefault();
             dragging = true;
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-            split.classList.add('aiscan-split-dragging');
+            document.body.classList.add('aiscan-drawer-resizing');
         });
 
-        document.addEventListener('mousemove', (e) => {
+        document.addEventListener('mousemove', (event) => {
             if (!dragging) {
                 return;
             }
-            const rect = split.getBoundingClientRect();
-            const offset = e.clientX - rect.left;
-            const pct = Math.min(Math.max((offset / rect.width) * 100, 25), 75);
-            left.style.flexBasis = pct + '%';
+
+            const width = Math.min(Math.max(window.innerWidth - event.clientX, 320), 840);
+            drawer.style.width = `${width}px`;
         });
 
         document.addEventListener('mouseup', () => {
-            if (dragging) {
-                dragging = false;
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-                split.classList.remove('aiscan-split-dragging');
+            if (!dragging) {
+                return;
             }
+
+            dragging = false;
+            document.body.classList.remove('aiscan-drawer-resizing');
         });
-    }
-
-    function clearFile() {
-        const entry = getCurrentFileEntry();
-        if (!entry || entry.isSaving || entry.isSaved) {
-            return;
-        }
-
-        if (entry.objectUrl) {
-            URL.revokeObjectURL(entry.objectUrl);
-        }
-
-        state.files.splice(state.currentFileIndex, 1);
-
-        if (state.files.length === 0) {
-            resetModal();
-            return;
-        }
-
-        if (state.currentFileIndex >= state.files.length) {
-            state.currentFileIndex = state.files.length - 1;
-        }
-
-        if (state.invoiceId && !state.files.some((file) => file.invoiceId)) {
-            state.files[0].invoiceId = state.invoiceId;
-        }
-
-        renderCurrentFile();
-        setStatus('');
-    }
-
-    function resetModal() {
-        state.files.forEach((file) => {
-            if (file.objectUrl) {
-                URL.revokeObjectURL(file.objectUrl);
-            }
-        });
-
-        state.invoiceId = getInvoiceId();
-        state.files = [];
-        state.currentFileIndex = 0;
-
-        const previewArea = document.getElementById(selectors.previewArea);
-        previewArea.innerHTML = dropAreaHtml();
-
-        document.getElementById(selectors.fileInput).value = '';
-        document.getElementById(selectors.clearBtn).classList.add('d-none');
-        document.getElementById(selectors.scanBtn).disabled = true;
-        document.getElementById(selectors.toolbar).style.display = 'none';
-        document.getElementById(selectors.acceptBtn).disabled = true;
-        document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
-        document.getElementById(selectors.wizardNav).classList.add('d-none');
-        document.getElementById(selectors.wizardProgress).textContent = '';
-        setInitialReviewMessage();
-        const splitLeft = document.getElementById('aiscan-split-left');
-        if (splitLeft) {
-            splitLeft.style.flexBasis = '';
-        }
-        setStatus('');
     }
 
     function getInvoiceId() {
@@ -623,16 +607,7 @@
                 }
 
                 setUploadedFiles(files, uploadedFiles, data);
-                setStatus(buildUploadStatus(data), data.errors && data.errors.length > 0 ? 'warning' : 'success');
-
-                if (data.auto_scan) {
-                    const selected = document.getElementById(selectors.providerSelect)?.value || '';
-                    if (selected === 'browser-prompt') {
-                        analyzeWithBrowserPrompt();
-                    } else {
-                        analyzeDocument(selected || undefined);
-                    }
-                }
+                setStatus(trans('aiscan-file-uploaded-select-provider'), 'success');
             })
             .catch((error) => setStatus(error.message, 'danger'));
     }
@@ -644,8 +619,8 @@
             }
         });
 
-        state.defaultProvider = response.provider || 'unknown';
-        state.availableProviders = response.available_providers || [response.provider || 'unknown'];
+        state.defaultProvider = response.provider || 'openai';
+        state.availableProviders = response.available_providers || [state.defaultProvider];
         state.extractionPrompt = response.extraction_prompt || FALLBACK_PROMPT;
         state.currentFileIndex = 0;
         state.files = flow.createWizardEntries(uploadedFiles, state.invoiceId).map((entry) => {
@@ -662,16 +637,40 @@
         renderCurrentFile();
     }
 
-    function buildUploadStatus(response) {
-        const errors = Array.isArray(response.errors)
-            ? response.errors.map((item) => item?.error).filter(Boolean)
-            : [];
-
-        if (errors.length === 0) {
-            return trans('aiscan-file-uploaded-select-provider');
+    function clearFile() {
+        const entry = getCurrentFileEntry();
+        if (!entry || entry.isSaving || entry.isSaved) {
+            return;
         }
 
-        return `${trans('aiscan-file-uploaded-select-provider')} ${errors.join(' ')}`.trim();
+        if (entry.objectUrl) {
+            URL.revokeObjectURL(entry.objectUrl);
+        }
+
+        state.files.splice(state.currentFileIndex, 1);
+        if (state.currentFileIndex >= state.files.length) {
+            state.currentFileIndex = Math.max(0, state.files.length - 1);
+        }
+
+        if (state.files.length === 0) {
+            resetDrawerAndPage();
+            return;
+        }
+
+        renderCurrentFile();
+    }
+
+    function resetDrawerAndPage() {
+        state.files.forEach((file) => {
+            if (file.objectUrl) {
+                URL.revokeObjectURL(file.objectUrl);
+            }
+        });
+
+        state.files = [];
+        state.currentFileIndex = 0;
+        renderCurrentFile();
+        resetNativeInvoiceView();
     }
 
     function navigateToFile(index) {
@@ -680,40 +679,73 @@
             return;
         }
 
-        persistCurrentFileState();
+        persistCurrentPageState();
         state.currentFileIndex = index;
         renderCurrentFile();
     }
 
     function renderCurrentFile() {
         const entry = getCurrentFileEntry();
+        const previewArea = document.getElementById(selectors.previewArea);
+        const summary = document.getElementById(selectors.summary);
+        const clearBtn = document.getElementById(selectors.clearBtn);
+        const scanBtn = document.getElementById(selectors.scanBtn);
+
+        buildProviderSelect();
+
         if (!entry) {
-            const previewArea = document.getElementById(selectors.previewArea);
             previewArea.innerHTML = dropAreaHtml();
-            document.getElementById(selectors.toolbar).style.display = 'none';
-            document.getElementById(selectors.scanBtn).disabled = true;
-            document.getElementById(selectors.acceptBtn).disabled = true;
-            document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
-            document.getElementById(selectors.clearBtn).classList.add('d-none');
-            setInitialReviewMessage();
+            summary.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-drawer-message'))}</p>`;
+            clearBtn.disabled = true;
+            scanBtn.disabled = true;
+            resetNativeInvoiceView();
             updateWizardControls();
             return;
         }
 
         showPreview(entry);
-        document.getElementById(selectors.toolbar).style.display = '';
-        document.getElementById(selectors.scanBtn).disabled = !entry.tmpFile || entry.isSaving;
-        document.getElementById(selectors.clearBtn).classList.toggle('d-none', entry.isSaving || entry.isSaved);
-        buildProviderSelect();
+        clearBtn.disabled = entry.isSaving || entry.isSaved;
+        scanBtn.disabled = !entry.tmpFile || entry.isSaving;
 
         if (entry.extractedData) {
-            renderReviewForm(entry.extractedData);
+            applyExtractedToPage(entry.extractedData);
+            renderDrawerSummary(entry.extractedData);
         } else {
-            document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
-            setInitialReviewMessage();
+            summary.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-no-document-selected'))}</p>`;
         }
 
         updateWizardControls();
+    }
+
+    function buildProviderSelect() {
+        const select = document.getElementById(selectors.providerSelect);
+        if (!select) {
+            return;
+        }
+
+        const entry = getCurrentFileEntry();
+        const selectedProvider = entry?.selectedProvider || state.defaultProvider || 'openai';
+        select.innerHTML = '';
+
+        const providers = state.availableProviders && state.availableProviders.length > 0
+            ? state.availableProviders
+            : ['openai'];
+
+        providers.forEach((provider) => {
+            const option = document.createElement('option');
+            option.value = provider;
+            option.textContent = providerLabel(provider);
+            option.selected = provider === selectedProvider;
+            select.appendChild(option);
+        });
+
+        if (state.browserPromptSupported) {
+            const option = document.createElement('option');
+            option.value = 'browser-prompt';
+            option.textContent = providerLabel('browser-prompt');
+            option.selected = selectedProvider === 'browser-prompt';
+            select.appendChild(option);
+        }
     }
 
     function showPreview(entry) {
@@ -736,42 +768,59 @@
         }
     }
 
+    function renderDrawerSummary(data) {
+        const summary = document.getElementById(selectors.summary);
+        const supplier = data.supplier || {};
+        const invoice = data.invoice || {};
+        const warnings = Array.isArray(data._validation_errors) ? data._validation_errors : [];
+        const warehouseField = document.querySelector('[name="codalmacen"]');
+        const warehouseValue = invoice.warehouse_code || warehouseField?.value || '';
+
+        summary.innerHTML = `
+            <div class="small">
+                <div><strong>${escapeHtml(trans('supplier'))}:</strong> ${escapeHtml(supplier.name || trans('aiscan-supplier-unresolved'))}</div>
+                <div><strong>${escapeHtml(trans('number'))}:</strong> ${escapeHtml(invoice.number || '')}</div>
+                <div><strong>${escapeHtml(trans('date'))}:</strong> ${escapeHtml(invoice.issue_date || '')}</div>
+                <div><strong>${escapeHtml(trans('total'))}:</strong> ${escapeHtml(invoice.total ?? '')}</div>
+            </div>
+            <div class="mt-3">
+                <label class="form-label small mb-1" for="invoice_warehouse_code">${escapeHtml(trans('aiscan-warehouse'))}</label>
+                <input type="text" class="form-control form-control-sm" id="invoice_warehouse_code"
+                    value="${escapeAttribute(warehouseValue)}" required aria-required="true">
+            </div>
+            ${warnings.length > 0 ? `
+                <div class="alert alert-warning py-2 mt-2 mb-0 small">
+                    <strong>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
+                    <ul class="mb-0">${warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+                </div>
+            ` : ''}
+        `;
+    }
+
     function updateWizardControls() {
         const entry = getCurrentFileEntry();
         const meta = flow.getWizardMeta(state.files, state.currentFileIndex);
-        const nav = document.getElementById(selectors.wizardNav);
         const progress = document.getElementById(selectors.wizardProgress);
         const backBtn = document.getElementById(selectors.wizardBackBtn);
         const nextBtn = document.getElementById(selectors.wizardNextBtn);
-        const acceptBtn = document.getElementById(selectors.acceptBtn);
 
-        nav.classList.toggle('d-none', !meta.isMultiFile);
         progress.textContent = meta.isMultiFile
             ? trans('aiscan-file-progress', {
                 '%current%': String(meta.currentPosition),
                 '%total%': String(meta.total),
             })
             : '';
-
         backBtn.disabled = !meta.canGoBack || Boolean(entry?.isSaving);
         nextBtn.disabled = !meta.canGoNext || Boolean(entry?.isSaving);
-
-        const labels = {
-            finish: trans('aiscan-finish'),
-            save: trans('aiscan-save'),
-            saveAndNext: trans('aiscan-save-and-next'),
-        };
-        acceptBtn.innerHTML = `<i class="fa-solid fa-check me-1"></i>${escapeHtml(labels[meta.primaryAction])}`;
-        acceptBtn.disabled = !entry?.extractedData || Boolean(entry?.isSaving);
     }
 
-    function persistCurrentFileState() {
+    function persistCurrentPageState() {
         const entry = getCurrentFileEntry();
         if (!entry || !entry.extractedData) {
             return;
         }
 
-        const data = collectFormData(entry.extractedData);
+        const data = collectPageData(entry.extractedData);
         if (data) {
             entry.extractedData = data;
         }
@@ -783,21 +832,21 @@
             return;
         }
 
-        entry.selectedProvider = provider || entry.selectedProvider || state.defaultProvider;
-        const providerName = providerLabel(provider || state.defaultProvider);
-        setStatus(trans('aiscan-analysis-started', {'%provider%': providerName}), 'info');
+        const selectedProvider = provider || entry.selectedProvider || state.defaultProvider || 'openai';
+        entry.selectedProvider = selectedProvider;
+        setStatus(trans('aiscan-analysis-started', {'%provider%': providerLabel(selectedProvider)}), 'info');
         document.getElementById(selectors.scanBtn).disabled = true;
 
         const params = new URLSearchParams({
             action: 'analyze',
-            tmp_file: entry.tmpFile,
             mime_type: entry.mimeType || '',
+            tmp_file: entry.tmpFile,
         });
-        if (provider) {
-            params.set('provider', provider);
+        if (selectedProvider) {
+            params.set('provider', selectedProvider);
         }
 
-        fetch('AiScanInvoice?' + params.toString())
+        fetch(`AiScanInvoice?${params.toString()}`)
             .then((response) => response.json())
             .then((data) => {
                 if (data.error) {
@@ -806,12 +855,7 @@
 
                 entry.extractedData = flow.cloneValue(data.data);
                 renderCurrentFile();
-                setStatus(
-                    trans('aiscan-analysis-completed', {
-                        '%provider%': providerLabel(data.data._provider || provider || state.defaultProvider),
-                    }),
-                    'success'
-                );
+                setStatus(trans('aiscan-analysis-completed', {'%provider%': providerLabel(selectedProvider)}), 'success');
             })
             .catch((error) => setStatus(error.message, 'danger'))
             .finally(() => {
@@ -833,7 +877,6 @@
 
         entry.selectedProvider = 'browser-prompt';
         setStatus(trans('aiscan-analyzing-browser-ai'), 'info');
-        document.getElementById(selectors.scanBtn).disabled = true;
 
         try {
             const session = await LanguageModel.create({
@@ -843,24 +886,18 @@
                     {role: 'system', content: 'You are an expert invoice data extractor. You always respond with valid JSON only, no markdown.'},
                 ],
             });
-
             const textContent = await fetchDocumentText(entry);
             if (!textContent) {
-                const isImage = entry.mimeType && entry.mimeType.startsWith('image/');
-                const msg = isImage
+                throw new Error(entry.mimeType?.startsWith('image/')
                     ? trans('aiscan-use-cloud-provider-for-image')
-                    : trans('aiscan-use-cloud-provider-for-pdf');
-                setStatus(msg, 'danger');
-                return;
+                    : trans('aiscan-use-cloud-provider-for-pdf'));
             }
 
-            const prompt = state.extractionPrompt || FALLBACK_PROMPT;
-            const rawJson = await session.prompt(prompt + '\n\nDocument content:\n' + textContent);
+            const rawJson = await session.prompt((state.extractionPrompt || FALLBACK_PROMPT) + '\n\nDocument content:\n' + textContent);
             session.destroy();
 
             const cleaned = rawJson.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
             const data = JSON.parse(cleaned);
-
             data._provider = 'browser-prompt';
             data._validation_errors = [];
 
@@ -870,57 +907,47 @@
         } catch (error) {
             setStatus(trans('aiscan-browser-ai-error', {'%message%': error.message}), 'danger');
         } finally {
-            document.getElementById(selectors.scanBtn).disabled = false;
             updateWizardControls();
         }
     }
 
     async function fetchDocumentText(entry) {
-        if (!entry?.tmpFile) {
-            return null;
-        }
-
-        if (entry.mimeType && entry.mimeType.startsWith('image/')) {
+        if (!entry?.tmpFile || (entry.mimeType && entry.mimeType.startsWith('image/'))) {
             return null;
         }
 
         try {
-            const params = new URLSearchParams({
-                action: 'get-text',
-                tmp_file: entry.tmpFile,
-            });
-            const response = await fetch('AiScanInvoice?' + params.toString());
+            const params = new URLSearchParams({action: 'get-text', tmp_file: entry.tmpFile});
+            const response = await fetch(`AiScanInvoice?${params.toString()}`);
             const data = await response.json();
             if (data.text && data.text.trim().length > 10) {
                 return data.text;
             }
         } catch (error) {
-            // fall through to client-side extraction
+            // ignore
         }
 
-        if (entry.mimeType === 'application/pdf' && entry.objectUrl) {
-            return await extractPdfTextClientSide(entry.objectUrl);
-        }
-
-        return null;
+        return entry.objectUrl && entry.mimeType === 'application/pdf'
+            ? extractPdfTextClientSide(entry.objectUrl)
+            : null;
     }
 
     async function extractPdfTextClientSide(url) {
         try {
             const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168';
             if (!window._pdfjsLib) {
-                window._pdfjsLib = await import(PDFJS_CDN + '/pdf.min.mjs');
-                window._pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_CDN + '/pdf.worker.min.mjs';
+                window._pdfjsLib = await import(`${PDFJS_CDN}/pdf.min.mjs`);
+                window._pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}/pdf.worker.min.mjs`;
             }
-            const pdfjsLib = window._pdfjsLib;
 
-            const pdf = await pdfjsLib.getDocument(url).promise;
+            const pdf = await window._pdfjsLib.getDocument(url).promise;
             const pages = [];
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+                const page = await pdf.getPage(pageNumber);
                 const content = await page.getTextContent();
                 pages.push(content.items.map((item) => item.str).join(' '));
             }
+
             const text = pages.join('\n').trim();
             return text.length > 10 ? text : null;
         } catch (error) {
@@ -928,342 +955,636 @@
         }
     }
 
-    function renderReviewForm(data) {
-        const review = document.getElementById(selectors.review);
-        const invoice = data.invoice || {};
+    function applyExtractedToPage(data) {
         const supplier = data.supplier || {};
-        const requiresWarehouse = !flow.getSaveInvoiceId(getCurrentFileEntry());
-        const taxes = Array.isArray(data.taxes) ? data.taxes : [];
-        const lines = Array.isArray(data.lines) ? data.lines : [];
-        const validationErrors = Array.isArray(data._validation_errors) ? data._validation_errors : [];
-        const confidence = data.confidence || {};
+        applySupplierToPage(supplier);
 
-        review.innerHTML = '';
-
-        if (validationErrors.length > 0) {
-            review.insertAdjacentHTML('beforeend', `
-                <div class="alert alert-warning py-2">
-                    <strong class="small">${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
-                    <ul class="mb-0 small">${validationErrors.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
-                </div>
-            `);
+        if (isSupplierResolved(supplier)) {
+            applyInvoiceToPage(data.invoice || {});
+            queuePendingLines();
         }
-
-        if (data.document_type && data.document_type !== 'invoice') {
-            review.insertAdjacentHTML('beforeend', `
-                <div class="alert alert-info py-2 small">
-                    <i class="fa-solid fa-circle-info me-1"></i>${escapeHtml(trans('aiscan-document-type'))}: <strong>${escapeHtml(data.document_type)}</strong>
-                </div>
-            `);
-        }
-
-        review.appendChild(buildSection(trans('supplier'), `
-            ${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}
-            ${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}
-            ${buildInput(trans('email'), 'supplier_email', supplier.email || '')}
-            ${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}
-            ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
-            ${buildSupplierStatus(supplier)}
-        `));
-
-        review.appendChild(buildSection(trans('invoice'), `
-            ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
-            ${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
-            ${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date', null, confidence.due_date)}
-            ${requiresWarehouse ? buildInput(
-                trans('aiscan-warehouse'),
-                'invoice_warehouse_code',
-                invoice.warehouse_code || '',
-                'text',
-                null,
-                null,
-                true
-            ) : ''}
-            ${buildInput(trans('currency'), 'invoice_currency', invoice.currency || 'EUR')}
-            ${buildInput(trans('subtotal'), 'invoice_subtotal', invoice.subtotal ?? '', 'number', '0.01')}
-            ${buildInput(trans('tax-amount'), 'invoice_tax_amount', invoice.tax_amount ?? '', 'number', '0.01')}
-            ${invoice.withholding_amount ? buildInput(trans('irpf'), 'invoice_withholding', invoice.withholding_amount, 'number', '0.01') : ''}
-            ${buildInput(trans('total'), 'invoice_total', invoice.total ?? '', 'number', '0.01', confidence.total)}
-            ${buildTextarea(trans('summary'), 'invoice_summary', invoice.summary || '')}
-            ${invoice.payment_terms ? buildInput(trans('payment-terms'), 'invoice_payment_terms', invoice.payment_terms) : ''}
-        `));
-
-        if (taxes.length > 0) {
-            review.appendChild(buildSection(trans('taxes'), `
-                <div class="small">
-                    ${taxes.map((tax) => `<strong>${escapeHtml(tax.name || trans('tax'))}</strong>: ${escapeHtml(tax.rate || 0)}% - ${escapeHtml(trans('base-imponible'))} ${escapeHtml(tax.base || 0)} - ${escapeHtml(trans('amount'))} ${escapeHtml(tax.amount || 0)}`).join('<br>')}
-                </div>
-            `));
-        }
-
-        review.appendChild(buildLinesSection(lines));
-
-        bindSupplierSearch();
-
-        document.getElementById(selectors.acceptBtn).disabled = false;
-        document.getElementById(selectors.acceptBtn).dataset.extractedData = JSON.stringify(data);
-        updateWizardControls();
     }
 
-    function buildSection(title, bodyHtml) {
-        const section = document.createElement('div');
-        section.className = 'card mb-3';
-        section.innerHTML = `
-            <div class="card-header py-2">${escapeHtml(title)}</div>
-            <div class="card-body py-2">${bodyHtml}</div>
-        `;
-        return section;
+    function isSupplierResolved(supplier) {
+        return Boolean(supplier && (supplier.matched_supplier_id || supplier.id));
     }
 
-    function buildInput(label, id, value, type = 'text', step = null, confidence = null, required = false) {
-        const badge = confidence != null ? ` <span class="badge ${confidence >= 0.7 ? 'text-bg-success' : confidence >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}" title="${escapeAttribute(trans('confidence'))}">${Math.round(confidence * 100)}%</span>` : '';
-        return `
-            <div class="mb-2">
-                <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}${badge}</label>
-                <input class="form-control form-control-sm" id="${id}" type="${type}" ${step ? `step="${step}"` : ''} ${required ? 'required aria-required="true"' : ''} value="${escapeAttribute(value)}">
-            </div>
-        `;
-    }
-
-    function buildTextarea(label, id, value) {
-        return `
-            <div class="mb-2">
-                <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}</label>
-                <textarea class="form-control form-control-sm" id="${id}" rows="2">${escapeHtml(value)}</textarea>
-            </div>
-        `;
-    }
-
-    function buildSupplierStatus(supplier) {
-        const status = supplier.match_status || 'not_found';
-        const variants = {
-            ambiguous: {klass: 'warning', text: trans('aiscan-supplier-ambiguous')},
-            created: {klass: 'info', text: trans('aiscan-supplier-created-on-save')},
-            matched: {klass: 'success', text: trans('aiscan-matched-with', {'%name%': supplier.matched_name || ''})},
-            not_found: {klass: 'secondary', text: trans('aiscan-supplier-not-found-on-save')},
-        };
-        const variant = variants[status] || variants.not_found;
-        let select = '';
-
-        if (status === 'ambiguous' && Array.isArray(supplier.candidates) && supplier.candidates.length > 0) {
-            select = `
-                <div class="mt-2">
-                    <select id="supplier_match_select" class="form-select form-select-sm">
-                        ${supplier.candidates.map((candidate) => `<option value="${escapeAttribute(candidate.id)}">${escapeHtml(candidate.name)} (${escapeHtml(candidate.tax_id || '')})</option>`).join('')}
-                    </select>
-                </div>
-            `;
-        }
-
-        const searchBox = `
-            <div class="mt-2">
-                <div class="input-group input-group-sm">
-                    <input type="text" class="form-control" id="aiscan-supplier-search" placeholder="${escapeAttribute(trans('search'))}">
-                    <button class="btn btn-outline-secondary" type="button" id="aiscan-supplier-search-btn"><i class="fa-solid fa-search"></i></button>
-                </div>
-                <div id="aiscan-supplier-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
-            </div>
-        `;
-
-        return `<div class="alert alert-${variant.klass} small mb-0">${escapeHtml(variant.text)}${select}</div>${searchBox}`;
-    }
-
-    function bindSupplierSearch() {
-        const searchInput = document.getElementById('aiscan-supplier-search');
-        const searchBtn = document.getElementById('aiscan-supplier-search-btn');
-        const resultsDiv = document.getElementById('aiscan-supplier-results');
-        if (!searchInput || !searchBtn || !resultsDiv) {
-            return;
-        }
-
-        let debounceTimer = null;
-
-        const doSearch = () => {
-            const query = searchInput.value.trim();
-            if (query.length < 2) {
-                resultsDiv.innerHTML = '';
-                return;
-            }
-            const params = new URLSearchParams({action: 'search-suppliers', query});
-            fetch('AiScanInvoice?' + params.toString())
-                .then((r) => r.json())
-                .then((data) => {
-                    const items = data.results || [];
-                    if (items.length === 0) {
-                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
-                        return;
-                    }
-                    resultsDiv.innerHTML = items.map((s) =>
-                        `<button type="button" class="list-group-item list-group-item-action small py-1" data-id="${escapeAttribute(s.id)}" data-name="${escapeAttribute(s.name)}" data-taxid="${escapeAttribute(s.tax_id || '')}">
-                            <strong>${escapeHtml(s.name)}</strong> <span class="text-muted">${escapeHtml(s.tax_id || '')}</span>
-                        </button>`
-                    ).join('');
-                })
-                .catch(() => {
-                    resultsDiv.innerHTML = '';
-                });
-        };
-
-        searchInput.addEventListener('input', () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(doSearch, 300);
-        });
-
-        searchBtn.addEventListener('click', doSearch);
-
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                doSearch();
-            }
-        });
-
-        resultsDiv.addEventListener('click', (event) => {
-            const item = event.target.closest('[data-id]');
-            if (!item) {
-                return;
-            }
-            const nameInput = document.getElementById('supplier_name');
-            const taxIdInput = document.getElementById('supplier_tax_id');
-            if (nameInput) {
-                nameInput.value = item.dataset.name;
-            }
-            if (taxIdInput) {
-                taxIdInput.value = item.dataset.taxid;
-            }
-
-            // Set or create the hidden select for matched supplier ID
-            let matchSelect = document.getElementById('supplier_match_select');
-            if (!matchSelect) {
-                matchSelect = document.createElement('select');
-                matchSelect.id = 'supplier_match_select';
-                matchSelect.className = 'form-select form-select-sm d-none';
-                resultsDiv.parentElement.appendChild(matchSelect);
-            }
-            matchSelect.innerHTML = `<option value="${escapeAttribute(item.dataset.id)}" selected>${escapeHtml(item.dataset.name)}</option>`;
-
-            resultsDiv.innerHTML = '';
-            searchInput.value = '';
-
-            // Update status alert
-            const alertEl = resultsDiv.closest('.card-body')?.querySelector('.alert');
-            if (alertEl) {
-                alertEl.className = 'alert alert-success small mb-0';
-                alertEl.textContent = trans('aiscan-selected-supplier', {
-                    '%name%': item.dataset.name,
-                    '%taxId%': item.dataset.taxid,
-                });
-            }
-        });
-    }
-
-    function buildLinesSection(lines) {
-        const rows = (lines.length > 0 ? lines : [{
-            description: trans('aiscan-scanned-supplier-invoice'),
-            discount: 0,
-            quantity: 1,
-            tax_rate: 0,
-            unit_price: 0,
-        }]).map((line, index) => `
-            <tr data-line-index="${index}">
-                <td><input class="form-control form-control-sm" data-field="description" value="${escapeAttribute(line.description || '')}"></td>
-                <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="0.01" value="${escapeAttribute(line.quantity ?? 1)}" style="width:70px"></td>
-                <td><input class="form-control form-control-sm" data-field="unit_price" type="number" step="0.01" value="${escapeAttribute(line.unit_price ?? 0)}" style="width:90px"></td>
-                <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="${escapeAttribute(line.discount ?? 0)}" style="width:70px"></td>
-                <td><input class="form-control form-control-sm" data-field="tax_rate" type="number" step="0.01" value="${escapeAttribute(line.tax_rate ?? 0)}" style="width:70px"></td>
-                <td><input class="form-control form-control-sm" data-field="sku" value="${escapeAttribute(line.sku || '')}" style="width:80px"></td>
-                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttribute(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
-            </tr>
-        `).join('');
-
-        const section = buildSection(trans('aiscan-line-items'), `
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>${escapeHtml(trans('description'))}</th>
-                            <th>${escapeHtml(trans('quantity'))}</th>
-                            <th>${escapeHtml(trans('price'))}</th>
-                            <th>${escapeHtml(trans('discount'))} %</th>
-                            <th>${escapeHtml(trans('tax'))} %</th>
-                            <th>SKU</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="${selectors.linesBody}">${rows}</tbody>
-                </table>
-            </div>
-        `);
-
-        section.addEventListener('click', (event) => {
-            const btn = event.target.closest('.aiscan-delete-line');
-            if (btn) {
-                const row = btn.closest('tr');
-                if (row && document.querySelectorAll(`#${selectors.linesBody} tr`).length > 1) {
-                    row.remove();
-                }
-            }
-        });
-
-        return section;
-    }
-
-    function collectFormData(baseData, options = {}) {
-        const acceptBtn = document.getElementById(selectors.acceptBtn);
-        const sourceData = baseData || (acceptBtn.dataset.extractedData ? JSON.parse(acceptBtn.dataset.extractedData) : null);
-        if (!sourceData) {
+    function getProviderField() {
+        const hidden = document.querySelector('input[name="codproveedor"]');
+        if (!hidden) {
             return null;
         }
 
-        const data = flow.cloneValue(sourceData);
+        const block = hidden.closest('.mb-2');
+        const column = block?.closest('[class*="col-"]') || block?.parentElement || hidden.parentElement;
+        const text = block?.querySelector('input[readonly]') || block?.querySelector('input.form-control');
+        const link = block?.querySelector('a[href*="EditProveedor"]');
+        return {block, column, hidden, link, text};
+    }
+
+    function getSupplierHelper() {
+        return document.getElementById('aiscan-supplier-helper');
+    }
+
+    function ensureSupplierHelper(supplier) {
+        const providerField = getProviderField();
+        if (!providerField?.column) {
+            return null;
+        }
+
+        let helper = getSupplierHelper();
+        if (!helper) {
+            providerField.column.insertAdjacentHTML('afterend', `
+                <div class="col-12" id="aiscan-supplier-helper">
+                    <div class="card border-warning mt-2">
+                        <div class="card-body py-3">
+                            <div class="alert alert-warning py-2 small mb-3" id="aiscan-supplier-helper-status"></div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1" for="aiscan-supplier-name">${escapeHtml(trans('name'))}</label>
+                                    <input type="text" class="form-control form-control-sm" id="aiscan-supplier-name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1" for="aiscan-supplier-taxid">${escapeHtml(trans('tax-id'))}</label>
+                                    <input type="text" class="form-control form-control-sm" id="aiscan-supplier-taxid">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1" for="aiscan-supplier-email">${escapeHtml(trans('email'))}</label>
+                                    <input type="text" class="form-control form-control-sm" id="aiscan-supplier-email">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1" for="aiscan-supplier-phone">${escapeHtml(trans('phone'))}</label>
+                                    <input type="text" class="form-control form-control-sm" id="aiscan-supplier-phone">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1" for="aiscan-supplier-address">${escapeHtml(trans('address'))}</label>
+                                    <textarea class="form-control form-control-sm" id="aiscan-supplier-address" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap mt-3">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiscan-supplier-search-btn">
+                                    <i class="fa-solid fa-magnifying-glass me-1"></i>${escapeHtml(trans('search'))}
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="aiscan-create-supplier-btn">
+                                    <i class="fa-solid fa-user-plus me-1"></i>${escapeHtml(trans('aiscan-create-supplier'))}
+                                </button>
+                            </div>
+                            <div class="list-group mt-2" id="aiscan-supplier-results"></div>
+                        </div>
+                    </div>
+                </div>
+            `);
+            helper = getSupplierHelper();
+        }
+
+        setSupplierHelperValues(supplier);
+        return helper;
+    }
+
+    function setSupplierHelperValues(supplier) {
+        setValue('aiscan-supplier-name', supplier.name || '');
+        setValue('aiscan-supplier-taxid', supplier.tax_id || '');
+        setValue('aiscan-supplier-email', supplier.email || '');
+        setValue('aiscan-supplier-phone', supplier.phone || '');
+        setValue('aiscan-supplier-address', supplier.address || '');
+
+        const statusEl = document.getElementById('aiscan-supplier-helper-status');
+        if (!statusEl) {
+            return;
+        }
+
+        const text = supplier.match_status === 'ambiguous'
+            ? trans('aiscan-supplier-ambiguous')
+            : trans('aiscan-supplier-inline-help');
+        statusEl.textContent = text;
+    }
+
+    function applySupplierToPage(supplier) {
+        const providerField = getProviderField();
+        if (!providerField) {
+            return;
+        }
+
+        if (supplier.matched_supplier_id && (supplier.matched_name || supplier.name)) {
+            applyMatchedSupplier({
+                id: supplier.matched_supplier_id,
+                name: supplier.matched_name || supplier.name || '',
+                tax_id: supplier.tax_id || '',
+            }, false);
+        } else {
+            if (!providerField.hidden.value) {
+                if (providerField.text) {
+                    providerField.text.value = '';
+                }
+            }
+            resetInvoiceWorkspace();
+            ensureSupplierHelper(supplier);
+        }
+
+        const detailName = document.querySelector('input[name="nombre"]');
+        const detailTax = document.querySelector('input[name="cifnif"]');
+        if (detailName && !detailName.value) {
+            detailName.value = supplier.name || '';
+        }
+        if (detailTax && !detailTax.value) {
+            detailTax.value = supplier.tax_id || '';
+        }
+    }
+
+    function hideSupplierHelper() {
+        const helper = getSupplierHelper();
+        if (helper) {
+            helper.remove();
+        }
+    }
+
+    function applyInvoiceToPage(invoice) {
+        setDateValue('input[name="fecha"]', invoice.issue_date || '');
+        setFormValue('input[name="numproveedor"]', invoice.number || '');
+        setFormValue('textarea[name="observaciones"]', invoice.summary || state.initialObservations || '');
+        setSelectValue('select[name="codserie"]', invoice.series || '');
+        setSelectValue('select[name="codpago"]', invoice.payment_method || invoice.payment_terms || '');
+        setSelectValue('select[name="coddivisa"]', invoice.currency || '');
+        setFormValue('input[name="nombre"]', readValue('aiscan-supplier-name') || invoice.supplier_name || '');
+        setFormValue('input[name="cifnif"]', readValue('aiscan-supplier-taxid') || invoice.supplier_tax_id || '');
+    }
+
+    function queuePendingLines() {
+        const entry = getCurrentFileEntry();
+        if (!entry?.extractedData) {
+            return;
+        }
+
+        window.clearTimeout(state.pendingLinesTimer);
+        state.pendingLinesTimer = window.setTimeout(() => {
+            waitForInvoiceWorkspace(12);
+        }, 150);
+    }
+
+    function waitForInvoiceWorkspace(remainingAttempts) {
+        const entry = getCurrentFileEntry();
+        if (!entry?.extractedData) {
+            return;
+        }
+
+        const container = document.getElementById('purchasesFormLines');
+        if (container) {
+            applyLinesToPage(Array.isArray(entry.extractedData.lines) ? entry.extractedData.lines : []);
+            return;
+        }
+
+        if (remainingAttempts <= 0) {
+            return;
+        }
+
+        state.pendingLinesTimer = window.setTimeout(() => {
+            waitForInvoiceWorkspace(remainingAttempts - 1);
+        }, 200);
+    }
+
+    function normalizeLines(lines) {
+        const safeLines = Array.isArray(lines) && lines.length > 0 ? lines : [{
+            description: trans('aiscan-scanned-supplier-invoice'),
+            discount: 0,
+            quantity: 1,
+            selected_reference: '',
+            sku: '',
+            tax_rate: 0,
+            unit_price: 0,
+        }];
+
+        return safeLines.map((line, index) => ({
+            description: line.description || '',
+            discount: line.discount ?? 0,
+            id: `n${index + 1}`,
+            product_description: line.product_description || '',
+            quantity: line.quantity ?? 1,
+            selected_reference: line.selected_reference || '',
+            sku: line.sku || '',
+            tax_rate: line.tax_rate ?? 0,
+            unit_price: line.unit_price ?? 0,
+        }));
+    }
+
+    function applyLinesToPage(lines) {
+        const container = document.getElementById('purchasesFormLines');
+        if (!container) {
+            return;
+        }
+
+        const normalizedLines = normalizeLines(lines);
+        container.innerHTML = `
+            <div class="container-fluid d-none d-lg-block pt-3">
+                <div class="row g-2 border-bottom">
+                    <div class="col-lg-2">Referencia</div>
+                    <div class="col-lg">Descripción</div>
+                    <div class="col-lg-1 text-end">Cantidad</div>
+                    <div class="col-lg-1 text-end">Precio</div>
+                    <div class="col-lg-1 text-center">% Dto.</div>
+                    <div class="col-lg-1 text-end">Impuesto</div>
+                    <div class="col-lg-auto"></div>
+                </div>
+            </div>
+            <div class="container-fluid" id="${selectors.linesBody}">
+                ${normalizedLines.map((line, index) => renderNativeLine(line, index)).join('')}
+            </div>
+        `;
+    }
+
+    function renderNativeLine(line, index) {
+        return `
+            <div class="row g-2 align-items-start border-bottom pb-3 pb-lg-0 aiscan-page-line" data-line-index="${index}">
+                <div class="col-sm-4 col-lg-2">
+                    <div class="d-lg-none mt-2 small">${escapeHtml(trans('reference'))}</div>
+                    <input type="hidden" data-field="selected_reference" value="${escapeAttribute(line.selected_reference)}">
+                    <input type="hidden" data-field="product_description" value="${escapeAttribute(line.product_description)}">
+                    <div class="input-group input-group-sm mb-1">
+                        <input type="text" class="form-control" data-field="reference_search" value="${escapeAttribute(line.selected_reference || line.sku || '')}" placeholder="${escapeAttribute(trans('reference'))}">
+                        <button class="btn btn-info aiscan-line-product-search" type="button">
+                            <i class="fa-solid fa-book fa-fw"></i>
+                        </button>
+                    </div>
+                    <div class="list-group aiscan-search-results mb-1"></div>
+                </div>
+                <div class="col-sm-8 col-lg">
+                    <div class="d-lg-none mt-2 small">${escapeHtml(trans('description'))}</div>
+                    <textarea class="form-control form-control-sm" data-field="description" rows="2">${escapeHtml(line.description)}</textarea>
+                </div>
+                <div class="col-sm-4 col-lg-1">
+                    <div class="d-lg-none mt-2 small">${escapeHtml(trans('quantity'))}</div>
+                    <input type="number" class="form-control form-control-sm text-lg-end" data-field="quantity" step="0.01" value="${escapeAttribute(line.quantity)}">
+                </div>
+                <div class="col-sm-4 col-lg-1">
+                    <div class="d-lg-none mt-2 small">${escapeHtml(trans('price'))}</div>
+                    <input type="number" class="form-control form-control-sm text-lg-end" data-field="unit_price" step="0.01" value="${escapeAttribute(line.unit_price)}">
+                </div>
+                <div class="col-sm-4 col-lg-1">
+                    <div class="d-lg-none mt-2 small">${escapeHtml(trans('discount'))}</div>
+                    <input type="number" class="form-control form-control-sm text-lg-center" data-field="discount" step="0.01" value="${escapeAttribute(line.discount)}">
+                </div>
+                <div class="col-sm-6 col-lg-1">
+                    <div class="d-lg-none mt-2 small">${escapeHtml(trans('tax'))}</div>
+                    <input type="number" class="form-control form-control-sm text-lg-end" data-field="tax_rate" step="0.01" value="${escapeAttribute(line.tax_rate)}">
+                    <input type="hidden" data-field="sku" value="${escapeAttribute(line.sku)}">
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-danger aiscan-delete-line" type="button" title="${escapeAttribute(trans('aiscan-delete-line'))}">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function handleGlobalClick(event) {
+        const searchBtn = event.target.closest('#aiscan-supplier-search-btn');
+        if (searchBtn) {
+            runSupplierSearch();
+            return;
+        }
+
+        const createSupplierBtn = event.target.closest('#aiscan-create-supplier-btn');
+        if (createSupplierBtn) {
+            createSupplierFromInline();
+            return;
+        }
+
+        const supplierResult = event.target.closest('[data-aiscan-supplier-id]');
+        if (supplierResult) {
+            applyMatchedSupplier({
+                id: supplierResult.dataset.aiscanSupplierId,
+                name: supplierResult.dataset.aiscanSupplierName,
+                tax_id: supplierResult.dataset.aiscanSupplierTaxid || '',
+            });
+            document.getElementById('aiscan-supplier-results').innerHTML = '';
+            return;
+        }
+
+        const deleteLine = event.target.closest('.aiscan-delete-line');
+        if (deleteLine) {
+            const lines = document.querySelectorAll(`#${selectors.linesBody} .aiscan-page-line`);
+            if (lines.length > 1) {
+                deleteLine.closest('.aiscan-page-line')?.remove();
+            }
+            return;
+        }
+
+        const productSearch = event.target.closest('.aiscan-line-product-search');
+        if (productSearch) {
+            searchProductsForRow(productSearch.closest('.aiscan-page-line'));
+            return;
+        }
+
+        const productResult = event.target.closest('[data-aiscan-product-reference]');
+        if (productResult) {
+            applySelectedProduct(productResult.closest('.aiscan-page-line'), {
+                description: productResult.dataset.aiscanProductDescription || '',
+                reference: productResult.dataset.aiscanProductReference,
+            });
+        }
+    }
+
+    function handleGlobalInput(event) {
+        if (event.target.matches('#aiscan-supplier-name, #aiscan-supplier-taxid')) {
+            syncInlineSupplierToDetailModal();
+            return;
+        }
+
+        if (event.target.matches('[data-field="reference_search"]')) {
+            debounceProductSearch(event.target.closest('.aiscan-page-line'));
+            return;
+        }
+
+        if (event.target.matches('[data-field="description"]') && event.target.value.trim() === '') {
+            const row = event.target.closest('.aiscan-page-line');
+            const productDescription = row?.querySelector('[data-field="product_description"]')?.value || '';
+            if (productDescription) {
+                event.target.value = productDescription;
+            }
+        }
+    }
+
+    function handleGlobalKeydown(event) {
+        if (event.key === 'Enter' && event.target.matches('[data-field="reference_search"]')) {
+            event.preventDefault();
+            searchProductsForRow(event.target.closest('.aiscan-page-line'));
+        }
+    }
+
+    function runSupplierSearch() {
+        const query = [readValue('aiscan-supplier-name'), readValue('aiscan-supplier-taxid')]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+        if (query.length < 2) {
+            return;
+        }
+
+        fetch(`AiScanInvoice?${new URLSearchParams({action: 'search-suppliers', query}).toString()}`)
+            .then((response) => response.json())
+            .then((data) => {
+                const results = Array.isArray(data.results) ? data.results : [];
+                const container = document.getElementById('aiscan-supplier-results');
+                if (results.length === 0) {
+                    container.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                    return;
+                }
+
+                container.innerHTML = results.map((item) => `
+                    <button type="button" class="list-group-item list-group-item-action small py-1"
+                        data-aiscan-supplier-id="${escapeAttribute(item.id)}"
+                        data-aiscan-supplier-name="${escapeAttribute(item.name)}"
+                        data-aiscan-supplier-taxid="${escapeAttribute(item.tax_id || '')}">
+                        <strong>${escapeHtml(item.name)}</strong>
+                        <span class="text-muted ms-1">${escapeHtml(item.tax_id || '')}</span>
+                    </button>
+                `).join('');
+            })
+            .catch(() => setStatus(trans('aiscan-no-results'), 'warning'));
+    }
+
+    function createSupplierFromInline() {
+        const payload = getInlineSupplierData();
+        if (!payload.name.trim()) {
+            setStatus(trans('aiscan-supplier-name-required'), 'danger');
+            return;
+        }
+
+        fetch('AiScanInvoice?action=create-supplier', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        })
+            .then((response) => response.json())
+            .then((result) => {
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                applyMatchedSupplier(result.supplier);
+                setStatus(trans('aiscan-supplier-created'), 'success');
+            })
+            .catch((error) => setStatus(error.message, 'danger'));
+    }
+
+    function getInlineSupplierData() {
+        return {
+            address: readValue('aiscan-supplier-address'),
+            email: readValue('aiscan-supplier-email'),
+            name: readValue('aiscan-supplier-name'),
+            phone: readValue('aiscan-supplier-phone'),
+            tax_id: readValue('aiscan-supplier-taxid'),
+        };
+    }
+
+    function applyMatchedSupplier(supplier, syncEntry = true) {
+        const providerField = getProviderField();
+        if (!providerField) {
+            return;
+        }
+
+        providerField.hidden.value = supplier.id || '';
+        if (providerField.text) {
+            providerField.text.value = supplier.name || '';
+        }
+        if (providerField.link) {
+            providerField.link.href = `EditProveedor?code=${encodeURIComponent(supplier.id || '')}`;
+        }
+
+        setFormValue('input[name="nombre"]', supplier.name || '');
+        setFormValue('input[name="cifnif"]', supplier.tax_id || '');
+        notifyNativeSupplierSelection(providerField);
+        hideSupplierHelper();
+
+        const entry = getCurrentFileEntry();
+        if (syncEntry && entry?.extractedData) {
+            entry.extractedData.supplier = {
+                ...(entry.extractedData.supplier || {}),
+                matched_name: supplier.name || '',
+                matched_supplier_id: supplier.id || '',
+                match_status: 'matched',
+                name: supplier.name || entry.extractedData.supplier?.name || '',
+                tax_id: supplier.tax_id || entry.extractedData.supplier?.tax_id || '',
+            };
+            renderDrawerSummary(entry.extractedData);
+        }
+
+        if (entry?.extractedData) {
+            applyInvoiceToPage(entry.extractedData.invoice || {});
+            runNativeSetSupplier();
+        }
+    }
+
+    function notifyNativeSupplierSelection(providerField) {
+        [providerField.hidden, providerField.text].forEach((field) => {
+            if (!field) {
+                return;
+            }
+
+            field.dispatchEvent(new Event('input', {bubbles: true}));
+            field.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+
+        document.dispatchEvent(new CustomEvent('aiscan:supplier-selected', {
+            bubbles: true,
+            detail: {
+                code: providerField.hidden?.value || '',
+                name: providerField.text?.value || '',
+            },
+        }));
+    }
+
+    function runNativeSetSupplier() {
+        if (typeof window.purchasesFormAction !== 'function') {
+            queuePendingLines();
+            return;
+        }
+
+        const form = document.forms.purchasesForm;
+        if (!form || !form.codproveedor || !form.codproveedor.value) {
+            return;
+        }
+
+        window.clearTimeout(state.pendingLinesTimer);
+        window.purchasesFormAction('set-supplier', '0');
+        state.pendingLinesTimer = window.setTimeout(() => {
+            const entry = getCurrentFileEntry();
+            if (!entry?.extractedData) {
+                return;
+            }
+
+            applyInvoiceToPage(entry.extractedData.invoice || {});
+            waitForInvoiceWorkspace(15);
+            window.setTimeout(() => applyInvoiceToPage(entry.extractedData.invoice || {}), 250);
+        }, 350);
+    }
+
+    function syncInlineSupplierToDetailModal() {
+        setFormValue('input[name="nombre"]', readValue('aiscan-supplier-name'));
+        setFormValue('input[name="cifnif"]', readValue('aiscan-supplier-taxid'));
+    }
+
+    function debounceProductSearch(row) {
+        if (!row) {
+            return;
+        }
+
+        if (row.dataset.searchTimer) {
+            window.clearTimeout(Number(row.dataset.searchTimer));
+        }
+
+        row.dataset.searchTimer = String(window.setTimeout(() => searchProductsForRow(row), 250));
+    }
+
+    function searchProductsForRow(row) {
+        if (!row) {
+            return;
+        }
+
+        const query = row.querySelector('[data-field="reference_search"]')?.value.trim() || '';
+        const results = row.querySelector('.aiscan-search-results');
+        if (!results) {
+            return;
+        }
+
+        if (query.length < 2) {
+            results.innerHTML = '';
+            return;
+        }
+
+        fetch(`AiScanInvoice?${new URLSearchParams({action: 'search-products', query}).toString()}`)
+            .then((response) => response.json())
+            .then((data) => {
+                const items = Array.isArray(data.results) ? data.results : [];
+                if (items.length === 0) {
+                    results.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                    return;
+                }
+
+                results.innerHTML = items.map((item) => `
+                    <button type="button" class="list-group-item list-group-item-action small py-1"
+                        data-aiscan-product-reference="${escapeAttribute(item.reference || '')}"
+                        data-aiscan-product-description="${escapeAttribute(item.description || '')}">
+                        <strong>${escapeHtml(item.reference || '')}</strong>
+                        <span class="text-muted ms-1">${escapeHtml(item.description || '')}</span>
+                    </button>
+                `).join('');
+            })
+            .catch(() => {
+                results.innerHTML = '';
+            });
+    }
+
+    function applySelectedProduct(row, product) {
+        if (!row) {
+            return;
+        }
+
+        const selectedReference = row.querySelector('[data-field="selected_reference"]');
+        const referenceSearch = row.querySelector('[data-field="reference_search"]');
+        const productDescription = row.querySelector('[data-field="product_description"]');
+        const description = row.querySelector('[data-field="description"]');
+        const results = row.querySelector('.aiscan-search-results');
+
+        if (selectedReference) {
+            selectedReference.value = product.reference || '';
+        }
+        if (referenceSearch) {
+            referenceSearch.value = product.reference || '';
+        }
+        if (productDescription) {
+            productDescription.value = product.description || '';
+        }
+        if (description && description.value.trim() === '') {
+            description.value = product.description || '';
+        }
+        if (results) {
+            results.innerHTML = '';
+        }
+    }
+
+    function collectPageData(baseData) {
+        if (!baseData) {
+            return null;
+        }
+
+        const data = flow.cloneValue(baseData);
+        const warehouseLabel = trans('aiscan-warehouse');
         data.invoice = data.invoice || {};
         data.supplier = data.supplier || {};
 
-        data.invoice.number = readValue('invoice_number');
-        data.invoice.issue_date = readValue('invoice_issue_date');
-        data.invoice.due_date = readValue('invoice_due_date');
-        data.invoice.currency = readValue('invoice_currency');
-        data.invoice.warehouse_code = readValue('invoice_warehouse_code').trim();
-        data.invoice.subtotal = parseFloat(readValue('invoice_subtotal') || 0);
-        data.invoice.tax_amount = parseFloat(readValue('invoice_tax_amount') || 0);
-        data.invoice.total = parseFloat(readValue('invoice_total') || 0);
-        const withholdingEl = document.getElementById('invoice_withholding');
-        if (withholdingEl) {
-            data.invoice.withholding_amount = parseFloat(withholdingEl.value || 0);
-        }
-        data.invoice.summary = readValue('invoice_summary');
-        const paymentTermsEl = document.getElementById('invoice_payment_terms');
-        if (paymentTermsEl) {
-            data.invoice.payment_terms = paymentTermsEl.value;
-        }
+        const providerField = getProviderField();
+        data.supplier.matched_supplier_id = providerField?.hidden?.value || '';
+        data.supplier.matched_name = providerField?.text?.value || '';
+        data.supplier.name = readValue('aiscan-supplier-name') || readValueBySelector('input[name="nombre"]') || data.supplier.name || '';
+        data.supplier.tax_id = readValue('aiscan-supplier-taxid') || readValueBySelector('input[name="cifnif"]') || data.supplier.tax_id || '';
+        data.supplier.email = readValue('aiscan-supplier-email') || data.supplier.email || '';
+        data.supplier.phone = readValue('aiscan-supplier-phone') || data.supplier.phone || '';
+        data.supplier.address = readValue('aiscan-supplier-address') || data.supplier.address || '';
+        data.supplier.match_status = data.supplier.matched_supplier_id ? 'matched' : 'not_found';
 
-        data.supplier.name = readValue('supplier_name');
-        data.supplier.tax_id = readValue('supplier_tax_id');
-        data.supplier.email = readValue('supplier_email');
-        data.supplier.phone = readValue('supplier_phone');
-        data.supplier.address = readValue('supplier_address');
-
-        const selectedSupplier = document.getElementById('supplier_match_select');
-        if (selectedSupplier) {
-            data.supplier.matched_supplier_id = selectedSupplier.value;
-            delete data.supplier.create_if_missing;
-        } else {
-            delete data.supplier.matched_supplier_id;
+        data.invoice.issue_date = readValueBySelector('input[name="fecha"]');
+        data.invoice.number = readValueBySelector('input[name="numproveedor"]');
+        data.invoice.series = readValueBySelector('select[name="codserie"]');
+        data.invoice.payment_method = readValueBySelector('select[name="codpago"]');
+        data.invoice.payment_terms = data.invoice.payment_method;
+        data.invoice.currency = readValueBySelector('select[name="coddivisa"]') || data.invoice.currency || 'EUR';
+        data.invoice.summary = readValueBySelector('textarea[name="observaciones"]');
+        data.invoice.warehouse_code = readValue('invoice_warehouse_code') || data.invoice.warehouse_code || '';
+        if (!data.invoice.warehouse_code && warehouseLabel === '') {
+            data.invoice.warehouse_code = '';
         }
 
-        if (options.confirmCreateSupplier && !selectedSupplier && (data.supplier.match_status || 'not_found') === 'not_found') {
-            if (!window.confirm(trans('aiscan-create-new-supplier-confirm'))) {
-                return null;
-            }
-            data.supplier.create_if_missing = true;
-        } else if (!options.confirmCreateSupplier) {
-            delete data.supplier.create_if_missing;
-        }
-
-        data.lines = Array.from(document.querySelectorAll(`#${selectors.linesBody} tr`)).map((row) => {
+        data.lines = Array.from(document.querySelectorAll(`#${selectors.linesBody} .aiscan-page-line`)).map((row) => {
             const line = {};
             row.querySelectorAll('[data-field]').forEach((input) => {
-                line[input.dataset.field] = input.type === 'number' ? parseFloat(input.value || 0) : input.value;
+                if (input.dataset.field === 'reference_search') {
+                    return;
+                }
+
+                line[input.dataset.field] = input.type === 'number'
+                    ? parseFloat(input.value || 0)
+                    : input.value;
             });
             return line;
         });
@@ -1274,17 +1595,16 @@
             tmp_file: getCurrentFileEntry()?.tmpFile || '',
         };
 
-        acceptBtn.dataset.extractedData = JSON.stringify(data);
         return data;
     }
 
-    function acceptExtracted() {
+    function saveCurrentDocument() {
         const entry = getCurrentFileEntry();
         if (!entry || entry.isSaving) {
             return;
         }
 
-        const data = collectFormData(entry.extractedData, {confirmCreateSupplier: true});
+        const data = collectPageData(entry.extractedData);
         if (!data) {
             return;
         }
@@ -1299,15 +1619,13 @@
         updateWizardControls();
         setStatus(trans('aiscan-saving-invoice'), 'info');
 
-        const params = new URLSearchParams({
+        fetch(`AiScanInvoice?${new URLSearchParams({
             action: 'apply',
             invoice_id: flow.getSaveInvoiceId(entry),
-        });
-
-        fetch('AiScanInvoice?' + params.toString(), {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+        }).toString()}`, {
             body: JSON.stringify(data),
+            headers: {'Content-Type': 'application/json'},
+            method: 'POST',
         })
             .then((response) => response.json())
             .then((result) => {
@@ -1317,14 +1635,17 @@
 
                 Object.assign(entry, flow.markEntrySaved(entry, result.invoice_id));
                 setStatus(trans('aiscan-invoice-saved-successfully'), 'success');
+
                 const meta = flow.getWizardMeta(state.files, state.currentFileIndex);
                 if (meta.isMultiFile && !meta.isLast) {
+                    resetNativeInvoiceView();
                     navigateToFile(state.currentFileIndex + 1);
                     return;
                 }
 
-                bootstrap.Modal.getInstance(document.getElementById(selectors.modalId))?.hide();
-                setTimeout(() => window.location.href = 'EditFacturaProveedor?code=' + encodeURIComponent(result.invoice_id), 300);
+                window.setTimeout(() => {
+                    window.location.href = `EditFacturaProveedor?code=${encodeURIComponent(result.invoice_id)}&action=save-ok`;
+                }, 300);
             })
             .catch((error) => setStatus(error.message, 'danger'))
             .finally(() => {
@@ -1333,8 +1654,90 @@
             });
     }
 
+    function resetNativeInvoiceView() {
+        const providerField = getProviderField();
+        if (providerField) {
+            providerField.hidden.value = '';
+            if (providerField.text) {
+                providerField.text.value = '';
+            }
+        }
+
+        setFormValue('input[name="fecha"]', '');
+        setFormValue('input[name="numproveedor"]', '');
+        setFormValue('textarea[name="observaciones"]', state.initialObservations || '');
+        setFormValue('input[name="nombre"]', '');
+        setFormValue('input[name="cifnif"]', '');
+
+        const linesContainer = document.getElementById('purchasesFormLines');
+        if (linesContainer) {
+            linesContainer.innerHTML = state.initialLinesMarkup || '';
+        }
+
+        hideSupplierHelper();
+    }
+
+    function resetInvoiceWorkspace() {
+        window.clearTimeout(state.pendingLinesTimer);
+        const linesContainer = document.getElementById('purchasesFormLines');
+        if (linesContainer) {
+            linesContainer.innerHTML = state.initialLinesMarkup || '';
+        }
+    }
+
+    function setFormValue(selector, value) {
+        const field = document.querySelector(selector);
+        if (field) {
+            field.value = value == null ? '' : String(value);
+            field.dispatchEvent(new Event('input', {bubbles: true}));
+            field.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+    }
+
+    function setDateValue(selector, value) {
+        const field = document.querySelector(selector);
+        if (!field) {
+            return;
+        }
+
+        const normalized = typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}$/)
+            ? value
+            : '';
+        field.value = normalized;
+        field.setAttribute('value', normalized);
+        field.dispatchEvent(new Event('input', {bubbles: true}));
+        field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+
+    function setSelectValue(selector, value) {
+        if (!value) {
+            return;
+        }
+
+        const field = document.querySelector(selector);
+        if (!field) {
+            return;
+        }
+
+        const option = Array.from(field.options).find((item) => item.value === value);
+        if (option) {
+            field.value = value;
+        }
+    }
+
     function readValue(id) {
         return document.getElementById(id)?.value || '';
+    }
+
+    function readValueBySelector(selector) {
+        return document.querySelector(selector)?.value || '';
+    }
+
+    function setValue(id, value) {
+        const field = document.getElementById(id);
+        if (field) {
+            field.value = value == null ? '' : String(value);
+        }
     }
 
     function setStatus(message, level = '') {
@@ -1342,12 +1745,13 @@
         if (!status) {
             return;
         }
+
         if (!message) {
             status.innerHTML = '';
             return;
         }
 
-        status.innerHTML = `<div class="alert alert-${level || 'secondary'} py-1 px-2 small mb-0">${escapeHtml(message)}</div>`;
+        status.innerHTML = `<div class="alert alert-${level || 'secondary'} py-2 px-2 small mb-0">${escapeHtml(message)}</div>`;
     }
 
     function escapeHtml(value) {

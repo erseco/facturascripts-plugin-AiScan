@@ -21,24 +21,12 @@
 namespace FacturaScripts\Plugins\AiScan\Extension\Controller;
 
 use Closure;
-use FacturaScripts\Core\Tools;
-use FacturaScripts\Dinamic\Lib\AssetManager;
 
 class ListFacturaProveedor
 {
     public function createViews(): Closure
     {
         return function () {
-            $route = Tools::config('route');
-            AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
-            AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan.js');
-            $this->addButton('ListFacturaProveedor', [
-                'action' => "var m=document.getElementById('modalaiscan');if(m){new bootstrap.Modal(m).show();}",
-                'color' => 'info',
-                'icon' => 'fa-solid fa-file-invoice',
-                'label' => 'scan-invoice',
-                'type' => 'js',
-            ]);
         };
     }
 }

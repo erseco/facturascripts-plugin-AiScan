@@ -30,17 +30,9 @@ class EditFacturaProveedor
     {
         return function () {
             $route = Tools::config('route');
-            $viewName = $this->getMainViewName();
             AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
             AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan-flow.js');
             AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan.js');
-            $this->addButton($viewName, [
-                'action' => "var m=document.getElementById('modalaiscan');if(m){new bootstrap.Modal(m).show();}",
-                'color' => 'info',
-                'icon' => 'fa-solid fa-file-invoice',
-                'label' => 'scan-invoice',
-                'type' => 'js',
-            ]);
         };
     }
 

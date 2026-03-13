@@ -29,7 +29,6 @@ class AiScanSettings
         'default_provider' => 'openai',
         'max_upload_size_mb' => 10,
         'allowed_extensions' => 'pdf,jpg,jpeg,png,webp',
-        'auto_scan' => false,
         'debug_mode' => false,
         'request_timeout' => 120,
         'openai_model' => 'gpt-5-mini',
@@ -63,11 +62,6 @@ class AiScanSettings
     {
         $extensions = self::get('allowed_extensions', 'pdf,jpg,jpeg,png,webp');
         return array_map('trim', explode(',', $extensions));
-    }
-
-    public static function isAutoScanEnabled(): bool
-    {
-        return (bool) self::get('auto_scan', false);
     }
 
     public static function isDebugMode(): bool

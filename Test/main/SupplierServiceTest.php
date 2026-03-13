@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * @runTestsInSeparateProcesses
+ *
  * @preserveGlobalState disabled
  */
 final class SupplierServiceTest extends TestCase
@@ -117,6 +118,44 @@ final class SupplierServiceTest extends TestCase
         $this->assertSame('created', $supplierData['match_status']);
         $this->assertSame('SUP-02', $supplierData['matched_supplier_id']);
         $this->assertSame('New Supplier', $supplierData['matched_name']);
+    }
+
+    public function testCreateOrResolveEnablesCreateFallback(): void
+    {
+        $createdSupplier = $this->stubSupplier('SUP-03', 'Created Supplier');
+        $matcher = $this->createMock(SupplierMatcher::class);
+        $matcher->expects($this->once())
+            ->method('findMatch')
+            ->willReturn([
+                'match_status' => 'not_found',
+                'supplier' => null,
+                'candidates' => [],
+            ]);
+
+        $service = new class ($matcher, $createdSupplier) extends SupplierService {
+            public function __construct(
+                SupplierMatcher $matcher,
+                private Proveedor $createdSupplier
+            ) {
+                parent::__construct($matcher);
+            }
+
+            protected function createSupplier(array $supplierData): ?Proveedor
+            {
+                return $this->createdSupplier;
+            }
+        };
+
+        $supplierData = [
+            'name' => 'Created Supplier',
+            'tax_id' => 'B11122233',
+        ];
+
+        $resolved = $service->createOrResolve($supplierData);
+
+        $this->assertSame($createdSupplier, $resolved);
+        $this->assertTrue($supplierData['create_if_missing']);
+        $this->assertSame('SUP-03', $supplierData['matched_supplier_id']);
     }
 
     private function stubSupplier(string $code, string $name): Proveedor

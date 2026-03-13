@@ -86,6 +86,14 @@ class InvoiceMapper
                 $invoice->vencimiento = $invoiceData['due_date'];
             }
 
+            if (!empty($invoiceData['series'])) {
+                $invoice->codserie = $invoiceData['series'];
+            }
+
+            if (!empty($invoiceData['payment_method'])) {
+                $invoice->codpago = $invoiceData['payment_method'];
+            }
+
             if (!empty($invoiceData['currency'])) {
                 $divisa = new Divisa();
                 if ($divisa->loadFromCode(strtoupper($invoiceData['currency']))) {
@@ -112,7 +120,7 @@ class InvoiceMapper
 
             $invoiceLines = [];
             foreach ($this->prepareLines($lines, $invoiceData) as $lineData) {
-                $reference = $this->productMatcher->findReference($lineData);
+                $reference = $this->resolveLineReference($lineData);
                 $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
                 $line->descripcion = trim((string) ($lineData['description'] ?? $line->descripcion));
                 $line->cantidad = max(1, (float) ($lineData['quantity'] ?? 1));
@@ -188,5 +196,11 @@ class InvoiceMapper
     private function getWarehouseCode(array $invoiceData): string
     {
         return trim((string) ($invoiceData['warehouse_code'] ?? ''));
+    }
+
+    private function resolveLineReference(array $lineData): ?string
+    {
+        $selectedReference = trim((string) ($lineData['selected_reference'] ?? ''));
+        return $selectedReference !== '' ? $selectedReference : null;
     }
 }

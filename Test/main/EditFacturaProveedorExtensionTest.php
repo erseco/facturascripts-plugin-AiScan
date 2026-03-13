@@ -38,7 +38,7 @@ final class EditFacturaProveedorExtensionTest extends TestCase
             . '/Extension/Controller/EditFacturaProveedor.php';
     }
 
-    public function testCreateViewsUsesMainViewNameForButton(): void
+    public function testCreateViewsDoesNotRegisterExtraButtons(): void
     {
         $this->defineExtensionStubs();
 
@@ -60,11 +60,7 @@ final class EditFacturaProveedorExtensionTest extends TestCase
         $closure = $extension->createViews();
         $closure->call($controller);
 
-        $this->assertCount(1, $controller->buttons);
-        $this->assertSame('MainView', $controller->buttons[0][0]);
-        $this->assertSame('js', $controller->buttons[0][1]['type']);
-        $this->assertStringContainsString('modalaiscan', $controller->buttons[0][1]['action']);
-        $this->assertArrayNotHasKey('row', $controller->buttons[0][1]);
+        $this->assertSame([], $controller->buttons);
     }
 
     public function testLoadDataOnlyStoresInvoiceIdOnMainView(): void

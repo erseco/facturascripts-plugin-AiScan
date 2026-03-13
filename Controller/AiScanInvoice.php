@@ -25,7 +25,9 @@ use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
+use FacturaScripts\Plugins\AiScan\Lib\ProductMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
+use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 
 class AiScanInvoice extends Controller
 {
@@ -80,6 +82,12 @@ class AiScanInvoice extends Controller
                     break;
                 case 'search-suppliers':
                     $this->handleSearchSuppliers();
+                    break;
+                case 'search-products':
+                    $this->handleSearchProducts();
+                    break;
+                case 'create-supplier':
+                    $this->handleCreateSupplier();
                     break;
                 default:
                     http_response_code(400);
@@ -238,7 +246,6 @@ class AiScanInvoice extends Controller
             'success' => true,
             'files' => $storedFiles,
             'errors' => $errors,
-            'auto_scan' => AiScanSettings::isAutoScanEnabled(),
             'provider' => AiScanSettings::getDefaultProvider(),
             'available_providers' => $service->getAvailableProviderNames(),
             'extraction_prompt' => ExtractionService::getSystemPrompt(),
@@ -422,15 +429,59 @@ class AiScanInvoice extends Controller
         return '';
     }
 
+    private function handleSearchProducts(): void
+    {
+        $query = trim($this->request()->get('query', ''));
+        if (strlen($query) < 2) {
+            echo json_encode(['results' => []]);
+            return;
+        }
+
+        $results = (new ProductMatcher())->search($query, 20);
+        $items = array_map(static fn ($product) => [
+            'description' => (string) ($product->description ?? $product->descripcion ?? ''),
+            'reference' => (string) ($product->code ?? $product->referencia ?? ''),
+        ], array_slice($results, 0, 20));
+
+        echo json_encode(['results' => array_values(array_filter($items, static function (array $item): bool {
+            return $item['reference'] !== '';
+        }))]);
+    }
+
+    private function handleCreateSupplier(): void
+    {
+        $data = $this->decodeJsonRequestBody();
+        if (empty(trim((string) ($data['name'] ?? '')))) {
+            http_response_code(422);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-supplier-name-required')]);
+            return;
+        }
+
+        $service = new SupplierService();
+        $supplier = $service->createOrResolve($data);
+        if ($supplier === null) {
+            http_response_code(422);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-supplier-not-matched-or-created')]);
+            return;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'supplier' => [
+                'id' => $supplier->codproveedor,
+                'name' => $supplier->nombre,
+                'tax_id' => $supplier->cifnif,
+            ],
+        ]);
+    }
+
     private function handleApply(): void
     {
         $invoiceId = $this->request()->get('invoice_id', '');
         $invoiceId = $invoiceId !== '' ? (int) $invoiceId : null;
 
-        $body = file_get_contents('php://input');
-        $data = json_decode($body, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+        $data = $this->decodeJsonRequestBody();
+        if ($data === []) {
             http_response_code(400);
             echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-json-payload')]);
             return;
@@ -446,5 +497,12 @@ class AiScanInvoice extends Controller
         }
 
         echo json_encode(['success' => true, 'invoice_id' => $result['invoice_id']]);
+    }
+
+    private function decodeJsonRequestBody(): array
+    {
+        $body = file_get_contents('php://input');
+        $data = json_decode($body, true);
+        return json_last_error() === JSON_ERROR_NONE && is_array($data) ? $data : [];
     }
 }

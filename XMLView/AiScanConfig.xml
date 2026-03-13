@@ -26,10 +26,7 @@
             <column name="allowed-extensions" numcolumns="4" order="140">
                 <widget type="text" fieldname="allowed_extensions"/>
             </column>
-            <column name="auto-scan" order="150">
-                <widget type="checkbox" fieldname="auto_scan"/>
-            </column>
-            <column name="debug-mode" order="160">
+            <column name="debug-mode" order="150">
                 <widget type="checkbox" fieldname="debug_mode"/>
             </column>
         </group>
