@@ -1,0 +1,49 @@
+---
+services:
+  mariadb:
+    image: mariadb:lts
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=facturascripts
+      - MYSQL_DATABASE=facturascripts
+      - MYSQL_USER=facturascripts
+      - MYSQL_PASSWORD=facturascripts
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  facturascripts:
+    image: erseco/alpine-facturascripts:main
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Connection
+      DB_HOST: mariadb
+      DB_NAME: facturascripts
+      DB_USER: facturascripts
+      DB_PASSWORD: facturascripts
+      # Initial Setup (unattended installation)
+      FS_INITIAL_USER: admin
+      FS_INITIAL_PASS: admin
+      FS_LANG: es_ES
+      FS_TIMEZONE: Europe/Madrid
+      # Debug mode (set to false in production)
+      FS_DEBUG: "true"
+      # Disable cron tasks in development
+      RUN_CRON_TASKS: "false"
+    volumes:
+      - facturascripts_data:/var/www/html/volume
+      # Mount the plugin directory
+      - ./:/var/www/html/Plugins/PluginTemplate
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  mariadb_data:
+  facturascripts_data:

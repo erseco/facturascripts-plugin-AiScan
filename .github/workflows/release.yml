@@ -1,0 +1,62 @@
+---
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build_and_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          echo "RELEASE_TAG=${GITHUB_REF##*/}" >> $GITHUB_ENV
+
+      - name: Create plugin package
+        run: |
+          # Remove the 'v' prefix from tag if present (e.g., v1.0.0 -> 1.0.0)
+          VERSION="${RELEASE_TAG#v}"
+
+          # Update version in facturascripts.ini
+          sed -i "s/^version[[:space:]]*=.*/version = ${VERSION}/" facturascripts.ini
+
+          # Create dist directory
+          mkdir -p dist
+
+          # Create ZIP package excluding development files
+          zip -r "dist/PluginTemplate-${VERSION}.zip" . \
+            -x "*.git*" \
+            -x "*Test/*" \
+            -x "*examples/*" \
+            -x "*dist/*" \
+            -x "*vendor/*" \
+            -x "*node_modules/*" \
+            -x "*.DS_Store" \
+            -x "*Makefile" \
+            -x "*docker-compose.yml" \
+            -x "*QUICKSTART.md" \
+            -x "*README.md" \
+            -x "*composer.json" \
+            -x "*composer.lock" \
+            -x "*phpunit.xml" \
+            -x "*.aider*" \
+            -x "*.editorconfig" \
+            -x "*.env*"
+
+      - name: Upload ZIP to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/PluginTemplate-${{ env.RELEASE_TAG }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to FacturaScripts.com (optional)
+        run: |
+          echo "To publish your plugin on FacturaScripts.com:"
+          echo "1. Go to https://facturascripts.com/plugins"
+          echo "2. Upload the ZIP file: dist/PluginTemplate-${{ env.RELEASE_TAG }}.zip"
+          echo "3. Fill in the plugin details"

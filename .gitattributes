@@ -1,0 +1,36 @@
+# Export ignore - these files will not be included in git archive or releases
+# Development and testing files
+/.aider*                export-ignore
+/.DS_Store              export-ignore
+/.editorconfig          export-ignore
+/.env                   export-ignore
+/.env.*                 export-ignore
+/.gitattributes         export-ignore
+/.github/               export-ignore
+/.gitignore             export-ignore
+/Test/                  export-ignore
+/tests/                 export-ignore
+
+# Documentation and examples
+/examples/              export-ignore
+/QUICKSTART.md          export-ignore
+/README.md              export-ignore
+
+# Build and dependencies
+/vendor/                export-ignore
+/node_modules/          export-ignore
+/dist/                  export-ignore
+/composer.json          export-ignore
+/composer.lock          export-ignore
+/package.json           export-ignore
+/package-lock.json      export-ignore
+
+# Development tools
+/docker-compose.yml     export-ignore
+/Makefile               export-ignore
+/phpunit.xml            export-ignore
+/phpunit-plugins.xml    export-ignore
+/.phpunit.result.cache  export-ignore
+/phpcs.xml              export-ignore
+/.php-cs-fixer.php      export-ignore
+/.php-cs-fixer.cache    export-ignore

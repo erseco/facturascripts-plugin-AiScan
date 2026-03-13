@@ -1,0 +1,11 @@
+{
+    "active": "Active",
+    "created-at": "Created at",
+    "description": "Description",
+    "example-controller": "Example Controller",
+    "example-models": "Example Models",
+    "id": "ID",
+    "name": "Name",
+    "name-cannot-be-empty": "Name cannot be empty",
+    "updated-at": "Updated at"
+}

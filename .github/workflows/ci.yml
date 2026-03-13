@@ -1,0 +1,183 @@
+---
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  docker-test:
+    name: Docker Environment Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+
+      - name: Remove plugin mount from docker-compose.yml
+        run: |
+          # In CI we don't mount the plugin directory to avoid permission issues
+          # Instead we copy the files after the container is running
+          sed -i '/\.\/:/d' docker-compose.yml
+
+      - name: Wait for services to be ready
+        run: |
+          make upd
+
+          echo "Waiting for containers to be healthy..."
+          timeout=120
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            if docker compose ps | grep -q "healthy"; then
+              echo "✅ Services are healthy"
+              break
+            fi
+            echo "⏳ Waiting for services... ($elapsed/$timeout seconds)"
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+
+          echo "Waiting for FacturaScripts to initialize..."
+          sleep 15
+
+      - name: Copy plugin files to container
+        run: |
+          echo "📦 Copying plugin files to container..."
+          docker compose exec -T facturascripts mkdir -p /var/www/html/Plugins/PluginTemplate
+          docker cp . facturascripts-plugin-template-facturascripts-1:/var/www/html/Plugins/PluginTemplate/
+
+          echo "📋 Fixing permissions..."
+          docker compose exec -T facturascripts chown -R nobody:nobody /var/www/html/Plugins/PluginTemplate || true
+
+          echo "✅ Plugin files copied successfully"
+
+      - name: Run code style check
+        run: make lint
+
+      - name: Run tests
+        run: make test
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "📋 Full logs:"
+          docker compose logs
+
+      - name: Stop Docker environment
+        if: always()
+        run: make clean
+
+  test:
+    needs: docker-test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-version: ['8.2', '8.3', '8.4']
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: facturascripts
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
+
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: mbstring, intl, curl, dom, json, pdo, mysql, xml, zip, soap
+          tools: composer
+          coverage: none
+
+      - name: Download FacturaScripts
+        run: |
+          git clone --depth=1 https://github.com/NeoRazorX/facturascripts.git facturascripts
+          cd facturascripts
+          composer install --no-interaction --prefer-dist --no-dev
+
+      - name: Install plugin
+        run: |
+          mkdir -p facturascripts/Plugins/PluginTemplate
+          cp -r plugin/* facturascripts/Plugins/PluginTemplate/
+
+      - name: Setup FacturaScripts
+        working-directory: facturascripts
+        run: |
+          cat > config.php << EOF
+          <?php
+          define('FS_DB_TYPE', 'mysql');
+          define('FS_DB_HOST', '127.0.0.1');
+          define('FS_DB_PORT', '3306');
+          define('FS_DB_NAME', 'facturascripts');
+          define('FS_DB_USER', 'root');
+          define('FS_DB_PASS', 'root');
+          define('FS_LANG', 'es_ES');
+          define('FS_TIMEZONE', 'Europe/Madrid');
+          define('FS_COOKIE_EXPIRE', 31536000);
+          define('FS_ROUTE', '/');
+          define('FS_DEBUG', true);
+          define('FS_DB_FOREIGN_KEYS', true);
+          define('FS_DB_TYPE_CHECK', true);
+          EOF
+
+      - name: Initialize FacturaScripts
+        working-directory: facturascripts
+        run: php index.php
+
+      - name: Copy tests to FacturaScripts Test directory
+        run: |
+          mkdir -p facturascripts/Test/Plugins
+          if [ -d "plugin/Test/main" ]; then
+            cp -r plugin/Test/main/* facturascripts/Test/Plugins/
+          fi
+
+      - name: Install test dependencies
+        working-directory: facturascripts
+        run: |
+          if [ ! -f "vendor/bin/phpunit" ]; then
+            composer require --dev phpunit/phpunit --no-interaction
+          fi
+
+      - name: Run install-plugins script
+        working-directory: facturascripts
+        run: |
+          if [ -f "Test/Plugins/install-plugins.txt" ]; then
+            php Test/install-plugins.php
+          fi
+
+      - name: Run PHPUnit tests
+        working-directory: facturascripts
+        run: |
+          if [ -f "phpunit-plugins.xml" ]; then
+            vendor/bin/phpunit -c phpunit-plugins.xml
+          else
+            echo "No phpunit-plugins.xml found, creating one..."
+            cat > phpunit-plugins.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <phpunit bootstrap="Test/bootstrap.php" colors="true">
+              <testsuites>
+                  <testsuite name="PluginTests">
+                      <directory>Test/Plugins</directory>
+                  </testsuite>
+              </testsuites>
+          </phpunit>
+          EOF
+            vendor/bin/phpunit -c phpunit-plugins.xml
+          fi
