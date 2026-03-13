@@ -39,7 +39,82 @@
         wizardProgress: 'aiscan-wizard-progress',
     };
 
-    const flow = window.AiScanFlow;
+    const flow = window.AiScanFlow || createFlowFallback();
+
+    function createFlowFallback() {
+        function cloneValue(value) {
+            if (value == null) {
+                return value;
+            }
+
+            return JSON.parse(JSON.stringify(value));
+        }
+
+        return {
+            cloneValue,
+            createWizardEntries(uploadedFiles, invoiceId) {
+                return (Array.isArray(uploadedFiles) ? uploadedFiles : []).map((file, index) => ({
+                    clientIndex: Number.isInteger(file.client_index) ? file.client_index : index,
+                    extractedData: null,
+                    file: null,
+                    invoiceId: index === 0 ? (invoiceId || '') : '',
+                    isSaved: false,
+                    isSaving: false,
+                    mimeType: file.mime_type || '',
+                    objectUrl: null,
+                    originalName: file.original_name || '',
+                    selectedProvider: '',
+                    size: file.size || 0,
+                    tmpFile: file.tmp_file || '',
+                }));
+            },
+            getSaveInvoiceId(entry) {
+                return entry && entry.invoiceId ? String(entry.invoiceId) : '';
+            },
+            getWizardMeta(entries, currentIndex) {
+                const total = Array.isArray(entries) ? entries.length : 0;
+                const safeIndex = total === 0 ? 0 : Math.min(Math.max(currentIndex || 0, 0), total - 1);
+                const isMultiFile = total > 1;
+                const isLast = total > 0 ? safeIndex === total - 1 : true;
+
+                return {
+                    canGoBack: isMultiFile && safeIndex > 0,
+                    canGoNext: isMultiFile && safeIndex < total - 1,
+                    currentIndex: safeIndex,
+                    currentPosition: total === 0 ? 0 : safeIndex + 1,
+                    isLast,
+                    isMultiFile,
+                    primaryAction: isMultiFile ? (isLast ? 'finish' : 'saveAndNext') : 'save',
+                    total,
+                };
+            },
+            markEntrySaved(entry, invoiceId) {
+                return {
+                    ...entry,
+                    invoiceId: invoiceId || (entry && entry.invoiceId ? String(entry.invoiceId) : ''),
+                    isSaved: true,
+                    isSaving: false,
+                };
+            },
+            normalizeUploadResponse(response) {
+                if (response && Array.isArray(response.files) && response.files.length > 0) {
+                    return response.files.map(cloneValue);
+                }
+
+                if (response && response.tmp_file) {
+                    return [cloneValue({
+                        client_index: response.client_index ?? 0,
+                        mime_type: response.mime_type,
+                        original_name: response.original_name,
+                        size: response.size,
+                        tmp_file: response.tmp_file,
+                    })];
+                }
+
+                return [];
+            },
+        };
+    }
 
     // Fallback prompt for Browser AI when server prompt is not available
     const FALLBACK_PROMPT = 'You are an invoice extraction engine. Extract data from the provided invoice and return ONLY valid JSON with supplier, invoice, taxes, lines, confidence and warnings fields. Never invent values, use null for unknown fields.';
