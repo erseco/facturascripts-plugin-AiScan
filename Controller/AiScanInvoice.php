@@ -269,25 +269,7 @@ class AiScanInvoice extends Controller
             return;
         }
 
-        $supplier = new \FacturaScripts\Dinamic\Model\Proveedor();
-        $where = [
-            new \FacturaScripts\Core\Where('nombre', 'LIKE', '%' . $query . '%'),
-        ];
-        $results = $supplier->all($where, ['nombre' => 'ASC'], 0, 20);
-
-        // Also search by tax ID if the query looks like one
-        if (preg_match('/^[A-Z0-9]/i', $query)) {
-            $whereCif = [
-                new \FacturaScripts\Core\Where('cifnif', 'LIKE', '%' . $query . '%'),
-            ];
-            $byCif = $supplier->all($whereCif, [], 0, 10);
-            $existingIds = array_map(fn ($s) => $s->codproveedor, $results);
-            foreach ($byCif as $s) {
-                if (!in_array($s->codproveedor, $existingIds)) {
-                    $results[] = $s;
-                }
-            }
-        }
+        $results = (new SupplierMatcher())->search($query, 20);
 
         $items = array_map(fn ($s) => [
             'id' => $s->codproveedor,
