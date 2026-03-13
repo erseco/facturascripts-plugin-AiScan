@@ -1,8 +1,22 @@
 {
+  "$schema": "./assets/blueprints/blueprint-schema.json",
   "meta": {
-    "title": "AiScan",
+    "title": "AiScan Playground Demo",
     "author": "erseco",
-    "description": "Run AiScan in FacturaScripts Playground"
+    "description": "Ejecuta AiScan en FacturaScripts Playground con el plugin cargado desde este repositorio."
+  },
+  "debug": {
+    "enabled": true
+  },
+  "landingPage": "/AdminPlugins",
+  "siteOptions": {
+    "title": "AiScan Playground Demo",
+    "locale": "es_ES",
+    "timezone": "Europe/Madrid"
+  },
+  "login": {
+    "username": "admin",
+    "password": "admin"
   },
   "plugins": [
     "https://github.com/erseco/facturascripts-plugin-AiScan/archive/refs/heads/main.zip"

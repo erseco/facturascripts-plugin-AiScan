@@ -17,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Create or update playground preview comment
         uses: actions/github-script@v7
         with:
@@ -27,15 +30,19 @@ jobs:
             const { owner, repo } = context.repo;
             const pullRequest = context.payload.pull_request;
             const branchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${pullRequest.head.ref}.zip`;
+            const fs = require('fs');
+            const mainBranchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
+            const blueprint = JSON.parse(fs.readFileSync('blueprint.json', 'utf8'));
+            const pluginIndex = Array.isArray(blueprint.plugins)
+              ? blueprint.plugins.indexOf(mainBranchZipUrl)
+              : -1;
 
-            const blueprint = {
-              meta: {
-                title: `${repo} PR #${pullRequest.number}`,
-                author: owner,
-                description: `Preview ${repo} from PR branch ${pullRequest.head.ref} in FacturaScripts Playground`
-              },
-              plugins: [branchZipUrl]
-            };
+            if (pluginIndex === -1) {
+              throw new Error(`Expected ${mainBranchZipUrl} in blueprint.json plugins[]`);
+            }
+
+            blueprint.plugins = [...blueprint.plugins];
+            blueprint.plugins[pluginIndex] = branchZipUrl;
 
             function toBase64Url(value) {
               return Buffer.from(value, 'utf8')
