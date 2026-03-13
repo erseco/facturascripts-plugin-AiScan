@@ -17,22 +17,29 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace FacturaScripts\Plugins\AiScan;
+namespace FacturaScripts\Test\Plugins;
 
-use FacturaScripts\Core\Template\InitClass;
+use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
+use PHPUnit\Framework\TestCase;
 
-class Init extends InitClass
+final class SupplierMatcherTest extends TestCase
 {
-    public function init(): void
+    private SupplierMatcher $matcher;
+
+    protected function setUp(): void
     {
-        $this->loadExtension(new Extension\Controller\EditFacturaProveedor());
+        $this->matcher = new SupplierMatcher();
     }
 
-    public function update(): void
+    public function testReturnsNotFoundWhenNoData(): void
     {
+        $result = $this->matcher->findMatch(['name' => '', 'tax_id' => '']);
+        $this->assertEquals('not_found', $result['match_status']);
+        $this->assertNull($result['supplier']);
     }
 
-    public function uninstall(): void
+    public function testCanInstantiate(): void
     {
+        $this->assertInstanceOf(SupplierMatcher::class, $this->matcher);
     }
 }

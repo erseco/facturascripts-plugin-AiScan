@@ -28,7 +28,7 @@ jobs:
           mkdir -p dist
 
           # Create ZIP package excluding development files
-          zip -r "dist/PluginTemplate-${VERSION}.zip" . \
+          zip -r "dist/AiScan-${VERSION}.zip" . \
             -x "*.git*" \
             -x "*Test/*" \
             -x "*examples/*" \
@@ -50,7 +50,7 @@ jobs:
       - name: Upload ZIP to release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/PluginTemplate-${{ env.RELEASE_TAG }}.zip
+          files: dist/AiScan-${{ env.RELEASE_TAG }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -58,5 +58,5 @@ jobs:
         run: |
           echo "To publish your plugin on FacturaScripts.com:"
           echo "1. Go to https://facturascripts.com/plugins"
-          echo "2. Upload the ZIP file: dist/PluginTemplate-${{ env.RELEASE_TAG }}.zip"
+          echo "2. Upload the ZIP file: dist/AiScan-${{ env.RELEASE_TAG }}.zip"
           echo "3. Fill in the plugin details"

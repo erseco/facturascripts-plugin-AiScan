@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of PluginTemplate plugin for FacturaScripts.
+ * This file is part of AiScan plugin for FacturaScripts.
  * Script to install plugins for testing
  */
 

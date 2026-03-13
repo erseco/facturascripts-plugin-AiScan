@@ -17,22 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace FacturaScripts\Plugins\AiScan;
+namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
-use FacturaScripts\Core\Template\InitClass;
-
-class Init extends InitClass
+interface ProviderInterface
 {
-    public function init(): void
-    {
-        $this->loadExtension(new Extension\Controller\EditFacturaProveedor());
-    }
+    public function getName(): string;
 
-    public function update(): void
-    {
-    }
+    public function isAvailable(): bool;
 
-    public function uninstall(): void
-    {
-    }
+    public function analyzeDocument(string $content, string $mimeType, string $prompt): string;
 }

@@ -17,22 +17,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace FacturaScripts\Plugins\AiScan;
+namespace FacturaScripts\Test\Plugins;
 
-use FacturaScripts\Core\Template\InitClass;
+use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
+use PHPUnit\Framework\TestCase;
 
-class Init extends InitClass
+final class InvoiceMapperTest extends TestCase
 {
-    public function init(): void
+    public function testCanInstantiate(): void
     {
-        $this->loadExtension(new Extension\Controller\EditFacturaProveedor());
-    }
-
-    public function update(): void
-    {
-    }
-
-    public function uninstall(): void
-    {
+        $mapper = new InvoiceMapper();
+        $this->assertInstanceOf(InvoiceMapper::class, $mapper);
     }
 }

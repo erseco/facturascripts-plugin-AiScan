@@ -46,11 +46,12 @@ jobs:
       - name: Copy plugin files to container
         run: |
           echo "📦 Copying plugin files to container..."
-          docker compose exec -T facturascripts mkdir -p /var/www/html/Plugins/PluginTemplate
-          docker cp . facturascripts-plugin-template-facturascripts-1:/var/www/html/Plugins/PluginTemplate/
+          docker compose exec -T facturascripts mkdir -p /var/www/html/Plugins/AiScan
+          CONTAINER_ID=$(docker compose ps -q facturascripts)
+          docker cp . "${CONTAINER_ID}":/var/www/html/Plugins/AiScan/
 
           echo "📋 Fixing permissions..."
-          docker compose exec -T facturascripts chown -R nobody:nobody /var/www/html/Plugins/PluginTemplate || true
+          docker compose exec -T facturascripts chown -R nobody:nobody /var/www/html/Plugins/AiScan || true
 
           echo "✅ Plugin files copied successfully"
 
@@ -114,8 +115,8 @@ jobs:
 
       - name: Install plugin
         run: |
-          mkdir -p facturascripts/Plugins/PluginTemplate
-          cp -r plugin/* facturascripts/Plugins/PluginTemplate/
+          mkdir -p facturascripts/Plugins/AiScan
+          cp -r plugin/* facturascripts/Plugins/AiScan/
 
       - name: Setup FacturaScripts
         working-directory: facturascripts

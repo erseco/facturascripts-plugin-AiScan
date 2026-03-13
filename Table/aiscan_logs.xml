@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    This file is part of PluginTemplate plugin for FacturaScripts.
-    Copyright (C) 2025 Your Name <your@email.com>
+    This file is part of AiScan plugin for FacturaScripts.
+    Copyright (C) 2025 Ernesto Serrano <ernesto@erseco.es>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as
@@ -23,20 +23,52 @@
         <null>NO</null>
     </column>
     <column>
-        <name>name</name>
+        <name>idfactura</name>
+        <type>integer</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>filename</name>
+        <type>character varying(255)</type>
+        <null>NO</null>
+    </column>
+    <column>
+        <name>mime_type</name>
         <type>character varying(100)</type>
         <null>NO</null>
     </column>
     <column>
-        <name>description</name>
+        <name>provider</name>
+        <type>character varying(50)</type>
+        <null>NO</null>
+        <default>openai</default>
+    </column>
+    <column>
+        <name>model</name>
+        <type>character varying(100)</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>status</name>
+        <type>character varying(20)</type>
+        <null>NO</null>
+        <default>pending</default>
+    </column>
+    <column>
+        <name>raw_payload</name>
         <type>text</type>
         <null>YES</null>
     </column>
     <column>
-        <name>active</name>
-        <type>boolean</type>
+        <name>error_message</name>
+        <type>text</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>confidence</name>
+        <type>double precision</type>
         <null>NO</null>
-        <default>true</default>
+        <default>0</default>
     </column>
     <column>
         <name>created_at</name>
@@ -44,14 +76,8 @@
         <null>NO</null>
         <default>CURRENT_TIMESTAMP</default>
     </column>
-    <column>
-        <name>updated_at</name>
-        <type>timestamp</type>
-        <null>NO</null>
-        <default>CURRENT_TIMESTAMP</default>
-    </column>
     <constraint>
-        <name>example_table_pkey</name>
+        <name>aiscan_logs_pkey</name>
         <type>PRIMARY KEY (id)</type>
     </constraint>
 </table>
