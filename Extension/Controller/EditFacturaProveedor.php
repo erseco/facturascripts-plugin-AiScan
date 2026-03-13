@@ -29,9 +29,10 @@ class EditFacturaProveedor
     {
         return function () {
             $route = Tools::config('route');
+            $viewName = $this->getMainViewName();
             AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
             AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan.js');
-            $this->addButton('EditFacturaProveedor', [
+            $this->addButton($viewName, [
                 'action' => 'aiscan',
                 'color' => 'info',
                 'icon' => 'fa-solid fa-file-invoice',
@@ -45,11 +46,13 @@ class EditFacturaProveedor
     public function loadData(): Closure
     {
         return function (string $viewName, $view) {
-            if ($viewName === 'EditFacturaProveedor') {
-                $invoiceId = $view->model->primaryColumnValue();
-                if ($invoiceId !== null) {
-                    $this->setSettings('EditFacturaProveedor', 'aiscan_invoice_id', $invoiceId);
-                }
+            if ($viewName !== $this->getMainViewName()) {
+                return;
+            }
+
+            $invoiceId = $view->model->primaryColumnValue();
+            if ($invoiceId !== null) {
+                $this->setSettings($viewName, 'aiscan_invoice_id', $invoiceId);
             }
         };
     }
