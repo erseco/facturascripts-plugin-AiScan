@@ -13,10 +13,8 @@
 (() => {
     const state = {
         invoiceId: null,
-        mimeType: null,
-        originalName: null,
-        tmpFile: null,
-        objectUrl: null,
+        files: [],
+        currentFileIndex: 0,
         availableProviders: [],
         defaultProvider: null,
         browserPromptSupported: false,
@@ -35,7 +33,88 @@
         status: 'aiscan-status',
         clearBtn: 'aiscan-clear-btn',
         toolbar: 'aiscan-toolbar',
+        wizardBackBtn: 'aiscan-back-btn',
+        wizardNextBtn: 'aiscan-next-btn',
+        wizardNav: 'aiscan-wizard-nav',
+        wizardProgress: 'aiscan-wizard-progress',
     };
+
+    const flow = window.AiScanFlow || createFlowFallback();
+
+    function createFlowFallback() {
+        function cloneValue(value) {
+            if (value == null) {
+                return value;
+            }
+
+            return JSON.parse(JSON.stringify(value));
+        }
+
+        return {
+            cloneValue,
+            createWizardEntries(uploadedFiles, invoiceId) {
+                return (Array.isArray(uploadedFiles) ? uploadedFiles : []).map((file, index) => ({
+                    clientIndex: Number.isInteger(file.client_index) ? file.client_index : index,
+                    extractedData: null,
+                    file: null,
+                    invoiceId: index === 0 ? (invoiceId || '') : '',
+                    isSaved: false,
+                    isSaving: false,
+                    mimeType: file.mime_type || '',
+                    objectUrl: null,
+                    originalName: file.original_name || '',
+                    selectedProvider: '',
+                    size: file.size || 0,
+                    tmpFile: file.tmp_file || '',
+                }));
+            },
+            getSaveInvoiceId(entry) {
+                return entry && entry.invoiceId ? String(entry.invoiceId) : '';
+            },
+            getWizardMeta(entries, currentIndex) {
+                const total = Array.isArray(entries) ? entries.length : 0;
+                const safeIndex = total === 0 ? 0 : Math.min(Math.max(currentIndex || 0, 0), total - 1);
+                const isMultiFile = total > 1;
+                const isLast = total > 0 ? safeIndex === total - 1 : true;
+
+                return {
+                    canGoBack: isMultiFile && safeIndex > 0,
+                    canGoNext: isMultiFile && safeIndex < total - 1,
+                    currentIndex: safeIndex,
+                    currentPosition: total === 0 ? 0 : safeIndex + 1,
+                    isLast,
+                    isMultiFile,
+                    primaryAction: isMultiFile ? (isLast ? 'finish' : 'saveAndNext') : 'save',
+                    total,
+                };
+            },
+            markEntrySaved(entry, invoiceId) {
+                return {
+                    ...entry,
+                    invoiceId: invoiceId || (entry && entry.invoiceId ? String(entry.invoiceId) : ''),
+                    isSaved: true,
+                    isSaving: false,
+                };
+            },
+            normalizeUploadResponse(response) {
+                if (response && Array.isArray(response.files) && response.files.length > 0) {
+                    return response.files.map(cloneValue);
+                }
+
+                if (response && response.tmp_file) {
+                    return [cloneValue({
+                        client_index: response.client_index ?? 0,
+                        mime_type: response.mime_type,
+                        original_name: response.original_name,
+                        size: response.size,
+                        tmp_file: response.tmp_file,
+                    })];
+                }
+
+                return [];
+            },
+        };
+    }
 
     // Fallback prompt for Browser AI when server prompt is not available
     const FALLBACK_PROMPT = 'You are an invoice extraction engine. Extract data from the provided invoice and return ONLY valid JSON with supplier, invoice, taxes, lines, confidence and warnings fields. Never invent values, use null for unknown fields.';
@@ -48,6 +127,7 @@
             'aiscan-analyzing-browser-ai': 'Analyzing with Browser AI (this may take a moment)...',
             'aiscan-browser-ai-error': 'Browser AI error: %message%',
             'aiscan-browser-prompt-not-available': 'Browser Prompt API is not available in this browser.',
+            'aiscan-back': 'Back',
             'aiscan-clear-file': 'Remove file',
             'aiscan-create-new-supplier-confirm': 'Supplier not found. Do you want AiScan to create a new supplier with the extracted data?',
             'aiscan-create-or-update-invoice': 'Create / update invoice',
@@ -57,13 +137,16 @@
             'aiscan-document-preview': 'Invoice preview',
             'aiscan-document-type': 'Document type',
             'aiscan-drag-to-resize': 'Drag to resize',
-            'aiscan-drop-or-click': 'or click to select a file',
+            'aiscan-drop-or-click': 'or click to select files',
+            'aiscan-file-progress': 'File %current% of %total%',
             'aiscan-file-uploaded-select-provider': 'File uploaded. Select a provider and click Analyze.',
+            'aiscan-finish': 'Finish',
             'aiscan-initial-review-message': 'Upload a document and analyze it to review supplier, invoice and line data.',
             'aiscan-invoice-saved-successfully': 'Invoice saved successfully.',
             'aiscan-line-items': 'Line items',
             'aiscan-loading-provider': 'Loading...',
             'aiscan-matched-with': 'Matched with: %name%',
+            'aiscan-next': 'Next',
             'aiscan-no-results': 'No results',
             'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
             'aiscan-provider-gemini': 'Google Gemini',
@@ -72,6 +155,8 @@
             'aiscan-provider-openai': 'OpenAI',
             'aiscan-provider-openai-compatible': 'OpenAI compatible',
             'aiscan-review-extracted-data': 'Review extracted data',
+            'aiscan-save': 'Save',
+            'aiscan-save-and-next': 'Save and next',
             'aiscan-saving-invoice': 'Saving purchase invoice...',
             'aiscan-scanned-supplier-invoice': 'Scanned supplier invoice',
             'aiscan-selected-supplier': 'Selected: %name% (%taxId%)',
@@ -91,9 +176,10 @@
             'aiscan-analysis-started': 'Analizando factura con %provider%...',
             'aiscan-analyzing-browser-ai': 'Analizando con Browser AI (esto puede tardar un momento)...',
             'aiscan-browser-ai-error': 'Error de Browser AI: %message%',
-            'aiscan-browser-prompt-not-available': 'La API Browser Prompt no esta disponible en este navegador.',
+            'aiscan-browser-prompt-not-available': 'La API Browser Prompt no está disponible en este navegador.',
+            'aiscan-back': 'Anterior',
             'aiscan-clear-file': 'Quitar archivo',
-            'aiscan-create-new-supplier-confirm': 'No se ha encontrado el proveedor. Quieres que AiScan cree uno nuevo con los datos extraidos?',
+            'aiscan-create-new-supplier-confirm': 'No se ha encontrado el proveedor. ¿Quieres que AiScan cree uno nuevo con los datos extraídos?',
             'aiscan-create-or-update-invoice': 'Crear / actualizar factura',
             'aiscan-delete-line': 'Eliminar linea',
             'aiscan-document': 'Documento',
@@ -101,13 +187,16 @@
             'aiscan-document-preview': 'Vista previa de la factura',
             'aiscan-document-type': 'Tipo de documento',
             'aiscan-drag-to-resize': 'Arrastra para redimensionar',
-            'aiscan-drop-or-click': 'o haz clic para seleccionar un archivo',
+            'aiscan-drop-or-click': 'o haz clic para seleccionar archivos',
+            'aiscan-file-progress': 'Archivo %current% de %total%',
             'aiscan-file-uploaded-select-provider': 'Archivo subido. Selecciona un proveedor y pulsa Analizar.',
-            'aiscan-initial-review-message': 'Sube un documento y analizalo para revisar proveedor, factura y lineas.',
+            'aiscan-finish': 'Finalizar',
+            'aiscan-initial-review-message': 'Sube un documento y analízalo para revisar proveedor, factura y líneas.',
             'aiscan-invoice-saved-successfully': 'Factura guardada correctamente.',
             'aiscan-line-items': 'Lineas',
             'aiscan-loading-provider': 'Cargando...',
             'aiscan-matched-with': 'Coincide con: %name%',
+            'aiscan-next': 'Siguiente',
             'aiscan-no-results': 'Sin resultados',
             'aiscan-provider-browser-prompt': 'Browser Prompt API (experimental)',
             'aiscan-provider-gemini': 'Google Gemini',
@@ -115,7 +204,9 @@
             'aiscan-provider-mistral': 'Mistral',
             'aiscan-provider-openai': 'OpenAI',
             'aiscan-provider-openai-compatible': 'OpenAI compatible',
-            'aiscan-review-extracted-data': 'Revisar datos extraidos',
+            'aiscan-review-extracted-data': 'Revisar datos extraídos',
+            'aiscan-save': 'Guardar',
+            'aiscan-save-and-next': 'Guardar y siguiente',
             'aiscan-saving-invoice': 'Guardando factura de proveedor...',
             'aiscan-scanned-supplier-invoice': 'Factura de proveedor escaneada',
             'aiscan-selected-supplier': 'Seleccionado: %name% (%taxId%)',
@@ -240,7 +331,7 @@
                                             </div>
                                         </div>
                                         <div class="card-body p-0 position-relative">
-                                            <input id="${selectors.fileInput}" type="file" class="d-none" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+                                            <input id="${selectors.fileInput}" type="file" class="d-none" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
                                             <div class="aiscan-preview-area" id="${selectors.previewArea}">
                                                 ${dropAreaHtml()}
                                             </div>
@@ -260,10 +351,23 @@
                                         <div class="card-body aiscan-sidebar" id="${selectors.review}">
                                             <p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>
                                         </div>
-                                        <div class="card-footer text-end py-2 rounded-0">
-                                            <button type="button" class="btn btn-success btn-sm" id="${selectors.acceptBtn}" disabled>
-                                                <i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-create-or-update-invoice'))}
-                                            </button>
+                                        <div class="card-footer py-2 rounded-0">
+                                            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap d-none" id="${selectors.wizardNav}">
+                                                    <span class="small text-muted" id="${selectors.wizardProgress}"></span>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.wizardBackBtn}">
+                                                        <i class="fa-solid fa-arrow-left me-1"></i>${escapeHtml(trans('aiscan-back'))}
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="${selectors.wizardNextBtn}">
+                                                        ${escapeHtml(trans('aiscan-next'))}<i class="fa-solid fa-arrow-right ms-1"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="ms-auto">
+                                                    <button type="button" class="btn btn-success btn-sm" id="${selectors.acceptBtn}" disabled>
+                                                        <i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-save'))}
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -282,12 +386,14 @@
         }
         select.innerHTML = '';
 
+        const entry = getCurrentFileEntry();
+        const selectedProvider = entry?.selectedProvider || state.defaultProvider;
         const providers = state.availableProviders || [];
         providers.forEach((p) => {
             const opt = document.createElement('option');
             opt.value = p;
             opt.textContent = providerLabel(p);
-            if (p === state.defaultProvider) {
+            if (p === selectedProvider) {
                 opt.selected = true;
             }
             select.appendChild(opt);
@@ -297,7 +403,7 @@
             const opt = document.createElement('option');
             opt.value = 'browser-prompt';
             opt.textContent = providerLabel('browser-prompt');
-            if (state.defaultProvider === 'browser-prompt') {
+            if (selectedProvider === 'browser-prompt') {
                 opt.selected = true;
             }
             select.appendChild(opt);
@@ -307,13 +413,16 @@
     function bindModalEvents() {
         const modal = document.getElementById(selectors.modalId);
         const previewArea = document.getElementById(selectors.previewArea);
-        const dropZone = document.getElementById('aiscan-drop-zone');
         const fileInput = document.getElementById(selectors.fileInput);
+        const providerSelect = document.getElementById(selectors.providerSelect);
         const scanBtn = document.getElementById(selectors.scanBtn);
         const acceptBtn = document.getElementById(selectors.acceptBtn);
         const clearBtn = document.getElementById(selectors.clearBtn);
+        const backBtn = document.getElementById(selectors.wizardBackBtn);
+        const nextBtn = document.getElementById(selectors.wizardNextBtn);
 
         modal.addEventListener('show.bs.modal', () => resetModal());
+        modal.addEventListener('hidden.bs.modal', () => resetModal());
 
         previewArea.addEventListener('dragover', (event) => {
             event.preventDefault();
@@ -337,7 +446,7 @@
                 dz.classList.remove('aiscan-drag-over');
             }
             if (event.dataTransfer.files.length > 0) {
-                handleFile(event.dataTransfer.files[0]);
+                handleFiles(event.dataTransfer.files);
             }
         });
 
@@ -349,13 +458,20 @@
 
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
-                handleFile(fileInput.files[0]);
+                handleFiles(fileInput.files);
             }
         });
 
         clearBtn.addEventListener('click', (event) => {
             event.stopPropagation();
             clearFile();
+        });
+
+        providerSelect.addEventListener('change', () => {
+            const entry = getCurrentFileEntry();
+            if (entry) {
+                entry.selectedProvider = providerSelect.value;
+            }
         });
 
         scanBtn.addEventListener('click', () => {
@@ -368,6 +484,8 @@
         });
 
         acceptBtn.addEventListener('click', acceptExtracted);
+        backBtn.addEventListener('click', () => navigateToFile(state.currentFileIndex - 1));
+        nextBtn.addEventListener('click', () => navigateToFile(state.currentFileIndex + 1));
 
         bindSplitHandle();
     }
@@ -411,33 +529,44 @@
     }
 
     function clearFile() {
-        if (state.objectUrl) {
-            URL.revokeObjectURL(state.objectUrl);
+        const entry = getCurrentFileEntry();
+        if (!entry || entry.isSaving || entry.isSaved) {
+            return;
         }
-        state.mimeType = null;
-        state.originalName = null;
-        state.tmpFile = null;
-        state.objectUrl = null;
 
-        const previewArea = document.getElementById(selectors.previewArea);
-        previewArea.innerHTML = dropAreaHtml();
+        if (entry.objectUrl) {
+            URL.revokeObjectURL(entry.objectUrl);
+        }
 
-        document.getElementById(selectors.clearBtn).classList.add('d-none');
-        document.getElementById(selectors.scanBtn).disabled = true;
-        document.getElementById(selectors.fileInput).value = '';
+        state.files.splice(state.currentFileIndex, 1);
+
+        if (state.files.length === 0) {
+            resetModal();
+            return;
+        }
+
+        if (state.currentFileIndex >= state.files.length) {
+            state.currentFileIndex = state.files.length - 1;
+        }
+
+        if (state.invoiceId && !state.files.some((file) => file.invoiceId)) {
+            state.files[0].invoiceId = state.invoiceId;
+        }
+
+        renderCurrentFile();
         setStatus('');
     }
 
     function resetModal() {
-        if (state.objectUrl) {
-            URL.revokeObjectURL(state.objectUrl);
-        }
+        state.files.forEach((file) => {
+            if (file.objectUrl) {
+                URL.revokeObjectURL(file.objectUrl);
+            }
+        });
 
         state.invoiceId = getInvoiceId();
-        state.mimeType = null;
-        state.originalName = null;
-        state.tmpFile = null;
-        state.objectUrl = null;
+        state.files = [];
+        state.currentFileIndex = 0;
 
         const previewArea = document.getElementById(selectors.previewArea);
         previewArea.innerHTML = dropAreaHtml();
@@ -448,6 +577,8 @@
         document.getElementById(selectors.toolbar).style.display = 'none';
         document.getElementById(selectors.acceptBtn).disabled = true;
         document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
+        document.getElementById(selectors.wizardNav).classList.add('d-none');
+        document.getElementById(selectors.wizardProgress).textContent = '';
         setInitialReviewMessage();
         const splitLeft = document.getElementById('aiscan-split-left');
         if (splitLeft) {
@@ -461,32 +592,23 @@
         return params.get('code') || document.querySelector('input[name="code"]')?.value || '';
     }
 
-    function handleFile(file) {
-        showPreview(file);
-        uploadFile(file);
+    function getCurrentFileEntry() {
+        return state.files[state.currentFileIndex] || null;
     }
 
-    function showPreview(file) {
-        if (state.objectUrl) {
-            URL.revokeObjectURL(state.objectUrl);
+    function handleFiles(fileList) {
+        const files = Array.from(fileList || []);
+        if (files.length === 0) {
+            return;
         }
 
-        state.objectUrl = URL.createObjectURL(file);
-        const previewArea = document.getElementById(selectors.previewArea);
-        previewArea.innerHTML = '';
-
-        if (file.type === 'application/pdf') {
-            previewArea.innerHTML = `<iframe src="${state.objectUrl}" title="${escapeAttribute(trans('aiscan-document-preview'))}"></iframe>`;
-        } else {
-            previewArea.innerHTML = `<img src="${state.objectUrl}" alt="${escapeAttribute(trans('aiscan-document-preview'))}">`;
-        }
-
-        document.getElementById(selectors.clearBtn).classList.remove('d-none');
+        document.getElementById(selectors.fileInput).value = '';
+        uploadFiles(files);
     }
 
-    function uploadFile(file) {
+    function uploadFiles(files) {
         const formData = new FormData();
-        formData.append('invoice_file', file);
+        files.forEach((file) => formData.append('invoice_files[]', file));
         setStatus(trans('aiscan-uploading-file'), 'info');
 
         fetch('AiScanInvoice?action=upload', {
@@ -495,21 +617,13 @@
         })
             .then((response) => response.json())
             .then((data) => {
-                if (data.error) {
-                    throw new Error(data.error);
+                const uploadedFiles = flow.normalizeUploadResponse(data);
+                if (uploadedFiles.length === 0) {
+                    throw new Error(data.error || trans('aiscan-no-file-uploaded'));
                 }
 
-                state.tmpFile = data.tmp_file;
-                state.mimeType = data.mime_type;
-                state.originalName = data.original_name;
-                state.defaultProvider = data.provider || 'unknown';
-                state.availableProviders = data.available_providers || [data.provider || 'unknown'];
-                state.extractionPrompt = data.extraction_prompt || FALLBACK_PROMPT;
-
-                document.getElementById(selectors.toolbar).style.display = '';
-                document.getElementById(selectors.scanBtn).disabled = false;
-                buildProviderSelect();
-                setStatus(trans('aiscan-file-uploaded-select-provider'), 'success');
+                setUploadedFiles(files, uploadedFiles, data);
+                setStatus(buildUploadStatus(data), data.errors && data.errors.length > 0 ? 'warning' : 'success');
 
                 if (data.auto_scan) {
                     const selected = document.getElementById(selectors.providerSelect)?.value || '';
@@ -523,19 +637,161 @@
             .catch((error) => setStatus(error.message, 'danger'));
     }
 
-    function analyzeDocument(provider) {
-        if (!state.tmpFile) {
+    function setUploadedFiles(localFiles, uploadedFiles, response) {
+        state.files.forEach((file) => {
+            if (file.objectUrl) {
+                URL.revokeObjectURL(file.objectUrl);
+            }
+        });
+
+        state.defaultProvider = response.provider || 'unknown';
+        state.availableProviders = response.available_providers || [response.provider || 'unknown'];
+        state.extractionPrompt = response.extraction_prompt || FALLBACK_PROMPT;
+        state.currentFileIndex = 0;
+        state.files = flow.createWizardEntries(uploadedFiles, state.invoiceId).map((entry) => {
+            const localFile = localFiles[entry.clientIndex] || null;
+            return {
+                ...entry,
+                file: localFile,
+                mimeType: entry.mimeType || localFile?.type || '',
+                objectUrl: localFile ? URL.createObjectURL(localFile) : null,
+                selectedProvider: state.defaultProvider,
+            };
+        });
+
+        renderCurrentFile();
+    }
+
+    function buildUploadStatus(response) {
+        const errors = Array.isArray(response.errors)
+            ? response.errors.map((item) => item?.error).filter(Boolean)
+            : [];
+
+        if (errors.length === 0) {
+            return trans('aiscan-file-uploaded-select-provider');
+        }
+
+        return `${trans('aiscan-file-uploaded-select-provider')} ${errors.join(' ')}`.trim();
+    }
+
+    function navigateToFile(index) {
+        const meta = flow.getWizardMeta(state.files, state.currentFileIndex);
+        if (index < 0 || index >= meta.total || index === state.currentFileIndex) {
             return;
         }
 
+        persistCurrentFileState();
+        state.currentFileIndex = index;
+        renderCurrentFile();
+    }
+
+    function renderCurrentFile() {
+        const entry = getCurrentFileEntry();
+        if (!entry) {
+            const previewArea = document.getElementById(selectors.previewArea);
+            previewArea.innerHTML = dropAreaHtml();
+            document.getElementById(selectors.toolbar).style.display = 'none';
+            document.getElementById(selectors.scanBtn).disabled = true;
+            document.getElementById(selectors.acceptBtn).disabled = true;
+            document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
+            document.getElementById(selectors.clearBtn).classList.add('d-none');
+            setInitialReviewMessage();
+            updateWizardControls();
+            return;
+        }
+
+        showPreview(entry);
+        document.getElementById(selectors.toolbar).style.display = '';
+        document.getElementById(selectors.scanBtn).disabled = !entry.tmpFile || entry.isSaving;
+        document.getElementById(selectors.clearBtn).classList.toggle('d-none', entry.isSaving || entry.isSaved);
+        buildProviderSelect();
+
+        if (entry.extractedData) {
+            renderReviewForm(entry.extractedData);
+        } else {
+            document.getElementById(selectors.acceptBtn).dataset.extractedData = '';
+            setInitialReviewMessage();
+        }
+
+        updateWizardControls();
+    }
+
+    function showPreview(entry) {
+        const previewArea = document.getElementById(selectors.previewArea);
+        previewArea.innerHTML = '';
+
+        if (!entry.objectUrl && entry.file) {
+            entry.objectUrl = URL.createObjectURL(entry.file);
+        }
+
+        if (!entry.objectUrl) {
+            previewArea.innerHTML = dropAreaHtml();
+            return;
+        }
+
+        if (entry.mimeType === 'application/pdf') {
+            previewArea.innerHTML = `<iframe src="${entry.objectUrl}" title="${escapeAttribute(trans('aiscan-document-preview'))}"></iframe>`;
+        } else {
+            previewArea.innerHTML = `<img src="${entry.objectUrl}" alt="${escapeAttribute(trans('aiscan-document-preview'))}">`;
+        }
+    }
+
+    function updateWizardControls() {
+        const entry = getCurrentFileEntry();
+        const meta = flow.getWizardMeta(state.files, state.currentFileIndex);
+        const nav = document.getElementById(selectors.wizardNav);
+        const progress = document.getElementById(selectors.wizardProgress);
+        const backBtn = document.getElementById(selectors.wizardBackBtn);
+        const nextBtn = document.getElementById(selectors.wizardNextBtn);
+        const acceptBtn = document.getElementById(selectors.acceptBtn);
+
+        nav.classList.toggle('d-none', !meta.isMultiFile);
+        progress.textContent = meta.isMultiFile
+            ? trans('aiscan-file-progress', {
+                '%current%': String(meta.currentPosition),
+                '%total%': String(meta.total),
+            })
+            : '';
+
+        backBtn.disabled = !meta.canGoBack || Boolean(entry?.isSaving);
+        nextBtn.disabled = !meta.canGoNext || Boolean(entry?.isSaving);
+
+        const labels = {
+            finish: trans('aiscan-finish'),
+            save: trans('aiscan-save'),
+            saveAndNext: trans('aiscan-save-and-next'),
+        };
+        acceptBtn.innerHTML = `<i class="fa-solid fa-check me-1"></i>${escapeHtml(labels[meta.primaryAction])}`;
+        acceptBtn.disabled = !entry?.extractedData || Boolean(entry?.isSaving);
+    }
+
+    function persistCurrentFileState() {
+        const entry = getCurrentFileEntry();
+        if (!entry || !entry.extractedData) {
+            return;
+        }
+
+        const data = collectFormData(entry.extractedData);
+        if (data) {
+            entry.extractedData = data;
+        }
+    }
+
+    function analyzeDocument(provider) {
+        const entry = getCurrentFileEntry();
+        if (!entry?.tmpFile) {
+            return;
+        }
+
+        entry.selectedProvider = provider || entry.selectedProvider || state.defaultProvider;
         const providerName = providerLabel(provider || state.defaultProvider);
         setStatus(trans('aiscan-analysis-started', {'%provider%': providerName}), 'info');
         document.getElementById(selectors.scanBtn).disabled = true;
 
         const params = new URLSearchParams({
             action: 'analyze',
-            tmp_file: state.tmpFile,
-            mime_type: state.mimeType || '',
+            tmp_file: entry.tmpFile,
+            mime_type: entry.mimeType || '',
         });
         if (provider) {
             params.set('provider', provider);
@@ -548,7 +804,8 @@
                     throw new Error(data.error);
                 }
 
-                renderReviewForm(data.data);
+                entry.extractedData = flow.cloneValue(data.data);
+                renderCurrentFile();
                 setStatus(
                     trans('aiscan-analysis-completed', {
                         '%provider%': providerLabel(data.data._provider || provider || state.defaultProvider),
@@ -559,15 +816,22 @@
             .catch((error) => setStatus(error.message, 'danger'))
             .finally(() => {
                 document.getElementById(selectors.scanBtn).disabled = false;
+                updateWizardControls();
             });
     }
 
     async function analyzeWithBrowserPrompt() {
+        const entry = getCurrentFileEntry();
+        if (!entry) {
+            return;
+        }
+
         if (typeof LanguageModel === 'undefined') {
             setStatus(trans('aiscan-browser-prompt-not-available'), 'danger');
             return;
         }
 
+        entry.selectedProvider = 'browser-prompt';
         setStatus(trans('aiscan-analyzing-browser-ai'), 'info');
         document.getElementById(selectors.scanBtn).disabled = true;
 
@@ -580,9 +844,9 @@
                 ],
             });
 
-            const textContent = await fetchDocumentText();
+            const textContent = await fetchDocumentText(entry);
             if (!textContent) {
-                const isImage = state.mimeType && state.mimeType.startsWith('image/');
+                const isImage = entry.mimeType && entry.mimeType.startsWith('image/');
                 const msg = isImage
                     ? trans('aiscan-use-cloud-provider-for-image')
                     : trans('aiscan-use-cloud-provider-for-pdf');
@@ -594,36 +858,36 @@
             const rawJson = await session.prompt(prompt + '\n\nDocument content:\n' + textContent);
             session.destroy();
 
-            let cleaned = rawJson.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+            const cleaned = rawJson.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
             const data = JSON.parse(cleaned);
 
             data._provider = 'browser-prompt';
             data._validation_errors = [];
 
-            renderReviewForm(data);
+            entry.extractedData = flow.cloneValue(data);
+            renderCurrentFile();
             setStatus(trans('aiscan-analysis-completed', {'%provider%': providerLabel('browser-prompt')}), 'success');
         } catch (error) {
             setStatus(trans('aiscan-browser-ai-error', {'%message%': error.message}), 'danger');
         } finally {
             document.getElementById(selectors.scanBtn).disabled = false;
+            updateWizardControls();
         }
     }
 
-    async function fetchDocumentText() {
-        if (!state.tmpFile) {
+    async function fetchDocumentText(entry) {
+        if (!entry?.tmpFile) {
             return null;
         }
 
-        // Browser AI is text-only — images cannot be analyzed
-        if (state.mimeType && state.mimeType.startsWith('image/')) {
+        if (entry.mimeType && entry.mimeType.startsWith('image/')) {
             return null;
         }
 
-        // Try server-side extraction first (pdftotext)
         try {
             const params = new URLSearchParams({
                 action: 'get-text',
-                tmp_file: state.tmpFile,
+                tmp_file: entry.tmpFile,
             });
             const response = await fetch('AiScanInvoice?' + params.toString());
             const data = await response.json();
@@ -634,9 +898,8 @@
             // fall through to client-side extraction
         }
 
-        // Fallback: client-side PDF text extraction via pdf.js
-        if (state.mimeType === 'application/pdf' && state.objectUrl) {
-            return await extractPdfTextClientSide(state.objectUrl);
+        if (entry.mimeType === 'application/pdf' && entry.objectUrl) {
+            return await extractPdfTextClientSide(entry.objectUrl);
         }
 
         return null;
@@ -729,6 +992,7 @@
 
         document.getElementById(selectors.acceptBtn).disabled = false;
         document.getElementById(selectors.acceptBtn).dataset.extractedData = JSON.stringify(data);
+        updateWizardControls();
     }
 
     function buildSection(title, bodyHtml) {
@@ -934,13 +1198,14 @@
         return section;
     }
 
-    function acceptExtracted() {
+    function collectFormData(baseData, options = {}) {
         const acceptBtn = document.getElementById(selectors.acceptBtn);
-        if (!acceptBtn.dataset.extractedData) {
-            return;
+        const sourceData = baseData || (acceptBtn.dataset.extractedData ? JSON.parse(acceptBtn.dataset.extractedData) : null);
+        if (!sourceData) {
+            return null;
         }
 
-        const data = JSON.parse(acceptBtn.dataset.extractedData);
+        const data = flow.cloneValue(sourceData);
         data.invoice = data.invoice || {};
         data.supplier = data.supplier || {};
 
@@ -970,11 +1235,18 @@
         const selectedSupplier = document.getElementById('supplier_match_select');
         if (selectedSupplier) {
             data.supplier.matched_supplier_id = selectedSupplier.value;
-        } else if ((data.supplier.match_status || 'not_found') === 'not_found') {
+            delete data.supplier.create_if_missing;
+        } else {
+            delete data.supplier.matched_supplier_id;
+        }
+
+        if (options.confirmCreateSupplier && !selectedSupplier && (data.supplier.match_status || 'not_found') === 'not_found') {
             if (!window.confirm(trans('aiscan-create-new-supplier-confirm'))) {
-                return;
+                return null;
             }
             data.supplier.create_if_missing = true;
+        } else if (!options.confirmCreateSupplier) {
+            delete data.supplier.create_if_missing;
         }
 
         data.lines = Array.from(document.querySelectorAll(`#${selectors.linesBody} tr`)).map((row) => {
@@ -986,16 +1258,34 @@
         });
 
         data._upload = {
-            mime_type: state.mimeType,
-            original_name: state.originalName,
-            tmp_file: state.tmpFile,
+            mime_type: getCurrentFileEntry()?.mimeType || '',
+            original_name: getCurrentFileEntry()?.originalName || '',
+            tmp_file: getCurrentFileEntry()?.tmpFile || '',
         };
 
+        acceptBtn.dataset.extractedData = JSON.stringify(data);
+        return data;
+    }
+
+    function acceptExtracted() {
+        const entry = getCurrentFileEntry();
+        if (!entry || entry.isSaving) {
+            return;
+        }
+
+        const data = collectFormData(entry.extractedData, {confirmCreateSupplier: true});
+        if (!data) {
+            return;
+        }
+
+        entry.extractedData = data;
+        entry.isSaving = true;
+        updateWizardControls();
         setStatus(trans('aiscan-saving-invoice'), 'info');
 
         const params = new URLSearchParams({
             action: 'apply',
-            invoice_id: state.invoiceId || '',
+            invoice_id: flow.getSaveInvoiceId(entry),
         });
 
         fetch('AiScanInvoice?' + params.toString(), {
@@ -1009,11 +1299,22 @@
                     throw new Error(result.error);
                 }
 
+                Object.assign(entry, flow.markEntrySaved(entry, result.invoice_id));
                 setStatus(trans('aiscan-invoice-saved-successfully'), 'success');
+                const meta = flow.getWizardMeta(state.files, state.currentFileIndex);
+                if (meta.isMultiFile && !meta.isLast) {
+                    navigateToFile(state.currentFileIndex + 1);
+                    return;
+                }
+
                 bootstrap.Modal.getInstance(document.getElementById(selectors.modalId))?.hide();
                 setTimeout(() => window.location.href = 'EditFacturaProveedor?code=' + encodeURIComponent(result.invoice_id), 300);
             })
-            .catch((error) => setStatus(error.message, 'danger'));
+            .catch((error) => setStatus(error.message, 'danger'))
+            .finally(() => {
+                entry.isSaving = false;
+                updateWizardControls();
+            });
     }
 
     function readValue(id) {
