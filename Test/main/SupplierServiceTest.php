@@ -31,7 +31,7 @@ final class SupplierServiceTest extends TestCase
                 'candidates' => [],
             ]);
 
-        $service = new class($matcher) extends SupplierService {
+        $service = new class ($matcher) extends SupplierService {
             public bool $createCalled = false;
 
             protected function createSupplier(array $supplierData): ?Proveedor
@@ -66,7 +66,7 @@ final class SupplierServiceTest extends TestCase
                 'candidates' => [],
             ]);
 
-        $service = new class($matcher, $createdSupplier) extends SupplierService {
+        $service = new class ($matcher, $createdSupplier) extends SupplierService {
             public function __construct(
                 SupplierMatcher $matcher,
                 private Proveedor $createdSupplier

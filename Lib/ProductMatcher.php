@@ -66,8 +66,16 @@ class ProductMatcher
                 $candidates,
                 $this->loadVariants([new Where('referencia', '=', $term)], [], $limit),
                 $this->loadVariants([new Where('codbarras', '=', $term)], [], $limit),
-                $this->loadVariants([new Where('referencia', 'LIKE', '%' . $term . '%')], ['referencia' => 'ASC'], $limit),
-                $this->loadVariants([new Where('codbarras', 'LIKE', '%' . $term . '%')], ['referencia' => 'ASC'], $limit)
+                $this->loadVariants(
+                    [new Where('referencia', 'LIKE', '%' . $term . '%')],
+                    ['referencia' => 'ASC'],
+                    $limit
+                ),
+                $this->loadVariants(
+                    [new Where('codbarras', 'LIKE', '%' . $term . '%')],
+                    ['referencia' => 'ASC'],
+                    $limit
+                )
             );
         }
 
@@ -121,8 +129,10 @@ class ProductMatcher
 
         $topCandidate = $rankedCandidates[0];
         $secondScore = $rankedCandidates[1]['score'] ?? 0;
-        if ($topCandidate['score'] < self::AUTO_MATCH_MIN_SCORE
-            || ($topCandidate['score'] - $secondScore) < self::SCORE_DELTA) {
+        if (
+            $topCandidate['score'] < self::AUTO_MATCH_MIN_SCORE
+            || ($topCandidate['score'] - $secondScore) < self::SCORE_DELTA
+        ) {
             return null;
         }
 
@@ -139,8 +149,10 @@ class ProductMatcher
         if ($normalizedSku !== '') {
             if ($reference === $normalizedSku || $barcode === $normalizedSku) {
                 $score += 220;
-            } elseif (($reference !== '' && str_contains($reference, $normalizedSku))
-                || ($barcode !== '' && str_contains($barcode, $normalizedSku))) {
+            } elseif (
+                ($reference !== '' && str_contains($reference, $normalizedSku))
+                || ($barcode !== '' && str_contains($barcode, $normalizedSku))
+            ) {
                 $score += 120;
             }
         }
@@ -148,11 +160,15 @@ class ProductMatcher
         if ($normalizedDescription !== '' && $description !== '') {
             if ($description === $normalizedDescription) {
                 $score += 140;
-            } elseif (str_starts_with($description, $normalizedDescription)
-                || str_starts_with($normalizedDescription, $description)) {
+            } elseif (
+                str_starts_with($description, $normalizedDescription)
+                || str_starts_with($normalizedDescription, $description)
+            ) {
                 $score += 110;
-            } elseif (str_contains($description, $normalizedDescription)
-                || str_contains($normalizedDescription, $description)) {
+            } elseif (
+                str_contains($description, $normalizedDescription)
+                || str_contains($normalizedDescription, $description)
+            ) {
                 $score += 80;
             }
         }

@@ -51,7 +51,11 @@ class SupplierMatcher
 
         if ($normalizedTaxId !== '') {
             $match = $this->buildMatchResult(
-                $this->rankCandidates($this->findSuppliersByTaxId((string) ($supplierData['tax_id'] ?? '')), $normalizedName, $normalizedTaxId)
+                $this->rankCandidates(
+                    $this->findSuppliersByTaxId((string) ($supplierData['tax_id'] ?? '')),
+                    $normalizedName,
+                    $normalizedTaxId
+                )
             );
             if ($match['match_status'] !== 'not_found') {
                 return $match;
@@ -60,7 +64,11 @@ class SupplierMatcher
 
         if ($normalizedName !== '') {
             return $this->buildMatchResult(
-                $this->rankCandidates($this->findSuppliersByName((string) ($supplierData['name'] ?? '')), $normalizedName, $normalizedTaxId)
+                $this->rankCandidates(
+                    $this->findSuppliersByName((string) ($supplierData['name'] ?? '')),
+                    $normalizedName,
+                    $normalizedTaxId
+                )
             );
         }
 
@@ -159,8 +167,10 @@ class SupplierMatcher
 
         $topCandidate = $rankedCandidates[0];
         $secondScore = $rankedCandidates[1]['score'] ?? 0;
-        if ($topCandidate['score'] >= self::AUTO_MATCH_MIN_SCORE
-            && ($topCandidate['score'] - $secondScore) >= self::SCORE_DELTA) {
+        if (
+            $topCandidate['score'] >= self::AUTO_MATCH_MIN_SCORE
+            && ($topCandidate['score'] - $secondScore) >= self::SCORE_DELTA
+        ) {
             $result['match_status'] = 'matched';
             $result['supplier'] = $topCandidate['supplier'];
             return $result;
@@ -222,12 +232,20 @@ class SupplierMatcher
         if ($normalizedTaxId !== '' && $candidateTaxId !== '') {
             if ($candidateTaxId === $normalizedTaxId) {
                 $score += 220;
-            } elseif ($this->stripTaxCountryPrefix($candidateTaxId) === $this->stripTaxCountryPrefix($normalizedTaxId)) {
+            } elseif (
+                $this->stripTaxCountryPrefix($candidateTaxId)
+                === $this->stripTaxCountryPrefix($normalizedTaxId)
+            ) {
                 $score += 200;
-            } elseif ($this->digitsOnly($candidateTaxId) !== ''
-                && $this->digitsOnly($candidateTaxId) === $this->digitsOnly($normalizedTaxId)) {
+            } elseif (
+                $this->digitsOnly($candidateTaxId) !== ''
+                && $this->digitsOnly($candidateTaxId) === $this->digitsOnly($normalizedTaxId)
+            ) {
                 $score += 160;
-            } elseif (str_contains($candidateTaxId, $normalizedTaxId) || str_contains($normalizedTaxId, $candidateTaxId)) {
+            } elseif (
+                str_contains($candidateTaxId, $normalizedTaxId)
+                || str_contains($normalizedTaxId, $candidateTaxId)
+            ) {
                 $score += 90;
             }
         }
@@ -235,9 +253,15 @@ class SupplierMatcher
         if ($normalizedName !== '' && $candidateName !== '') {
             if ($candidateName === $normalizedName) {
                 $score += 140;
-            } elseif (str_starts_with($candidateName, $normalizedName) || str_starts_with($normalizedName, $candidateName)) {
+            } elseif (
+                str_starts_with($candidateName, $normalizedName)
+                || str_starts_with($normalizedName, $candidateName)
+            ) {
                 $score += 100;
-            } elseif (str_contains($candidateName, $normalizedName) || str_contains($normalizedName, $candidateName)) {
+            } elseif (
+                str_contains($candidateName, $normalizedName)
+                || str_contains($normalizedName, $candidateName)
+            ) {
                 $score += 70;
             }
 

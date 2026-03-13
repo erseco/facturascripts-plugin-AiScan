@@ -153,7 +153,7 @@ final class SupplierMatcherTest extends TestCase
 
     private function createMatcher(array $taxCandidates = [], array $nameCandidates = []): SupplierMatcher
     {
-        return new class($taxCandidates, $nameCandidates) extends SupplierMatcher {
+        return new class ($taxCandidates, $nameCandidates) extends SupplierMatcher {
             public function __construct(
                 private array $taxCandidates,
                 private array $nameCandidates
