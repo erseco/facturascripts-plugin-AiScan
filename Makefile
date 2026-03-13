@@ -72,14 +72,34 @@ package:
 	@mkdir -p dist
 	@zip -r dist/AiScan-$(VERSION).zip . \
 		-x "*.git*" \
-		-x "*examples/*" \
-		-x "*dist/*" \
-		-x "*vendor/*" \
-		-x "*node_modules/*" \
+		-x "*.aider*" \
+		-x "*.claude/*" \
 		-x "*.DS_Store" \
-		-x "*Makefile" \
+		-x "*.editorconfig" \
+		-x "*.env" \
+		-x "*.env.*" \
+		-x "*.php-cs-fixer.php" \
+		-x "*.php-cs-fixer.cache" \
+		-x "*.phpunit.result.cache" \
+		-x "*.playwright-mcp/*" \
+		-x "*CLAUDE.md" \
+		-x "*composer.json" \
+		-x "*composer.lock" \
+		-x "*dist/*" \
 		-x "*docker-compose.yml" \
-		-x "*.md"
+		-x "*examples/*" \
+		-x "*Makefile" \
+		-x "*node_modules/*" \
+		-x "*package.json" \
+		-x "*package-lock.json" \
+		-x "*phpcs.xml" \
+		-x "*phpunit.xml" \
+		-x "*phpunit-plugins.xml" \
+		-x "*QUICKSTART.md" \
+		-x "*README.md" \
+		-x "*Test/*" \
+		-x "*tests/*" \
+		-x "*vendor/*"
 	@echo "Restoring version in facturascripts.ini..."
 	$(SED_INPLACE) 's/^\(version[[:space:]]*=[[:space:]]*\).*$$/\11.0/' facturascripts.ini
 	@echo "Package created: dist/AiScan-$(VERSION).zip"
