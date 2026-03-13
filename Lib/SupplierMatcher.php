@@ -27,8 +27,8 @@ class SupplierMatcher
 {
     // Legal form suffixes to strip for normalized name matching
     private const LEGAL_FORM_PATTERN =
-        '/\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?'
-        . '|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\b/i';
+        '/\s*\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?'
+        . '|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\.?\s*/i';
     public function findMatch(array $supplierData): array
     {
         $result = [

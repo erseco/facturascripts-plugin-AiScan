@@ -21,6 +21,7 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SupplierMatcherTest extends TestCase
@@ -32,15 +33,64 @@ final class SupplierMatcherTest extends TestCase
         $this->matcher = new SupplierMatcher();
     }
 
-    public function testReturnsNotFoundWhenNoData(): void
-    {
-        $result = $this->matcher->findMatch(['name' => '', 'tax_id' => '']);
-        $this->assertEquals('not_found', $result['match_status']);
-        $this->assertNull($result['supplier']);
-    }
-
     public function testCanInstantiate(): void
     {
         $this->assertInstanceOf(SupplierMatcher::class, $this->matcher);
+    }
+
+    public function testReturnsNotFoundWhenNoData(): void
+    {
+        $result = $this->matcher->findMatch([
+            'name' => '',
+            'tax_id' => '',
+        ]);
+        $this->assertEquals('not_found', $result['match_status']);
+        $this->assertNull($result['supplier']);
+        $this->assertEmpty($result['candidates']);
+    }
+
+    public function testReturnsNotFoundWhenBothFieldsNull(): void
+    {
+        $result = $this->matcher->findMatch([
+            'name' => null,
+            'tax_id' => null,
+        ]);
+        $this->assertEquals('not_found', $result['match_status']);
+    }
+
+    public function testResultStructureHasRequiredKeys(): void
+    {
+        $result = $this->matcher->findMatch([]);
+        $this->assertArrayHasKey('match_status', $result);
+        $this->assertArrayHasKey('supplier', $result);
+        $this->assertArrayHasKey('candidates', $result);
+    }
+
+    #[DataProvider('legalFormProvider')]
+    public function testNormalizeNameStripsLegalForms(
+        string $input,
+        string $expected
+    ): void {
+        $method = new \ReflectionMethod(SupplierMatcher::class, 'normalizeName');
+        $method->setAccessible(true);
+        $result = $method->invoke($this->matcher, $input);
+        $this->assertEquals($expected, $result);
+    }
+
+    public static function legalFormProvider(): array
+    {
+        return [
+            'S.A.' => ['Empresa S.A.', 'Empresa'],
+            'S.L.' => ['Acme S.L.', 'Acme'],
+            'S.R.L.' => ['Compañía S.R.L.', 'Compañía'],
+            'S.L.U.' => ['Tech S.L.U.', 'Tech'],
+            'S.A.U.' => ['Mega Corp S.A.U.', 'Mega Corp'],
+            'S.C.' => ['Cooperativa S.C.', 'Cooperativa'],
+            'without dots SA' => ['Empresa SA', 'Empresa'],
+            'without dots SL' => ['Acme SL', 'Acme'],
+            'no legal form' => ['Simple Company', 'Simple Company'],
+            'empty string' => ['', ''],
+            'only legal form' => ['S.L.', ''],
+        ];
     }
 }

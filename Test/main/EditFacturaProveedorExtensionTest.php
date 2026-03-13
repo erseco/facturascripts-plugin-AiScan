@@ -21,13 +21,12 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Plugins\AiScan\Extension\Controller\EditFacturaProveedor;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @runTestsInSeparateProcesses
- *
- * @preserveGlobalState disabled
- */
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class EditFacturaProveedorExtensionTest extends TestCase
 {
     public static function setUpBeforeClass(): void

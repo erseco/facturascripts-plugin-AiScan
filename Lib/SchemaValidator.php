@@ -206,16 +206,6 @@ class SchemaValidator
 
     private function isValidCurrencyCode(string $currency): bool
     {
-        if (1 !== preg_match('/^[A-Z]{3}$/', $currency)) {
-            return false;
-        }
-
-        if (false === class_exists(\ResourceBundle::class)) {
-            return true;
-        }
-
-        $bundle = \ResourceBundle::create('en', 'ICUDATA-curr');
-        $value = $bundle instanceof \ResourceBundle ? $bundle->get($currency) : false;
-        return false !== $value && null !== $value;
+        return 1 === preg_match('/^[A-Z]{3}$/', $currency);
     }
 }
