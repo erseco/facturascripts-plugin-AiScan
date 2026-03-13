@@ -50,7 +50,8 @@ class SchemaValidator
             $errors[] = 'Lines must be an array';
         }
 
-        foreach ($data['lines'] ?? [] as $index => $line) {
+        $lines = is_array($data['lines'] ?? null) ? $data['lines'] : [];
+        foreach ($lines as $index => $line) {
             if (empty($line['description'])) {
                 $errors[] = 'Missing line description at index ' . $index;
             }
