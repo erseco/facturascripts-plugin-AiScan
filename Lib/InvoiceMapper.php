@@ -43,7 +43,10 @@ class InvoiceMapper
             if ($invoiceId) {
                 $invoice = new FacturaProveedor();
                 if (!$invoice->loadFromCode($invoiceId)) {
-                    $result['errors'][] = Tools::lang()->trans('aiscan-invoice-not-found', ['%invoiceId%' => (string) $invoiceId]);
+                    $result['errors'][] = Tools::lang()->trans(
+                        'aiscan-invoice-not-found',
+                        ['%invoiceId%' => (string) $invoiceId]
+                    );
                     return $result;
                 }
             } else {
@@ -154,7 +157,9 @@ class InvoiceMapper
         $taxRate = $subtotal > 0 && $taxAmount > 0 ? round(($taxAmount / $subtotal) * 100, 2) : 0.0;
 
         return [[
-            'description' => trim((string) ($invoiceData['summary'] ?? Tools::lang()->trans('aiscan-scanned-supplier-invoice'))),
+            'description' => trim((string) (
+                $invoiceData['summary'] ?? Tools::lang()->trans('aiscan-scanned-supplier-invoice')
+            )),
             'quantity' => 1,
             'unit_price' => $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0),
             'discount' => 0,
