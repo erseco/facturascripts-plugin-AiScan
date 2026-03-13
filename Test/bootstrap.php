@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of PluginTemplate plugin for FacturaScripts.
+ * This file is part of AiScan plugin for FacturaScripts.
  * PHPUnit bootstrap file for testing
  */
 
@@ -31,8 +31,8 @@ $loader = require FS_FOLDER . '/vendor/autoload.php';
 // Register FacturaScripts Core
 $loader->addPsr4('FacturaScripts\\Core\\', FS_FOLDER . '/Core');
 
-// Register PluginTemplate
-$loader->addPsr4('FacturaScripts\\Plugins\\PluginTemplate\\', FS_FOLDER . '/Plugins/PluginTemplate');
+// Register AiScan
+$loader->addPsr4('FacturaScripts\\Plugins\\AiScan\\', FS_FOLDER . '/Plugins/AiScan');
 
 // If your plugin depends on other plugins, register them here as well
 // Example: $loader->addPsr4('FacturaScripts\\Plugins\\OtherPlugin\\', FS_FOLDER . '/Plugins/OtherPlugin');

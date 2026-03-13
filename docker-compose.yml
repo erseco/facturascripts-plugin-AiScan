@@ -39,7 +39,7 @@ services:
     volumes:
       - facturascripts_data:/var/www/html/volume
       # Mount the plugin directory
-      - ./:/var/www/html/Plugins/PluginTemplate
+      - ./:/var/www/html/Plugins/AiScan
     depends_on:
       mariadb:
         condition: service_healthy

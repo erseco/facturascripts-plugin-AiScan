@@ -1,0 +1,121 @@
+<?php
+/**
+ * This file is part of AiScan plugin for FacturaScripts.
+ * Copyright (C) 2025 Carlos Garcia Gomez <carlos@facturascripts.com>
+ */
+
+namespace FacturaScripts\Plugins\AiScan\Lib;
+
+class SchemaValidator
+{
+    private const REQUIRED_INVOICE_FIELDS = ['number', 'issue_date', 'total'];
+
+    public function validate(array $data): array
+    {
+        $errors = [];
+
+        if (!isset($data['invoice'])) {
+            $errors[] = 'Missing invoice section';
+            return $errors;
+        }
+
+        foreach (self::REQUIRED_INVOICE_FIELDS as $field) {
+            if (empty($data['invoice'][$field])) {
+                $errors[] = 'Missing required invoice field: ' . $field;
+            }
+        }
+
+        if (
+            isset($data['invoice']['subtotal'])
+            && isset($data['invoice']['tax_amount'])
+            && isset($data['invoice']['total'])
+        ) {
+            $computed = (float) $data['invoice']['subtotal'] + (float) $data['invoice']['tax_amount'];
+            $declared = (float) $data['invoice']['total'];
+            if (abs($computed - $declared) > 0.02) {
+                $errors[] = sprintf(
+                    'Tax mismatch: subtotal(%.2f) + tax(%.2f) = %.2f but total is %.2f',
+                    $data['invoice']['subtotal'],
+                    $data['invoice']['tax_amount'],
+                    $computed,
+                    $declared
+                );
+            }
+        }
+
+        return $errors;
+    }
+
+    public function normalize(array $data): array
+    {
+        if (!empty($data['invoice']['issue_date'])) {
+            $data['invoice']['issue_date'] = $this->normalizeDate($data['invoice']['issue_date']);
+        }
+        if (!empty($data['invoice']['due_date'])) {
+            $data['invoice']['due_date'] = $this->normalizeDate($data['invoice']['due_date']);
+        }
+
+        foreach (['subtotal', 'tax_amount', 'total'] as $field) {
+            if (isset($data['invoice'][$field])) {
+                $data['invoice'][$field] = $this->normalizeDecimal($data['invoice'][$field]);
+            }
+        }
+
+        if (isset($data['lines']) && is_array($data['lines'])) {
+            foreach ($data['lines'] as &$line) {
+                foreach (['quantity', 'unit_price', 'discount', 'tax_rate', 'line_total'] as $field) {
+                    if (isset($line[$field])) {
+                        $line[$field] = $this->normalizeDecimal($line[$field]);
+                    }
+                }
+            }
+        }
+
+        if (isset($data['taxes']) && is_array($data['taxes'])) {
+            foreach ($data['taxes'] as &$tax) {
+                foreach (['rate', 'base', 'amount'] as $field) {
+                    if (isset($tax[$field])) {
+                        $tax[$field] = $this->normalizeDecimal($tax[$field]);
+                    }
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    private function normalizeDate(string $date): string
+    {
+        $formats = ['Y-m-d', 'd/m/Y', 'm/d/Y', 'd-m-Y', 'd.m.Y', 'Y/m/d'];
+        foreach ($formats as $format) {
+            $dt = \DateTime::createFromFormat($format, $date);
+            if ($dt !== false) {
+                return $dt->format('Y-m-d');
+            }
+        }
+
+        $ts = strtotime($date);
+        if ($ts !== false) {
+            return date('Y-m-d', $ts);
+        }
+
+        return $date;
+    }
+
+    private function normalizeDecimal(mixed $value): float
+    {
+        if (is_float($value)) {
+            return $value;
+        }
+
+        $str = (string) $value;
+        // Handle European format: 1.234,56 → 1234.56
+        if (preg_match('/^\d{1,3}(\.\d{3})+(,\d+)?$/', $str)) {
+            $str = str_replace('.', '', $str);
+            $str = str_replace(',', '.', $str);
+        } else {
+            $str = str_replace(',', '.', $str);
+        }
+        return (float) $str;
+    }
+}

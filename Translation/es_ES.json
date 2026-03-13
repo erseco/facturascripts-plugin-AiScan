@@ -1,11 +1,7 @@
 {
-    "active": "Activo",
-    "created-at": "Fecha de creación",
-    "description": "Descripción",
-    "example-controller": "Controlador de Ejemplo",
-    "example-models": "Modelos de Ejemplo",
-    "id": "ID",
-    "name": "Nombre",
-    "name-cannot-be-empty": "El nombre no puede estar vacío",
-    "updated-at": "Fecha de actualización"
+    "aiscan-config": "Configuración AiScan",
+    "aiscan-filename-required": "El nombre de archivo es requerido",
+    "aiscan-invoice": "Escanear Factura",
+    "aiscan-settings": "Configuración AiScan",
+    "scan-invoice": "Escanear Factura"
 }

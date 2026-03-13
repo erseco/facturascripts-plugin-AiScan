@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<view>
+    <group name="general" valign="top">
+        <column name="enabled" numcolumns="3">
+            <widget type="checkbox" fieldname="value" onclick="" />
+        </column>
+    </group>
+</view>

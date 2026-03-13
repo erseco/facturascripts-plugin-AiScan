@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<table>
+    <column>
+        <name>id</name>
+        <type>serial</type>
+        <null>NO</null>
+    </column>
+    <column>
+        <name>idfactura</name>
+        <type>integer</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>filename</name>
+        <type>character varying(255)</type>
+        <null>NO</null>
+    </column>
+    <column>
+        <name>mime_type</name>
+        <type>character varying(100)</type>
+        <null>NO</null>
+    </column>
+    <column>
+        <name>provider</name>
+        <type>character varying(50)</type>
+        <null>NO</null>
+        <default>openai</default>
+    </column>
+    <column>
+        <name>model</name>
+        <type>character varying(100)</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>status</name>
+        <type>character varying(20)</type>
+        <null>NO</null>
+        <default>pending</default>
+    </column>
+    <column>
+        <name>raw_payload</name>
+        <type>text</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>error_message</name>
+        <type>text</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>confidence</name>
+        <type>double precision</type>
+        <null>NO</null>
+        <default>0</default>
+    </column>
+    <column>
+        <name>created_at</name>
+        <type>timestamp</type>
+        <null>NO</null>
+        <default>CURRENT_TIMESTAMP</default>
+    </column>
+    <constraint>
+        <name>aiscan_logs_pkey</name>
+        <type>PRIMARY KEY (id)</type>
+    </constraint>
+</table>
