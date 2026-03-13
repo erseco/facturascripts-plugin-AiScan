@@ -29,8 +29,8 @@ class SupplierMatcher
     private const LEGAL_FORM_PATTERN =
         '/\s*\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?'
         . '|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?'
-        . '|L\.?T\.?D\.?|L\.?L\.?C\.?|I\.?N\.?C\.?|C\.?O\.?R\.?P\.?'
-        . '|LIMITE?D|CORPORATION|GMBH|SARL)\.?\b\s*/iu';
+        . '|L\.?T\.?D\.?|L\.?L\.?C\.?|I\.?N\.?C\.?'
+        . '|LIMITED|CORPORATION|GMBH|SARL)\.?\b\s*/iu';
     private const AUTO_MATCH_MIN_SCORE = 140;
     private const AMBIGUOUS_MIN_SCORE = 60;
     private const SCORE_DELTA = 15;

@@ -72,7 +72,7 @@ final class SupplierMatcherTest extends TestCase
             ['Acme S.L.', 'acme'],
             ['Compañía S.R.L.', 'compania'],
             ['Tech S.L.U.', 'tech'],
-            ['Mega Corp S.A.U.', 'mega'],
+            ['Mega Corp S.A.U.', 'mega corp'],
             ['Cooperativa S.C.', 'cooperativa'],
             ['Empresa SA', 'empresa'],
             ['Acme SL', 'acme'],
