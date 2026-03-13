@@ -67,6 +67,8 @@
     "aiscan-use-cloud-provider-for-image": "Browser AI no puede analizar imágenes. Selecciona un proveedor en la nube (OpenAI, Gemini, etc.).",
     "aiscan-use-cloud-provider-for-pdf": "No se pudo extraer texto de este PDF. Selecciona un proveedor en la nube para analizarlo.",
     "aiscan-validation-warnings": "Avisos",
+    "aiscan-warehouse": "Almacén",
+    "aiscan-warehouse-required": "El almacén es obligatorio para crear una nueva factura de proveedor.",
     "aiscan-invoice-saved-successfully": "Factura guardada correctamente.",
     "allowed-extensions": "Extensiones permitidas",
     "auto-scan": "Analizar automáticamente tras la subida",

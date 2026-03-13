@@ -67,6 +67,8 @@
     "aiscan-use-cloud-provider-for-image": "Browser AI cannot analyze images. Please select a cloud provider (OpenAI, Gemini, etc.).",
     "aiscan-use-cloud-provider-for-pdf": "Could not extract text from this PDF. Please select a cloud provider for analysis.",
     "aiscan-validation-warnings": "Warnings",
+    "aiscan-warehouse": "Warehouse",
+    "aiscan-warehouse-required": "Warehouse is required to create a new purchase invoice.",
     "aiscan-invoice-saved-successfully": "Invoice saved successfully.",
     "allowed-extensions": "Allowed extensions",
     "auto-scan": "Analyze automatically after upload",

@@ -57,6 +57,15 @@ class InvoiceMapper
             $supplierData = $extractedData['supplier'] ?? [];
             $lines = $extractedData['lines'] ?? [];
 
+            $result['errors'] = array_merge($result['errors'], $this->validateInvoiceData($invoiceData, $invoiceId));
+            if (!empty($result['errors'])) {
+                return $result;
+            }
+
+            if (null === $invoiceId) {
+                $invoice->codalmacen = $this->getWarehouseCode($invoiceData);
+            }
+
             $supplier = $this->supplierService->resolve($supplierData);
             if ($supplier instanceof Proveedor) {
                 $invoice->setSubject($supplier);
@@ -165,5 +174,19 @@ class InvoiceMapper
             'discount' => 0,
             'tax_rate' => $taxRate,
         ]];
+    }
+
+    private function validateInvoiceData(array $invoiceData, ?int $invoiceId): array
+    {
+        if (null !== $invoiceId || '' !== $this->getWarehouseCode($invoiceData)) {
+            return [];
+        }
+
+        return [Tools::lang()->trans('aiscan-warehouse-required')];
+    }
+
+    private function getWarehouseCode(array $invoiceData): string
+    {
+        return trim((string) ($invoiceData['warehouse_code'] ?? ''));
     }
 }
