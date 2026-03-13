@@ -49,7 +49,7 @@ class SupplierService
         }
 
         $supplier = $this->createSupplier($supplierData);
-        if (false === $supplier instanceof Proveedor) {
+        if (!($supplier instanceof Proveedor)) {
             return null;
         }
 

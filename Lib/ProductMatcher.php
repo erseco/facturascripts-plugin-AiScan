@@ -64,8 +64,8 @@ class ProductMatcher
 
             $candidates = array_merge(
                 $candidates,
-                $this->loadVariants([Where::eq('referencia', $term)], [], $limit),
-                $this->loadVariants([Where::eq('codbarras', $term)], [], $limit),
+                $this->loadVariants([new Where('referencia', '=', $term)], [], $limit),
+                $this->loadVariants([new Where('codbarras', '=', $term)], [], $limit),
                 $this->loadVariants([new Where('referencia', 'LIKE', '%' . $term . '%')], ['referencia' => 'ASC'], $limit),
                 $this->loadVariants([new Where('codbarras', 'LIKE', '%' . $term . '%')], ['referencia' => 'ASC'], $limit)
             );

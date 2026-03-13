@@ -12,6 +12,7 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Where;
 use FacturaScripts\Plugins\AiScan\Lib\ProductMatcher;
 use PHPUnit\Framework\TestCase;
 
@@ -111,5 +112,35 @@ final class ProductMatcherTest extends TestCase
         ]);
 
         $this->assertNull($reference);
+    }
+
+    public function testSkuSearchBuildsExpectedWhereClauses(): void
+    {
+        $matcher = new class extends ProductMatcher {
+            public array $queries = [];
+
+            public function inspectSkuSearch(string $sku): void
+            {
+                $this->findVariantsBySku($sku);
+            }
+
+            protected function loadVariants(array $where, array $orderBy = [], int $limit = 20): array
+            {
+                $this->queries[] = [
+                    'where' => $where,
+                    'orderBy' => $orderBy,
+                    'limit' => $limit,
+                ];
+                return [];
+            }
+        };
+
+        $matcher->inspectSkuSearch('ab-123');
+
+        $this->assertCount(12, $matcher->queries);
+        foreach ($matcher->queries as $query) {
+            $this->assertCount(1, $query['where']);
+            $this->assertInstanceOf(Where::class, $query['where'][0]);
+        }
     }
 }
