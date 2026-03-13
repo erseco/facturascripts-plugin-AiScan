@@ -1,5 +1,10 @@
 # AiScan para FacturaScripts
 
+<a href="https://erseco.github.io/facturascripts-playground/?blueprint=https%3A%2F%2Fraw.githubusercontent.com%2Ferseco%2Ffacturascripts-plugin-AiScan%2Frefs%2Fheads%2Fmain%2Fblueprint.json">
+  <img src="https://raw.githubusercontent.com/erseco/facturascripts-playground/main/ogimage.png" alt="Try AiScan in your browser" width="220">
+</a><br>
+<small><a href="https://erseco.github.io/facturascripts-playground/?blueprint=https%3A%2F%2Fraw.githubusercontent.com%2Ferseco%2Ffacturascripts-plugin-AiScan%2Frefs%2Fheads%2Fmain%2Fblueprint.json">Try in your browser</a></small>
+
 Plugin para escanear facturas de proveedor con ayuda de IA directamente desde FacturaScripts. AiScan extrae automáticamente proveedor, número de factura, fechas, importes, impuestos y líneas de detalle desde un PDF o una imagen, y te permite revisar los datos antes de aplicarlos a la factura de compra.
 
 ## Cómo funciona

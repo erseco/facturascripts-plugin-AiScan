@@ -1,0 +1,95 @@
+name: PR Playground Preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-playground-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Create or update playground preview comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- facturascripts-playground-preview -->';
+            const playgroundUrl = 'https://erseco.github.io/facturascripts-playground/';
+            const imageUrl = 'https://raw.githubusercontent.com/erseco/facturascripts-playground/main/ogimage.png';
+            const { owner, repo } = context.repo;
+            const pullRequest = context.payload.pull_request;
+            const branchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${pullRequest.head.ref}.zip`;
+            const fs = require('fs');
+            const mainBranchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
+            const blueprint = JSON.parse(fs.readFileSync('blueprint.json', 'utf8'));
+            const pluginIndex = Array.isArray(blueprint.plugins)
+              ? blueprint.plugins.indexOf(mainBranchZipUrl)
+              : -1;
+
+            if (pluginIndex === -1) {
+              throw new Error(`Expected ${mainBranchZipUrl} in blueprint.json plugins[]`);
+            }
+
+            blueprint.plugins = [...blueprint.plugins];
+            blueprint.plugins[pluginIndex] = branchZipUrl;
+
+            function toBase64Url(value) {
+              return Buffer.from(value, 'utf8')
+                .toString('base64')
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/g, '');
+            }
+
+            const previewUrl = `${playgroundUrl}?blueprint-data=${toBase64Url(JSON.stringify(blueprint))}`;
+            const body = [
+              marker,
+              '## FacturaScripts Playground Preview',
+              '',
+              `<a href="${previewUrl}">`,
+              `  <img src="${imageUrl}" alt="Open this PR in FacturaScripts Playground" width="220">`,
+              '</a><br>',
+              `<small><a href="${previewUrl}">Try this PR in your browser</a></small>`,
+              '',
+              `This preview is generated automatically for the \`${pullRequest.head.ref}\` branch and loads the plugin directly from the PR branch ZIP in FacturaScripts Playground.`
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pullRequest.number,
+              per_page: 100
+            });
+
+            const existingComment = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body
+              });
+              core.info(`Updated existing playground preview comment: ${existingComment.id}`);
+              return;
+            }
+
+            const createdComment = await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pullRequest.number,
+              body
+            });
+
+            core.info(`Created playground preview comment: ${createdComment.data.id}`);
