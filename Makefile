@@ -101,7 +101,9 @@ package:
 		-x "*README.md" \
 		-x "*Test/*" \
 		-x "*tests/*" \
-		-x "*vendor/*"
+		-x "*vendor/*" \
+		-x "*.agents/*" \
+		-x "*docs/*"
 	@echo "Restoring version in facturascripts.ini..."
 	$(SED_INPLACE) 's/^\(version[[:space:]]*=[[:space:]]*\).*$$/\11.0/' facturascripts.ini
 	@echo "Package created: dist/AiScan-$(VERSION).zip"
