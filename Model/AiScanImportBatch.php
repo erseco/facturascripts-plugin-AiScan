@@ -29,15 +29,15 @@ class AiScanImportBatch extends ModelClass
 {
     use ModelTrait;
 
-    public int $id;
+    public ?int $id;
     public ?string $nick;
-    public string $importmode;
+    public ?string $importmode;
     public ?string $provider;
-    public int $totaldocuments;
-    public int $importedcount;
-    public int $discardedcount;
-    public int $failedcount;
-    public string $created_at;
+    public ?int $totaldocuments;
+    public ?int $importedcount;
+    public ?int $discardedcount;
+    public ?int $failedcount;
+    public ?string $created_at;
 
     public function clear(): void
     {
@@ -60,6 +60,22 @@ class AiScanImportBatch extends ModelClass
     public static function tableName(): string
     {
         return 'aiscan_import_batches';
+    }
+
+    public function install(): string
+    {
+        return 'CREATE TABLE IF NOT EXISTS ' . static::tableName() . ' ('
+            . ' id int(11) NOT NULL AUTO_INCREMENT,'
+            . ' nick varchar(50) DEFAULT NULL,'
+            . ' importmode varchar(20) NOT NULL DEFAULT "lines",'
+            . ' provider varchar(50) DEFAULT NULL,'
+            . ' totaldocuments int(11) NOT NULL DEFAULT 0,'
+            . ' importedcount int(11) NOT NULL DEFAULT 0,'
+            . ' discardedcount int(11) NOT NULL DEFAULT 0,'
+            . ' failedcount int(11) NOT NULL DEFAULT 0,'
+            . ' created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+            . ' PRIMARY KEY (id)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;';
     }
 
     public function getDocuments(): array

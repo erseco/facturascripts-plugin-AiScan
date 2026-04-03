@@ -28,22 +28,22 @@ class AiScanImportDocument extends ModelClass
 {
     use ModelTrait;
 
-    public int $id;
-    public int $idbatch;
-    public string $originalname;
+    public ?int $id;
+    public ?int $idbatch;
+    public ?string $originalname;
     public ?string $codproveedor;
     public ?string $suppliername;
     public ?string $numproveedor;
     public ?string $fecha;
     public ?string $coddivisa;
-    public float $neto;
-    public float $totaliva;
-    public float $total;
-    public string $status;
+    public ?float $neto;
+    public ?float $totaliva;
+    public ?float $total;
+    public ?string $status;
     public ?int $idfactura;
     public ?string $codigofactura;
     public ?string $errormessage;
-    public string $created_at;
+    public ?string $created_at;
 
     public function clear(): void
     {
@@ -67,6 +67,29 @@ class AiScanImportDocument extends ModelClass
     public static function tableName(): string
     {
         return 'aiscan_import_documents';
+    }
+
+    public function install(): string
+    {
+        return 'CREATE TABLE IF NOT EXISTS ' . static::tableName() . ' ('
+            . ' id int(11) NOT NULL AUTO_INCREMENT,'
+            . ' idbatch int(11) NOT NULL,'
+            . ' originalname varchar(255) NOT NULL,'
+            . ' codproveedor varchar(10) DEFAULT NULL,'
+            . ' suppliername varchar(100) DEFAULT NULL,'
+            . ' numproveedor varchar(50) DEFAULT NULL,'
+            . ' fecha date DEFAULT NULL,'
+            . ' coddivisa varchar(3) DEFAULT "EUR",'
+            . ' neto double NOT NULL DEFAULT 0,'
+            . ' totaliva double NOT NULL DEFAULT 0,'
+            . ' total double NOT NULL DEFAULT 0,'
+            . ' status varchar(20) NOT NULL DEFAULT "pending",'
+            . ' idfactura int(11) DEFAULT NULL,'
+            . ' codigofactura varchar(20) DEFAULT NULL,'
+            . ' errormessage text DEFAULT NULL,'
+            . ' created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+            . ' PRIMARY KEY (id)'
+            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;';
     }
 
     public function getLines(): array

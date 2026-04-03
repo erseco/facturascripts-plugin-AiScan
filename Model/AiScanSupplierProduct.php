@@ -28,11 +28,11 @@ class AiScanSupplierProduct extends ModelClass
 {
     use ModelTrait;
 
-    public int $id;
-    public string $codproveedor;
-    public string $referencia;
+    public ?int $id;
+    public ?string $codproveedor;
+    public ?string $referencia;
     public ?string $description;
-    public string $created_at;
+    public ?string $created_at;
 
     public function clear(): void
     {
