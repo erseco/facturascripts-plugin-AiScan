@@ -72,7 +72,8 @@ class EditAiScanImportBatch extends PanelController
 
         switch ($viewName) {
             case $mvn:
-                parent::loadData($viewName, $view);
+                $code = $this->request->get('code');
+                $view->loadData($code);
                 break;
 
             case 'EditAiScanImportDocument':

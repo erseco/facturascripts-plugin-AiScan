@@ -1334,7 +1334,7 @@
                     <td>${escapeHtml(invoice.issue_date || '-')}</td>
                     <td>${escapeHtml(invoice.total ?? '-')}</td>
                     <td><span class="badge ${info.cls}"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span></td>
-                    <td>${doc.status !== STATUS.DISCARDED && doc.status !== STATUS.FAILED ? `<button class="btn btn-sm btn-outline-danger aiscan-toggle-discard" data-index="${i}"><i class="fa-solid fa-ban"></i></button>` : ''}</td>
+                    <td>${doc.status !== STATUS.DISCARDED && doc.status !== STATUS.FAILED && doc.status !== STATUS.IMPORTED ? `<button class="btn btn-sm btn-outline-danger aiscan-toggle-discard" data-index="${i}"><i class="fa-solid fa-ban"></i></button>` : ''}${doc.status === STATUS.IMPORTED && doc.invoiceId ? `<a href="EditFacturaProveedor?code=${encodeURIComponent(doc.invoiceId)}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-eye"></i></a>` : ''}</td>
                 </tr>
             `;
         }).join('');
@@ -1399,7 +1399,7 @@
             });
 
             buildImportSummary();
-            showImportResults(data.results || []);
+            showImportResults(data.results || [], data.batch_id || null);
         } catch (error) {
             alert(error.message);
         } finally {
@@ -1408,7 +1408,7 @@
         }
     }
 
-    function showImportResults(results) {
+    function showImportResults(results, batchId) {
         const imported = results.filter(r => r.status === 'imported');
         const importBtn = document.getElementById('aiscan-import-all-btn');
         const backBtn = document.getElementById('aiscan-back-to-review');
@@ -1442,6 +1442,14 @@
                 link.className = 'btn btn-primary';
                 link.innerHTML = `<i class="fa-solid fa-eye me-1"></i>${escapeHtml(trans('aiscan-view-invoice'))}`;
                 wrapper.appendChild(link);
+
+                if (batchId) {
+                    const histLink = document.createElement('a');
+                    histLink.href = 'EditAiScanImportBatch?code=' + encodeURIComponent(batchId);
+                    histLink.className = 'btn btn-outline-info';
+                    histLink.innerHTML = `<i class="fa-solid fa-clock-rotate-left me-1"></i>${escapeHtml(trans('aiscan-import-history'))}`;
+                    wrapper.appendChild(histLink);
+                }
 
                 footer.innerHTML = '';
                 footer.appendChild(wrapper);
