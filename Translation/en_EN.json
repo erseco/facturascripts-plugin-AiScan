@@ -60,6 +60,7 @@
     "aiscan-no-results": "No results",
     "aiscan-page-title": "AiScan",
     "aiscan-plugin-disabled": "AiScan plugin is disabled.",
+    "aiscan-providers": "AI Providers",
     "aiscan-provider-browser-prompt": "Browser Prompt API (experimental)",
     "aiscan-provider-gemini": "Google Gemini",
     "aiscan-provider-label-browser-prompt": "Browser AI",

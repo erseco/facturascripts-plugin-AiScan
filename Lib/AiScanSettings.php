@@ -32,9 +32,9 @@ class AiScanSettings
         'auto_scan' => false,
         'debug_mode' => false,
         'request_timeout' => 120,
-        'openai_model' => 'gpt-5-mini',
+        'openai_model' => 'gpt-5-nano',
         'openai_base_url' => 'https://api.openai.com/v1',
-        'gemini_model' => 'gemini-2.5-flash',
+        'gemini_model' => 'gemini-2.5-flash-lite',
         'mistral_model' => 'mistral-small-latest',
     ];
 

@@ -26,19 +26,11 @@
             <column name="allowed-extensions" numcolumns="4" order="140">
                 <widget type="text" fieldname="allowed_extensions"/>
             </column>
-            <column name="auto-scan" order="150">
-                <widget type="checkbox" fieldname="auto_scan"/>
-            </column>
             <column name="debug-mode" order="160">
                 <widget type="checkbox" fieldname="debug_mode"/>
             </column>
         </group>
-        <group name="prompt" title="extraction-prompt" icon="fa-solid fa-comment-dots" numcolumns="12">
-            <column name="extraction-prompt" numcolumns="12" order="100">
-                <widget type="textarea" fieldname="extraction_prompt" rows="10"/>
-            </column>
-        </group>
-        <group name="openai" title="aiscan-provider-openai" icon="fa-solid fa-circle-nodes" numcolumns="12">
+        <group name="providers" title="aiscan-providers" icon="fa-solid fa-circle-nodes" numcolumns="12">
             <column name="openai-api-key" numcolumns="4" order="100">
                 <widget type="password" fieldname="openai_api_key"/>
             </column>
@@ -48,32 +40,31 @@
             <column name="openai-base-url" numcolumns="4" order="120">
                 <widget type="text" fieldname="openai_base_url"/>
             </column>
-        </group>
-        <group name="gemini" title="aiscan-provider-gemini" icon="fa-solid fa-wand-magic-sparkles" numcolumns="12">
-            <column name="gemini-api-key" numcolumns="6" order="100">
+            <column name="gemini-api-key" numcolumns="6" order="200">
                 <widget type="password" fieldname="gemini_api_key"/>
             </column>
-            <column name="gemini-model" numcolumns="6" order="110">
+            <column name="gemini-model" numcolumns="6" order="210">
                 <widget type="text" fieldname="gemini_model"/>
             </column>
-        </group>
-        <group name="mistral" title="aiscan-provider-mistral" icon="fa-solid fa-wind" numcolumns="12">
-            <column name="mistral-api-key" numcolumns="6" order="100">
+            <column name="mistral-api-key" numcolumns="6" order="300">
                 <widget type="password" fieldname="mistral_api_key"/>
             </column>
-            <column name="mistral-model" numcolumns="6" order="110">
+            <column name="mistral-model" numcolumns="6" order="310">
                 <widget type="text" fieldname="mistral_model"/>
             </column>
-        </group>
-        <group name="compatible" title="aiscan-provider-openai-compatible" icon="fa-solid fa-plug" numcolumns="12">
-            <column name="custom-api-key" numcolumns="4" order="100">
+            <column name="custom-api-key" numcolumns="4" order="400">
                 <widget type="password" fieldname="custom_api_key"/>
             </column>
-            <column name="custom-model" numcolumns="4" order="110">
+            <column name="custom-model" numcolumns="4" order="410">
                 <widget type="text" fieldname="custom_model"/>
             </column>
-            <column name="custom-base-url" numcolumns="4" order="120">
+            <column name="custom-base-url" numcolumns="4" order="420">
                 <widget type="text" fieldname="custom_base_url"/>
+            </column>
+        </group>
+        <group name="prompt" title="extraction-prompt" icon="fa-solid fa-comment-dots" numcolumns="12">
+            <column name="extraction-prompt" numcolumns="12" order="100">
+                <widget type="textarea" fieldname="extraction_prompt" rows="10"/>
             </column>
         </group>
     </columns>

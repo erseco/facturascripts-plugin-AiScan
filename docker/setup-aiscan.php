@@ -56,7 +56,6 @@ function configureApiKeys(): void
         'GEMINI_API_KEY' => 'gemini_api_key',
         'MISTRAL_API_KEY' => 'mistral_api_key',
         'ANTHROPIC_API_KEY' => 'custom_api_key',
-        'DEEPSEEK_API_KEY' => 'custom_api_key',
         'OPENROUTER_API_KEY' => 'custom_api_key',
     ];
 
@@ -67,17 +66,12 @@ function configureApiKeys(): void
         'ANTHROPIC_API_KEY' => [
             'provider' => 'openai-compatible',
             'custom_base_url' => 'https://api.anthropic.com/v1',
-            'custom_model' => 'claude-sonnet-4-20250514',
-        ],
-        'DEEPSEEK_API_KEY' => [
-            'provider' => 'openai-compatible',
-            'custom_base_url' => 'https://api.deepseek.com/v1',
-            'custom_model' => 'deepseek-chat',
+            'custom_model' => 'claude-3-haiku-20240307',
         ],
         'OPENROUTER_API_KEY' => [
             'provider' => 'openai-compatible',
             'custom_base_url' => 'https://openrouter.ai/api/v1',
-            'custom_model' => 'google/gemini-2.5-flash',
+            'custom_model' => 'google/gemini-2.5-flash-lite',
         ],
     ];
 
@@ -93,9 +87,9 @@ function configureApiKeys(): void
         $settings->auto_scan = '0';
         $settings->debug_mode = '0';
         $settings->request_timeout = '120';
-        $settings->openai_model = 'gpt-4o-mini';
+        $settings->openai_model = 'gpt-5-nano';
         $settings->openai_base_url = 'https://api.openai.com/v1';
-        $settings->gemini_model = 'gemini-2.5-flash';
+        $settings->gemini_model = 'gemini-2.5-flash-lite';
         $settings->mistral_model = 'mistral-small-latest';
         $settings->save();
         echo "[AiScan] Settings created.\n";

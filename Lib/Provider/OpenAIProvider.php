@@ -32,7 +32,7 @@ class OpenAIProvider implements ProviderInterface
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'openai_api_key', '');
-        $this->model = Tools::settings('AiScan', 'openai_model', 'gpt-5-mini');
+        $this->model = Tools::settings('AiScan', 'openai_model', 'gpt-5-nano');
         $this->baseUrl = Tools::settings('AiScan', 'openai_base_url', 'https://api.openai.com/v1');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
