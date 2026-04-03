@@ -24,7 +24,7 @@ use FacturaScripts\Core\Lib\ExtendedController\PanelController;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 
-class EditAiScanHistory extends PanelController
+class EditAiScanImportBatch extends PanelController
 {
     public function getPageData(): array
     {
