@@ -219,6 +219,9 @@
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-uploading-file'))}`;
 
+        // Save user's provider choice BEFORE upload (buildProviderSelect will rebuild the dropdown)
+        const userSelectedProvider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+
         const formData = new FormData();
         state.documents.forEach(doc => formData.append('invoice_files[]', doc.file));
 
@@ -230,10 +233,11 @@
                 throw new Error(data.error || trans('aiscan-no-file-uploaded'));
             }
 
-            state.defaultProvider = data.provider || 'unknown';
             state.availableProviders = data.available_providers || [data.provider];
             state.extractionPrompt = data.extraction_prompt || '';
             state.maxParallelRequests = data.max_parallel_requests || 5;
+            // Use the user's selection, not the server default
+            state.defaultProvider = userSelectedProvider;
 
             const uploadedFiles = data.files || [];
             uploadedFiles.forEach(uf => {
