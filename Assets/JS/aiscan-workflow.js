@@ -15,11 +15,14 @@
     const state = {
         documents: [],
         currentIndex: 0,
-        importMode: 'lines',
+        importMode: null,
         useHistory: false,
         availableProviders: [],
         defaultProvider: null,
         extractionPrompt: null,
+        maxParallelRequests: 5,
+        selectedIndices: new Set(),
+        sortField: 'upload_order',
     };
 
     const STATUS = {
@@ -50,6 +53,9 @@
         let value = key;
         if (window.i18n && typeof window.i18n.trans === 'function') {
             value = window.i18n.trans(key);
+        }
+        if (value === key && window.aiscanI18n && window.aiscanI18n[key]) {
+            value = window.aiscanI18n[key];
         }
         if (value === key) {
             return key;
@@ -134,6 +140,7 @@
         document.querySelectorAll('input[name="import_mode"]').forEach(radio => {
             radio.addEventListener('change', () => {
                 state.importMode = radio.value;
+                document.getElementById('aiscan-import-mode-error')?.classList.add('d-none');
             });
         });
 
@@ -162,6 +169,7 @@
             status: STATUS.PENDING,
             extractedData: null,
             error: null,
+            reviewDecision: null,
         }));
 
         const dropZone = document.getElementById('aiscan-drop-zone');
@@ -169,16 +177,44 @@
             <div>
                 <div class="fs-3 mb-2 text-success"><i class="fa-solid fa-check-circle"></i></div>
                 <div class="fw-semibold">${escapeHtml(trans('aiscan-files-selected', {'%count%': String(files.length)}))}</div>
-                <div class="small text-muted mt-1">${files.map(f => escapeHtml(f.name)).join(', ')}</div>
                 <div class="small text-muted mt-2">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
             </div>
         `;
+
+        const fileListEl = document.getElementById('aiscan-file-list');
+        const fileListBody = document.getElementById('aiscan-file-list-body');
+        const fileCount = document.getElementById('aiscan-file-count');
+        if (fileListEl && fileListBody) {
+            fileListEl.classList.remove('d-none');
+            if (fileCount) {
+                fileCount.textContent = trans('aiscan-files-selected', {'%count%': String(files.length)});
+            }
+            fileListBody.innerHTML = files.map((f, i) => {
+                const icon = f.type === 'application/pdf' ? 'fa-file-pdf text-danger' : 'fa-file-image text-primary';
+                const sizeMb = (f.size / 1024 / 1024).toFixed(2);
+                return `<div class="list-group-item py-1 px-2 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center min-width-0">
+                        <i class="fa-solid ${icon} me-2"></i>
+                        <span class="text-truncate small">${escapeHtml(f.name)}</span>
+                    </div>
+                    <span class="text-muted small ms-2" style="white-space:nowrap">${sizeMb} MB</span>
+                </div>`;
+            }).join('');
+        }
 
         document.getElementById('aiscan-upload-btn').disabled = false;
         document.getElementById('aiscan-file-input').value = '';
     }
 
     async function startUploadAndAnalyze() {
+        if (!state.importMode) {
+            const errorEl = document.getElementById('aiscan-import-mode-error');
+            if (errorEl) {
+                errorEl.classList.remove('d-none');
+            }
+            return;
+        }
+
         const uploadBtn = document.getElementById('aiscan-upload-btn');
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-uploading-file'))}`;
@@ -197,6 +233,7 @@
             state.defaultProvider = data.provider || 'unknown';
             state.availableProviders = data.available_providers || [data.provider];
             state.extractionPrompt = data.extraction_prompt || '';
+            state.maxParallelRequests = data.max_parallel_requests || 5;
 
             const uploadedFiles = data.files || [];
             uploadedFiles.forEach(uf => {
@@ -231,18 +268,25 @@
 
     async function analyzeAllPending() {
         const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+        const concurrency = state.maxParallelRequests;
+        const queue = state.documents.filter(d => d.tmpFile && d.status !== STATUS.FAILED);
 
-        for (let i = 0; i < state.documents.length; i++) {
-            const doc = state.documents[i];
-            if (!doc.tmpFile || doc.status === STATUS.FAILED) {
-                continue;
+        let running = 0;
+        let nextIdx = 0;
+
+        function refreshUI() {
+            renderSidebar();
+            const cur = currentDoc();
+            if (cur && (cur.status === STATUS.ANALYZING || cur.status === STATUS.ANALYZED
+                || cur.status === STATUS.NEEDS_REVIEW || cur.status === STATUS.FAILED)) {
+                renderPreview(cur);
+                renderReviewPanel(cur);
             }
+        }
 
+        async function analyzeOne(doc) {
             doc.status = STATUS.ANALYZING;
-            if (i === state.currentIndex) {
-                renderCurrentDocument();
-            }
-            updateProgressBar();
+            refreshUI();
 
             try {
                 const params = new URLSearchParams({
@@ -263,7 +307,6 @@
                 }
 
                 doc.extractedData = data.data;
-                doc.status = STATUS.ANALYZED;
 
                 if (state.useHistory && doc.extractedData?.supplier?.matched_supplier_id && !doc._historyAnalyzed) {
                     doc._historyAnalyzed = true;
@@ -282,30 +325,301 @@
                         doc.extractedData = reData.data;
                     }
                 }
+
+                const warnings = doc.extractedData?._validation_errors || [];
+                doc.status = warnings.length > 0 ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
             } catch (error) {
-                doc.status = STATUS.NEEDS_REVIEW;
+                doc.status = STATUS.FAILED;
                 doc.error = error.message;
             }
 
-            if (i === state.currentIndex) {
-                renderCurrentDocument();
-            }
-            updateProgressBar();
+            refreshUI();
         }
+
+        return new Promise(resolve => {
+            function scheduleNext() {
+                while (running < concurrency && nextIdx < queue.length) {
+                    const doc = queue[nextIdx++];
+                    running++;
+                    analyzeOne(doc).then(() => {
+                        running--;
+                        if (running === 0 && nextIdx >= queue.length) {
+                            resolve();
+                        } else {
+                            scheduleNext();
+                        }
+                    });
+                }
+                if (queue.length === 0) {
+                    resolve();
+                }
+            }
+            scheduleNext();
+        });
     }
 
     // ── Step 2: Review ─────────────────────────────────────────────────
 
     function bindReviewStep() {
-        document.getElementById('aiscan-back-to-upload')?.addEventListener('click', () => {
-            showStep('upload');
-            resetUploadUI();
-        });
-        document.getElementById('aiscan-prev-doc')?.addEventListener('click', () => navigateTo(state.currentIndex - 1));
-        document.getElementById('aiscan-next-doc')?.addEventListener('click', () => navigateTo(state.currentIndex + 1));
         document.getElementById('aiscan-reanalyze-btn')?.addEventListener('click', reanalyzeCurrentDoc);
         document.getElementById('aiscan-discard-btn')?.addEventListener('click', discardCurrentDoc);
+
+        document.getElementById('aiscan-sort-by')?.addEventListener('change', (e) => {
+            state.sortField = e.target.value;
+            renderSidebar();
+        });
+
+        document.getElementById('aiscan-select-all')?.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                state.documents.forEach((_, i) => state.selectedIndices.add(i));
+            } else {
+                state.selectedIndices.clear();
+            }
+            renderSidebar();
+        });
+
+        document.getElementById('aiscan-bulk-apply')?.addEventListener('click', applyBulkAction);
+
+        document.getElementById('aiscan-proceed-import-btn')?.addEventListener('click', () => {
+            if (!state.importMode) {
+                alert(trans('aiscan-import-mode-required'));
+                return;
+            }
+            showStep('import');
+            buildImportSummary();
+        });
     }
+
+    // ── Sidebar ────────────────────────────────────────────────────────
+
+    function getSortedIndices() {
+        const indices = state.documents.map((_, i) => i);
+        const field = state.sortField;
+
+        indices.sort((a, b) => {
+            const da = state.documents[a];
+            const db = state.documents[b];
+            let va, vb;
+
+            switch (field) {
+                case 'supplier':
+                    va = da.extractedData?.supplier?.name || '';
+                    vb = db.extractedData?.supplier?.name || '';
+                    break;
+                case 'number':
+                    va = da.extractedData?.invoice?.number || '';
+                    vb = db.extractedData?.invoice?.number || '';
+                    break;
+                case 'date':
+                    va = da.extractedData?.invoice?.issue_date || '';
+                    vb = db.extractedData?.invoice?.issue_date || '';
+                    break;
+                case 'total':
+                    va = parseFloat(da.extractedData?.invoice?.total) || 0;
+                    vb = parseFloat(db.extractedData?.invoice?.total) || 0;
+                    return va - vb;
+                case 'status':
+                    va = da.reviewDecision || da.status;
+                    vb = db.reviewDecision || db.status;
+                    break;
+                default:
+                    return a - b;
+            }
+            return String(va).localeCompare(String(vb));
+        });
+
+        return indices;
+    }
+
+    function renderSidebar() {
+        const listEl = document.getElementById('aiscan-sidebar-list');
+        const countersEl = document.getElementById('aiscan-status-counters');
+        if (!listEl) {
+            return;
+        }
+
+        const sorted = getSortedIndices();
+        const total = state.documents.length;
+        const ready = state.documents.filter(d => d.status === STATUS.READY).length;
+        const analyzed = state.documents.filter(d => d.status === STATUS.ANALYZED).length;
+        const analyzing = state.documents.filter(d => d.status === STATUS.ANALYZING).length;
+        const discarded = state.documents.filter(d => d.status === STATUS.DISCARDED).length;
+        const needsReview = state.documents.filter(d => d.status === STATUS.NEEDS_REVIEW).length;
+        const failed = state.documents.filter(d => d.status === STATUS.FAILED).length;
+        const pending = state.documents.filter(d => d.status === STATUS.PENDING).length;
+
+        if (countersEl) {
+            countersEl.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+                const tip = bootstrap.Tooltip.getInstance(el);
+                if (tip) {
+                    tip.dispose();
+                }
+            });
+
+            const legend = [
+                {cls: 'text-bg-secondary', icon: 'fa-clock', count: pending, label: trans('aiscan-status-pending')},
+                {cls: 'text-bg-info', icon: 'fa-spinner', count: analyzing, label: trans('aiscan-status-analyzing')},
+                {cls: 'text-bg-primary', icon: 'fa-check', count: analyzed, label: trans('aiscan-status-analyzed')},
+                {cls: 'text-bg-warning', icon: 'fa-exclamation-triangle', count: needsReview, label: trans('aiscan-status-needs_review')},
+                {cls: 'text-bg-success', icon: 'fa-check-circle', count: ready, label: trans('aiscan-status-ready')},
+                {cls: 'text-bg-dark', icon: 'fa-ban', count: discarded, label: trans('aiscan-status-discarded')},
+                {cls: 'text-bg-danger', icon: 'fa-times-circle', count: failed, label: trans('aiscan-status-failed')},
+            ];
+            countersEl.innerHTML = legend.map(s =>
+                `<span class="badge ${s.cls}${s.count === 0 ? ' opacity-25' : ''}" data-bs-toggle="tooltip" data-bs-placement="bottom" title="${escapeAttr(s.label)}"><i class="fa-solid ${s.icon} me-1"></i>${s.count}</span>`
+            ).join('') + `<span class="text-muted small fw-semibold">${ready + discarded} / ${total}</span>`;
+
+            countersEl.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+                new bootstrap.Tooltip(el, {trigger: 'hover'});
+            });
+        }
+
+        listEl.innerHTML = sorted.map(i => {
+            const doc = state.documents[i];
+            const invoice = doc.extractedData?.invoice || {};
+            const supplier = doc.extractedData?.supplier || {};
+            const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
+            const isActive = i === state.currentIndex;
+            const isSelected = state.selectedIndices.has(i);
+            const invoiceNum = invoice.number || doc.originalName;
+            const supplierName = supplier.name || '-';
+            const dateStr = invoice.issue_date || '-';
+            const totalStr = invoice.total != null ? String(invoice.total) : '-';
+
+            return `<div class="list-group-item${isActive ? ' active' : ''}" data-doc-index="${i}">
+                <div class="d-flex align-items-start">
+                    <input type="checkbox" class="form-check-input me-2 mt-1 aiscan-row-check"
+                        data-index="${i}" ${isSelected ? 'checked' : ''}>
+                    <div class="flex-grow-1" style="min-width:0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-truncate fw-semibold">${escapeHtml(invoiceNum)}</span>
+                            <span class="badge ${info.cls} ms-1" style="white-space:nowrap">
+                                <i class="fa-solid ${info.icon}"></i>
+                            </span>
+                        </div>
+                        <div class="text-muted text-truncate">${escapeHtml(supplierName)}</div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>${escapeHtml(dateStr)}</span>
+                            <span>${escapeHtml(totalStr)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Bind clicks
+        listEl.querySelectorAll('.list-group-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('aiscan-row-check')) {
+                    return;
+                }
+                const idx = parseInt(item.dataset.docIndex);
+                navigateTo(idx);
+            });
+        });
+
+        listEl.querySelectorAll('.aiscan-row-check').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const idx = parseInt(cb.dataset.index);
+                if (cb.checked) {
+                    state.selectedIndices.add(idx);
+                } else {
+                    state.selectedIndices.delete(idx);
+                }
+                updateSelectAll();
+            });
+        });
+
+        updateImportButton();
+    }
+
+    function updateSelectAll() {
+        const selectAll = document.getElementById('aiscan-select-all');
+        if (selectAll) {
+            selectAll.checked = state.selectedIndices.size > 0
+                && state.selectedIndices.size === state.documents.length;
+            selectAll.indeterminate = state.selectedIndices.size > 0
+                && state.selectedIndices.size < state.documents.length;
+        }
+    }
+
+
+    // ── Bulk Actions ───────────────────────────────────────────────────
+
+    function applyBulkAction() {
+        const actionSelect = document.getElementById('aiscan-bulk-action');
+        const action = actionSelect?.value;
+        if (!action || state.selectedIndices.size === 0) {
+            return;
+        }
+
+        persistCurrentFormState();
+
+        const toReanalyze = [];
+
+        state.selectedIndices.forEach(i => {
+            const doc = state.documents[i];
+            if (!doc) {
+                return;
+            }
+
+            switch (action) {
+                case 'approve':
+                    if (doc.status === STATUS.ANALYZED || doc.status === STATUS.NEEDS_REVIEW) {
+                        doc.reviewDecision = 'approved';
+                        doc.status = STATUS.READY;
+                    }
+                    break;
+                case 'discard':
+                    if (doc.status !== STATUS.PENDING && doc.status !== STATUS.ANALYZING) {
+                        doc.reviewDecision = 'discarded';
+                        doc.status = STATUS.DISCARDED;
+                    }
+                    break;
+                case 'reanalyze':
+                    if (doc.tmpFile && doc.status !== STATUS.ANALYZING) {
+                        toReanalyze.push(doc);
+                    }
+                    break;
+            }
+        });
+
+        state.selectedIndices.clear();
+        if (actionSelect) {
+            actionSelect.value = '';
+        }
+        updateSelectAll();
+        renderSidebar();
+        renderCurrentDocument();
+
+        if (toReanalyze.length > 0) {
+            reanalyzeDocs(toReanalyze);
+        }
+    }
+
+    // ── Import Button Gate ─────────────────────────────────────────────
+
+    function updateImportButton() {
+        const btn = document.getElementById('aiscan-proceed-import-btn');
+        if (!btn) {
+            return;
+        }
+
+        const nonFailed = state.documents.filter(d => d.status !== STATUS.FAILED);
+        const allDecided = nonFailed.length > 0
+            && nonFailed.every(d => d.reviewDecision !== null);
+
+        btn.disabled = !allDecided;
+
+        if (allDecided) {
+            btn.title = '';
+        } else {
+            const undecided = nonFailed.filter(d => d.reviewDecision === null).length;
+            btn.title = trans('aiscan-undecided-remaining', {'%count%': String(undecided)});
+        }
+    }
+
+    // ── Navigation & Rendering ─────────────────────────────────────────
 
     function navigateTo(index) {
         if (index < 0 || index >= state.documents.length) {
@@ -324,8 +638,7 @@
 
         renderPreview(doc);
         renderReviewPanel(doc);
-        updateProgressBar();
-        updateNavigationButtons();
+        renderSidebar();
     }
 
     function renderPreview(doc) {
@@ -381,6 +694,10 @@
         if (!doc.extractedData) {
             if (doc.status === STATUS.ANALYZING) {
                 review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-spinner fa-spin fa-2x text-primary mb-2"></i><p class="text-muted">${escapeHtml(trans('aiscan-analyzing'))}</p></div>`;
+            } else if (doc.status === STATUS.PENDING) {
+                review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-clock fa-2x text-secondary mb-2"></i><p class="text-muted">${escapeHtml(trans('aiscan-queued-for-analysis'))}</p></div>`;
+            } else if (doc.status === STATUS.FAILED) {
+                review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-times-circle fa-2x text-danger mb-2"></i><p class="text-danger">${escapeHtml(doc.error || trans('aiscan-status-failed'))}</p></div>`;
             } else {
                 review.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>`;
             }
@@ -864,13 +1181,17 @@
         }
 
         doc.status = STATUS.READY;
-        updateProgressBar();
+        doc.reviewDecision = 'approved';
         renderCurrentDocument();
 
-        if (state.currentIndex < state.documents.length - 1) {
-            navigateTo(state.currentIndex + 1);
-        } else {
-            checkAllReviewed();
+        // Auto-advance to next unreviewed document
+        const nextUnreviewed = state.documents.findIndex(
+            (d, i) => i !== state.currentIndex && d.reviewDecision === null
+                && d.status !== STATUS.FAILED && d.status !== STATUS.PENDING
+                && d.status !== STATUS.ANALYZING
+        );
+        if (nextUnreviewed >= 0) {
+            navigateTo(nextUnreviewed);
         }
     }
 
@@ -880,12 +1201,63 @@
             return;
         }
         doc.status = STATUS.DISCARDED;
-        doc.extractedData = null;
-        updateProgressBar();
+        doc.reviewDecision = 'discarded';
         renderCurrentDocument();
 
-        if (state.currentIndex < state.documents.length - 1) {
-            navigateTo(state.currentIndex + 1);
+        // Auto-advance to next unreviewed document
+        const nextUnreviewed = state.documents.findIndex(
+            (d, i) => i !== state.currentIndex && d.reviewDecision === null
+                && d.status !== STATUS.FAILED && d.status !== STATUS.PENDING
+                && d.status !== STATUS.ANALYZING
+        );
+        if (nextUnreviewed >= 0) {
+            navigateTo(nextUnreviewed);
+        }
+    }
+
+    async function reanalyzeDocs(docs) {
+        const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+
+        for (const doc of docs) {
+            doc.status = STATUS.ANALYZING;
+            doc.error = null;
+            doc.reviewDecision = null;
+            renderSidebar();
+            if (doc.index === state.currentIndex) {
+                renderPreview(doc);
+                renderReviewPanel(doc);
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    action: 'analyze',
+                    tmp_file: doc.tmpFile,
+                    mime_type: doc.mimeType,
+                    import_mode: state.importMode,
+                    use_history: state.useHistory ? '1' : '0',
+                    supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
+                    provider: provider,
+                });
+
+                const response = await fetch('AiScanInvoice?' + params.toString());
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                doc.extractedData = data.data;
+                doc.status = STATUS.ANALYZED;
+            } catch (error) {
+                doc.status = STATUS.NEEDS_REVIEW;
+                doc.error = error.message;
+            }
+
+            renderSidebar();
+            if (doc.index === state.currentIndex) {
+                renderPreview(doc);
+                renderReviewPanel(doc);
+            }
         }
     }
 
@@ -898,6 +1270,7 @@
         const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
         doc.status = STATUS.ANALYZING;
         doc.error = null;
+        doc.reviewDecision = null;
         renderCurrentDocument();
 
         try {
@@ -926,49 +1299,6 @@
         }
 
         renderCurrentDocument();
-    }
-
-    function checkAllReviewed() {
-        const ready = state.documents.filter(d => d.status === STATUS.READY || d.status === STATUS.ANALYZED);
-        const total = state.documents.filter(d => d.status !== STATUS.DISCARDED && d.status !== STATUS.FAILED);
-        if (ready.length === total.length && total.length > 0) {
-            showStep('import');
-            buildImportSummary();
-        }
-    }
-
-    function updateProgressBar() {
-        const total = state.documents.length;
-        const progressEl = document.getElementById('aiscan-review-progress');
-        if (progressEl) {
-            progressEl.textContent = trans('aiscan-file-progress', {'%current%': String(state.currentIndex + 1), '%total%': String(total)});
-        }
-
-        const badges = document.getElementById('aiscan-doc-status-badges');
-        if (badges) {
-            badges.innerHTML = state.documents.map((doc, i) => {
-                const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
-                const active = i === state.currentIndex ? 'border border-2 border-primary' : '';
-                return `<span class="badge ${info.cls} ${active}" style="cursor:pointer" data-doc-index="${i}" title="${escapeAttr(doc.originalName)}">
-                    <i class="fa-solid ${info.icon}"></i> ${i + 1}
-                </span>`;
-            }).join('');
-
-            badges.querySelectorAll('[data-doc-index]').forEach(badge => {
-                badge.addEventListener('click', () => navigateTo(parseInt(badge.dataset.docIndex)));
-            });
-        }
-    }
-
-    function updateNavigationButtons() {
-        const prevBtn = document.getElementById('aiscan-prev-doc');
-        const nextBtn = document.getElementById('aiscan-next-doc');
-        if (prevBtn) {
-            prevBtn.disabled = state.currentIndex <= 0;
-        }
-        if (nextBtn) {
-            nextBtn.disabled = state.currentIndex >= state.documents.length - 1;
-        }
     }
 
     // ── Step 3: Import ─────────────────────────────────────────────────
@@ -1076,21 +1406,42 @@
 
     function showImportResults(results) {
         const imported = results.filter(r => r.status === 'imported');
-        const failed = results.filter(r => r.status === 'error');
         const importBtn = document.getElementById('aiscan-import-all-btn');
+        const backBtn = document.getElementById('aiscan-back-to-review');
+        const countEl = document.getElementById('aiscan-import-count');
+        const footer = importBtn?.closest('.card-footer');
 
-        if (imported.length > 0 && failed.length === 0) {
-            importBtn.classList.replace('btn-success', 'btn-outline-success');
-            importBtn.innerHTML = `<i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-import-complete'))}`;
-            importBtn.disabled = true;
-        }
+        if (imported.length > 0) {
+            importBtn.classList.add('d-none');
+            if (backBtn) {
+                backBtn.classList.add('d-none');
+            }
+            if (countEl) {
+                countEl.classList.add('d-none');
+            }
 
-        if (imported.length === 1) {
-            const link = document.createElement('a');
-            link.href = 'EditFacturaProveedor?code=' + encodeURIComponent(imported[0].invoice_id);
-            link.className = 'btn btn-primary ms-2';
-            link.innerHTML = `<i class="fa-solid fa-eye me-1"></i>${escapeHtml(trans('aiscan-view-invoice'))}`;
-            importBtn.parentElement.appendChild(link);
+            if (footer) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'd-flex align-items-center justify-content-end gap-2 w-100';
+
+                const summary = document.createElement('span');
+                summary.className = 'text-success fw-semibold';
+                summary.innerHTML = `<i class="fa-solid fa-check-circle me-1"></i>${escapeHtml(trans('aiscan-import-complete'))} (${imported.length})`;
+                wrapper.appendChild(summary);
+
+                const link = document.createElement('a');
+                if (imported.length === 1) {
+                    link.href = 'EditFacturaProveedor?code=' + encodeURIComponent(imported[0].invoice_id);
+                } else {
+                    link.href = 'ListFacturaProveedor';
+                }
+                link.className = 'btn btn-primary';
+                link.innerHTML = `<i class="fa-solid fa-eye me-1"></i>${escapeHtml(trans('aiscan-view-invoice'))}`;
+                wrapper.appendChild(link);
+
+                footer.innerHTML = '';
+                footer.appendChild(wrapper);
+            }
         }
     }
 
@@ -1110,6 +1461,7 @@
         });
         state.documents = [];
         state.currentIndex = 0;
+        state.selectedIndices.clear();
 
         const dropZone = document.getElementById('aiscan-drop-zone');
         dropZone.innerHTML = `
@@ -1124,6 +1476,11 @@
         document.getElementById('aiscan-file-input').value = '';
         document.getElementById('aiscan-upload-btn').disabled = true;
         document.getElementById('aiscan-upload-btn').innerHTML = `<i class="fa-solid fa-cloud-arrow-up me-1"></i>${escapeHtml(trans('aiscan-upload-and-analyze'))}`;
+
+        const fileList = document.getElementById('aiscan-file-list');
+        if (fileList) {
+            fileList.classList.add('d-none');
+        }
     }
 
     function buildProviderSelect() {
@@ -1146,39 +1503,64 @@
     // ── Split handle ───────────────────────────────────────────────────
 
     function bindSplitHandle() {
+        // Preview / form split handle
         const handle = document.getElementById('aiscan-split-handle');
         const split = document.getElementById('aiscan-split');
         const left = document.getElementById('aiscan-split-left');
-        if (!handle || !split || !left) {
-            return;
+        if (handle && split && left) {
+            bindResizeHandle(handle, split, left, () => {
+                const rect = split.getBoundingClientRect();
+                return (offset) => {
+                    const pct = Math.min(Math.max((offset / rect.width) * 100, 25), 75);
+                    left.style.flexBasis = pct + '%';
+                };
+            });
         }
 
+        // Sidebar resize handle
+        const sidebarHandle = document.getElementById('aiscan-sidebar-handle');
+        const layout = document.getElementById('aiscan-review-layout');
+        const sidebar = document.getElementById('aiscan-sidebar');
+        if (sidebarHandle && layout && sidebar) {
+            bindResizeHandle(sidebarHandle, layout, sidebar, () => {
+                const rect = layout.getBoundingClientRect();
+                return (offset) => {
+                    const px = Math.min(Math.max(offset, 200), rect.width * 0.5);
+                    sidebar.style.flexBasis = px + 'px';
+                };
+            });
+        }
+    }
+
+    function bindResizeHandle(handle, container, target, makeResizer) {
         let dragging = false;
+        let resizer = null;
 
         handle.addEventListener('mousedown', e => {
             e.preventDefault();
             dragging = true;
+            resizer = makeResizer();
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
-            split.classList.add('aiscan-split-dragging');
+            container.classList.add('aiscan-split-dragging');
         });
 
         document.addEventListener('mousemove', e => {
             if (!dragging) {
                 return;
             }
-            const rect = split.getBoundingClientRect();
+            const rect = container.getBoundingClientRect();
             const offset = e.clientX - rect.left;
-            const pct = Math.min(Math.max((offset / rect.width) * 100, 25), 75);
-            left.style.flexBasis = pct + '%';
+            resizer(offset);
         });
 
         document.addEventListener('mouseup', () => {
             if (dragging) {
                 dragging = false;
+                resizer = null;
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
-                split.classList.remove('aiscan-split-dragging');
+                container.classList.remove('aiscan-split-dragging');
             }
         });
     }

@@ -23,6 +23,9 @@
             <column name="request-timeout" numcolumns="2" order="130">
                 <widget type="number" fieldname="request_timeout" min="10" max="300" decimal="0" step="1" required="true"/>
             </column>
+            <column name="max-parallel-requests" numcolumns="2" order="135">
+                <widget type="number" fieldname="max_parallel_requests" min="1" max="20" decimal="0" step="1" required="true"/>
+            </column>
             <column name="allowed-extensions" numcolumns="4" order="140">
                 <widget type="text" fieldname="allowed_extensions"/>
             </column>

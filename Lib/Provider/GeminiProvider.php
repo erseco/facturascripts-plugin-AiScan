@@ -74,6 +74,7 @@ class GeminiProvider implements ProviderInterface
                 'temperature' => 0,
                 'maxOutputTokens' => 4096,
                 'responseMimeType' => 'application/json',
+                'thinkingConfig' => ['thinkingBudget' => 0],
             ],
         ];
 

@@ -8,11 +8,69 @@
  * License, or (at your option) any later version.
  */
 
-/* Split pane layout */
-.aiscan-split {
+/* Review layout: sidebar + split */
+.aiscan-review-layout {
     display: flex;
     height: 75vh;
     min-height: 400px;
+    gap: 0;
+}
+
+/* Collapsible sidebar */
+.aiscan-review-sidebar {
+    flex: 0 0 300px;
+    min-width: 200px;
+    max-width: 50%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.aiscan-review-sidebar > .card {
+    border-radius: 0;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.aiscan-review-sidebar > .card > .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Sidebar list */
+.aiscan-sidebar-list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.aiscan-sidebar-list .list-group-item {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    border-left: 3px solid transparent;
+    border-radius: 0;
+}
+
+.aiscan-sidebar-list .list-group-item:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.aiscan-sidebar-list .list-group-item.active {
+    border-left-color: var(--bs-primary);
+    background: rgba(13, 110, 253, 0.06);
+    color: inherit;
+}
+
+/* Split pane layout */
+.aiscan-split {
+    display: flex;
+    flex: 1;
+    min-width: 0;
 }
 
 .aiscan-split-left {

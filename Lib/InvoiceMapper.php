@@ -22,6 +22,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\Proveedor;
@@ -94,6 +95,16 @@ class InvoiceMapper
 
             $invoice->observaciones = $this->buildNotes($invoiceData);
 
+            if (empty($invoice->codalmacen)) {
+                $invoice->codalmacen = Tools::settings('default', 'codalmacen', '');
+                if (empty($invoice->codalmacen)) {
+                    $warehouse = new Almacen();
+                    foreach ($warehouse->all([], [], 0, 1) as $first) {
+                        $invoice->codalmacen = $first->codalmacen;
+                    }
+                }
+            }
+
             if (!$invoice->save()) {
                 $result['errors'][] = Tools::lang()->trans('record-save-error');
                 return $result;
@@ -105,8 +116,9 @@ class InvoiceMapper
                 }
             }
 
+            $taxes = $extractedData['taxes'] ?? [];
             $invoiceLines = $importMode === 'total'
-                ? $this->buildTotalModeLine($invoice, $invoiceData, $supplier)
+                ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData);
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
@@ -161,9 +173,10 @@ class InvoiceMapper
         return $invoiceLines;
     }
 
-    private function buildTotalModeLine(
+    private function buildTotalModeLines(
         FacturaProveedor $invoice,
         array $invoiceData,
+        array $taxes,
         ?Proveedor $supplier
     ): array {
         $reference = null;
@@ -174,12 +187,28 @@ class InvoiceMapper
             }
         }
 
+        $description = $this->fallbackDescription($invoiceData);
+
+        if (!empty($taxes) && count($taxes) > 1) {
+            $invoiceLines = [];
+            foreach ($taxes as $tax) {
+                $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+                $line->descripcion = $description;
+                $line->cantidad = 1;
+                $line->pvpunitario = (float) ($tax['base'] ?? 0);
+                $line->dtopor = 0;
+                $line->iva = (float) ($tax['rate'] ?? 0);
+                $invoiceLines[] = $line;
+            }
+            return $invoiceLines;
+        }
+
         $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
-        $line->descripcion = $this->fallbackDescription($invoiceData);
+        $line->descripcion = $description;
         $line->cantidad = 1;
         $line->pvpunitario = $this->fallbackSubtotal($invoiceData);
         $line->dtopor = 0;
-        $line->iva = $this->computeTaxRate($invoiceData);
+        $line->iva = !empty($taxes) ? (float) ($taxes[0]['rate'] ?? 0) : $this->computeTaxRate($invoiceData);
 
         return [$line];
     }

@@ -203,7 +203,14 @@ PROMPT;
 
 Import mode is "total": Focus on accurate invoice-level totals (subtotal, tax, total).
 Do not try to extract individual line items. Return an empty lines array.
-The operator will create a single line from the totals.
+IMPORTANT: Always extract the "taxes" array with every distinct tax rate present in the invoice.
+Each entry must have: name, rate, base (taxable amount for that rate), and amount (tax amount).
+Examples:
+- An invoice with IVA 21% on 1000 and IVA 0% on 500:
+  taxes: [{"name":"IVA","rate":21,"base":1000,"amount":210},{"name":"IVA","rate":0,"base":500,"amount":0}]
+- A Canary Islands invoice with IGIC 7% and exempt:
+  taxes: [{"name":"IGIC","rate":7,"base":800,"amount":56},{"name":"IGIC","rate":0,"base":200,"amount":0}]
+The system will create one invoice line per tax rate from this breakdown.
 PROMPT;
 
     public function __construct()
@@ -232,6 +239,19 @@ PROMPT;
         $prompt = str_replace('{{FILE_NAME}}', $fileName ?: 'unknown', $prompt);
         $prompt = str_replace('{{MIME_TYPE}}', $mimeType ?: 'unknown', $prompt);
         $prompt = str_replace('{{IMPORT_MODE}}', $importMode === 'total' ? 'total' : 'lines', $prompt);
+
+        $langCode = Tools::settings('default', 'codpais', '');
+        $langMap = [
+            'ESP' => 'Spanish', 'MEX' => 'Spanish', 'ARG' => 'Spanish', 'COL' => 'Spanish',
+            'CHL' => 'Spanish', 'PER' => 'Spanish', 'ECU' => 'Spanish', 'VEN' => 'Spanish',
+            'DEU' => 'German', 'AUT' => 'German', 'CHE' => 'German',
+            'FRA' => 'French', 'ITA' => 'Italian', 'PRT' => 'Portuguese', 'BRA' => 'Portuguese',
+            'NLD' => 'Dutch', 'POL' => 'Polish', 'ROU' => 'Romanian',
+        ];
+        $langName = $langMap[$langCode] ?? 'English';
+        $prompt .= "\n\nIMPORTANT: All text output (warnings, summary, payment_terms, descriptions)"
+            . ' MUST be written in ' . $langName . '.'
+            . ' Do not use English unless the application language is English.';
 
         $prompt .= $importMode === 'total' ? self::MODE_TOTAL_HINT : self::MODE_LINES_HINT;
 

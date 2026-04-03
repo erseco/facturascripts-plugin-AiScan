@@ -278,6 +278,7 @@ class AiScanInvoice extends Controller
             'provider' => AiScanSettings::getDefaultProvider(),
             'available_providers' => $service->getAvailableProviderNames(),
             'extraction_prompt' => ExtractionService::getSystemPrompt(),
+            'max_parallel_requests' => (int) AiScanSettings::get('max_parallel_requests', 5),
         ];
 
         if (count($storedFiles) === 1) {
