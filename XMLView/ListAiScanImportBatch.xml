@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<view>
+    <columns>
+        <column name="id" order="10">
+            <widget type="text" fieldname="id"/>
+        </column>
+        <column name="date" order="20">
+            <widget type="datetime" fieldname="created_at"/>
+        </column>
+        <column name="user" order="30">
+            <widget type="text" fieldname="nick"/>
+        </column>
+        <column name="aiscan-import-mode" order="40">
+            <widget type="text" fieldname="importmode" translate="true"/>
+        </column>
+        <column name="aiscan-provider" order="50">
+            <widget type="text" fieldname="provider"/>
+        </column>
+        <column name="aiscan-total-documents" order="60">
+            <widget type="number" fieldname="totaldocuments" decimal="0"/>
+        </column>
+        <column name="aiscan-imported" order="70">
+            <widget type="number" fieldname="importedcount" decimal="0"/>
+        </column>
+        <column name="aiscan-hist-discarded" order="80">
+            <widget type="number" fieldname="discardedcount" decimal="0"/>
+        </column>
+        <column name="aiscan-hist-failed" order="90">
+            <widget type="number" fieldname="failedcount" decimal="0"/>
+        </column>
+    </columns>
+</view>

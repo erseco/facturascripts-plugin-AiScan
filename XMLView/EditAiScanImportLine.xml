@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<view>
+    <columns>
+        <column name="aiscan-hist-document" order="5">
+            <widget type="number" fieldname="iddocument" decimal="0" readonly="true"/>
+        </column>
+        <column name="description" order="10">
+            <widget type="text" fieldname="descripcion" readonly="true"/>
+        </column>
+        <column name="quantity" order="20">
+            <widget type="number" fieldname="cantidad" decimal="2" readonly="true"/>
+        </column>
+        <column name="price" order="30">
+            <widget type="money" fieldname="pvpunitario" readonly="true"/>
+        </column>
+        <column name="discount" order="40">
+            <widget type="number" fieldname="dtopor" decimal="2" readonly="true"/>
+        </column>
+        <column name="tax" order="50">
+            <widget type="number" fieldname="iva" decimal="2" readonly="true"/>
+        </column>
+        <column name="total" order="60">
+            <widget type="money" fieldname="pvptotal" readonly="true"/>
+        </column>
+        <column name="reference" order="70">
+            <widget type="text" fieldname="referencia" readonly="true"/>
+        </column>
+    </columns>
+</view>

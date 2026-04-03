@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<table>
+    <column>
+        <name>id</name>
+        <type>serial</type>
+        <null>NO</null>
+    </column>
+    <column>
+        <name>nick</name>
+        <type>character varying(50)</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>importmode</name>
+        <type>character varying(20)</type>
+        <null>NO</null>
+        <default>lines</default>
+    </column>
+    <column>
+        <name>provider</name>
+        <type>character varying(50)</type>
+        <null>YES</null>
+    </column>
+    <column>
+        <name>totaldocuments</name>
+        <type>integer</type>
+        <null>NO</null>
+        <default>0</default>
+    </column>
+    <column>
+        <name>importedcount</name>
+        <type>integer</type>
+        <null>NO</null>
+        <default>0</default>
+    </column>
+    <column>
+        <name>discardedcount</name>
+        <type>integer</type>
+        <null>NO</null>
+        <default>0</default>
+    </column>
+    <column>
+        <name>failedcount</name>
+        <type>integer</type>
+        <null>NO</null>
+        <default>0</default>
+    </column>
+    <column>
+        <name>created_at</name>
+        <type>timestamp</type>
+        <null>NO</null>
+        <default>CURRENT_TIMESTAMP</default>
+    </column>
+    <constraint>
+        <name>aiscan_import_batches_pkey</name>
+        <type>PRIMARY KEY (id)</type>
+    </constraint>
+</table>

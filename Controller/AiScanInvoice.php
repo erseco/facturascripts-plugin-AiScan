@@ -28,6 +28,9 @@ use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
+use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
+use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
+use FacturaScripts\Plugins\AiScan\Model\AiScanImportLine;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
 
 class AiScanInvoice extends Controller
@@ -592,9 +595,37 @@ class AiScanInvoice extends Controller
         $results = [];
         $mapper = new InvoiceMapper();
 
+        // Create history batch record
+        $historyBatch = new AiScanImportBatch();
+        $historyBatch->importmode = $importMode;
+        $historyBatch->provider = $batch['provider'] ?? null;
+        $historyBatch->totaldocuments = count($documents);
+        $historyBatch->save();
+
+        $imported = 0;
+        $discarded = 0;
+        $failed = 0;
+
         foreach ($documents as $index => $doc) {
             $status = $doc['status'] ?? 'pending';
+            $extracted = $doc['extracted_data'] ?? [];
+            $invoice = $extracted['invoice'] ?? [];
+            $supplier = $extracted['supplier'] ?? [];
+            $lines = $extracted['lines'] ?? [];
+
             if ($status === 'discarded') {
+                $this->persistHistoryDocument(
+                    $historyBatch->id,
+                    $doc,
+                    $invoice,
+                    $supplier,
+                    'discarded',
+                    null,
+                    null,
+                    null,
+                    $lines
+                );
+                $discarded++;
                 $results[] = [
                     'index' => $index,
                     'status' => 'skipped',
@@ -603,8 +634,19 @@ class AiScanInvoice extends Controller
                 continue;
             }
 
-            $extractedData = $doc['extracted_data'] ?? [];
-            if (empty($extractedData)) {
+            if (empty($extracted)) {
+                $this->persistHistoryDocument(
+                    $historyBatch->id,
+                    $doc,
+                    $invoice,
+                    $supplier,
+                    'failed',
+                    null,
+                    null,
+                    'No extracted data',
+                    $lines
+                );
+                $failed++;
                 $results[] = [
                     'index' => $index,
                     'status' => 'error',
@@ -614,13 +656,43 @@ class AiScanInvoice extends Controller
                 continue;
             }
 
-            $extractedData['_upload'] = [
+            $extracted['_upload'] = [
                 'tmp_file' => $doc['tmp_file'] ?? '',
                 'mime_type' => $doc['mime_type'] ?? '',
                 'original_name' => $doc['original_name'] ?? '',
             ];
 
-            $result = $mapper->mapToInvoice($extractedData, null, $importMode);
+            $result = $mapper->mapToInvoice($extracted, null, $importMode);
+
+            if ($result['success']) {
+                $invoiceCode = $this->resolveInvoiceCode($result['invoice_id']);
+                $this->persistHistoryDocument(
+                    $historyBatch->id,
+                    $doc,
+                    $invoice,
+                    $supplier,
+                    'imported',
+                    $result['invoice_id'],
+                    $invoiceCode,
+                    null,
+                    $lines
+                );
+                $imported++;
+            } else {
+                $errorMsg = implode('; ', $result['errors']);
+                $this->persistHistoryDocument(
+                    $historyBatch->id,
+                    $doc,
+                    $invoice,
+                    $supplier,
+                    'failed',
+                    null,
+                    null,
+                    $errorMsg,
+                    $lines
+                );
+                $failed++;
+            }
 
             $results[] = [
                 'index' => $index,
@@ -631,6 +703,74 @@ class AiScanInvoice extends Controller
             ];
         }
 
-        echo json_encode(['success' => true, 'results' => $results]);
+        // Update batch counters
+        $historyBatch->importedcount = $imported;
+        $historyBatch->discardedcount = $discarded;
+        $historyBatch->failedcount = $failed;
+        $historyBatch->save();
+
+        echo json_encode([
+            'success' => true,
+            'results' => $results,
+            'batch_id' => $historyBatch->id,
+        ]);
+    }
+
+    private function persistHistoryDocument(
+        int $batchId,
+        array $doc,
+        array $invoice,
+        array $supplier,
+        string $status,
+        ?int $invoiceId,
+        ?string $invoiceCode,
+        ?string $error,
+        array $lines
+    ): void {
+        $histDoc = new AiScanImportDocument();
+        $histDoc->idbatch = $batchId;
+        $histDoc->originalname = $doc['original_name'] ?? '';
+        $histDoc->codproveedor = $supplier['matched_supplier_id'] ?? null;
+        $histDoc->suppliername = $supplier['name'] ?? null;
+        $histDoc->numproveedor = $invoice['number'] ?? null;
+        $histDoc->fecha = $invoice['issue_date'] ?? null;
+        $histDoc->coddivisa = $invoice['currency'] ?? 'EUR';
+        $histDoc->neto = (float) ($invoice['subtotal'] ?? 0);
+        $histDoc->totaliva = (float) ($invoice['tax_amount'] ?? 0);
+        $histDoc->total = (float) ($invoice['total'] ?? 0);
+        $histDoc->status = $status;
+        $histDoc->idfactura = $invoiceId;
+        $histDoc->codigofactura = $invoiceCode;
+        $histDoc->errormessage = $error;
+
+        if (!$histDoc->save()) {
+            return;
+        }
+
+        foreach ($lines as $idx => $line) {
+            $histLine = new AiScanImportLine();
+            $histLine->iddocument = $histDoc->id;
+            $histLine->sortorder = $idx + 1;
+            $histLine->descripcion = trim((string) ($line['description'] ?? ''));
+            $histLine->cantidad = (float) ($line['quantity'] ?? 1);
+            $histLine->pvpunitario = (float) ($line['unit_price'] ?? 0);
+            $histLine->dtopor = (float) ($line['discount'] ?? 0);
+            $histLine->iva = (float) ($line['tax_rate'] ?? 0);
+            $histLine->pvptotal = $histLine->cantidad * $histLine->pvpunitario;
+            $histLine->referencia = $line['sku'] ?? null;
+            $histLine->save();
+        }
+    }
+
+    private function resolveInvoiceCode(?int $invoiceId): ?string
+    {
+        if (!$invoiceId) {
+            return null;
+        }
+        $invoice = new \FacturaScripts\Dinamic\Model\FacturaProveedor();
+        if ($invoice->loadFromCode($invoiceId)) {
+            return $invoice->codigo;
+        }
+        return null;
     }
 }

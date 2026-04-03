@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<view>
+    <columns>
+        <column name="status" order="10">
+            <widget type="text" fieldname="status" readonly="true" translate="true"/>
+        </column>
+        <column name="aiscan-original-file" order="20">
+            <widget type="text" fieldname="originalname" readonly="true"/>
+        </column>
+        <column name="supplier" order="30">
+            <widget type="text" fieldname="suppliername" readonly="true"/>
+        </column>
+        <column name="number" order="40">
+            <widget type="text" fieldname="numproveedor" readonly="true"/>
+        </column>
+        <column name="date" order="50">
+            <widget type="date" fieldname="fecha" readonly="true"/>
+        </column>
+        <column name="net" order="60">
+            <widget type="money" fieldname="neto" readonly="true"/>
+        </column>
+        <column name="taxes" order="70">
+            <widget type="money" fieldname="totaliva" readonly="true"/>
+        </column>
+        <column name="total" order="80">
+            <widget type="money" fieldname="total" readonly="true"/>
+        </column>
+        <column name="aiscan-invoice-link" order="90">
+            <widget type="text" fieldname="codigofactura" readonly="true"/>
+        </column>
+        <column name="aiscan-error" display="none" order="100">
+            <widget type="text" fieldname="errormessage" readonly="true"/>
+        </column>
+    </columns>
+</view>
