@@ -20,8 +20,8 @@
 
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
+use FacturaScripts\Core\Base\DataBase\DataBaseWhere;
 use FacturaScripts\Core\Lib\ExtendedController\PanelController;
-use FacturaScripts\Core\Where;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 
 class EditAiScanImportBatch extends PanelController
@@ -78,19 +78,17 @@ class EditAiScanImportBatch extends PanelController
 
             case 'EditAiScanImportDocument':
                 $idbatch = $this->getViewModelValue($mvn, 'id');
-                $where = [Where::eq('idbatch', $idbatch)];
+                $where = [new DataBaseWhere('idbatch', $idbatch)];
                 $view->loadData('', $where, ['id' => 'ASC']);
                 break;
 
             case 'EditAiScanImportLine':
                 $idbatch = $this->getViewModelValue($mvn, 'id');
                 $doc = new AiScanImportDocument();
-                $docs = $doc->all([Where::eq('idbatch', $idbatch)], [], 0, 0);
+                $docs = $doc->all([new DataBaseWhere('idbatch', $idbatch)], [], 0, 0);
                 $docIds = array_map(fn ($d) => $d->id, $docs);
-                if (empty($docIds)) {
-                    $docIds = [0];
-                }
-                $where = [Where::in('iddocument', $docIds)];
+                $idList = empty($docIds) ? '0' : implode(',', $docIds);
+                $where = [new DataBaseWhere('iddocument', $idList, 'IN')];
                 $view->loadData('', $where, ['iddocument' => 'ASC', 'sortorder' => 'ASC']);
                 break;
         }
