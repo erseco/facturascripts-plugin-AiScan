@@ -23,120 +23,119 @@
   ],
   "install": {
     "codpais": "ESP",
-    "empresa": "Empresa Demo AiScan",
-    "cifnif": "B12345678",
-    "tipoidfiscal": "CIF",
+    "empresa": "Pepita Gómez - Autónoma",
+    "cifnif": "125478938W",
+    "tipoidfiscal": "NIF",
     "regimeniva": "General",
     "defaultplan": true
   },
   "seed": {
     "suppliers": [
       {
-        "nombre": "Telefónica S.A.",
-        "razonsocial": "Telefónica S.A.",
-        "cifnif": "A28015865",
+        "nombre": "Clínica Dental Sonrisa",
+        "razonsocial": "Clínica Dental Sonrisa S.L.",
+        "cifnif": "B38456789",
         "tipoidfiscal": "CIF",
-        "email": "facturacion@telefonica.es",
-        "telefono1": "900100100",
+        "email": "info@clinicasonrisa.es",
+        "telefono1": "922123456",
         "regimeniva": "General"
       },
       {
-        "nombre": "Amazon EU S.à r.l.",
-        "razonsocial": "Amazon EU S.à r.l.",
-        "cifnif": "ESN0186868I",
-        "tipoidfiscal": "NIF-IVA",
-        "email": "billing@amazon.eu",
-        "telefono1": "",
-        "regimeniva": "General"
-      },
-      {
-        "nombre": "Iberdrola Clientes S.A.U.",
-        "razonsocial": "Iberdrola Clientes S.A.U.",
-        "cifnif": "A95758389",
+        "nombre": "Panadería Artesana El Horno",
+        "razonsocial": "Panadería Artesana El Horno S.L.",
+        "cifnif": "B38901234",
         "tipoidfiscal": "CIF",
-        "email": "facturacion@iberdrola.es",
-        "telefono1": "900225235",
+        "email": "contacto@elhorno.es",
+        "telefono1": "922234567",
         "regimeniva": "General"
       },
       {
-        "nombre": "Papelería Central S.L.",
-        "razonsocial": "Papelería Central S.L.",
-        "cifnif": "B87654321",
+        "nombre": "Gimnasio Fit & Strong",
+        "razonsocial": "Gimnasio Fit & Strong S.L.",
+        "cifnif": "B38012345",
         "tipoidfiscal": "CIF",
-        "email": "info@papeleriacentral.es",
-        "telefono1": "912345678",
+        "email": "admin@fitstrong.es",
+        "telefono1": "922345678",
         "regimeniva": "General"
       },
       {
-        "nombre": "García López, Juan",
-        "razonsocial": "Juan García López",
-        "cifnif": "12345678Z",
-        "tipoidfiscal": "NIF",
-        "email": "juan.garcia@autonomo.es",
-        "telefono1": "654321987",
+        "nombre": "Bodega Volcanes del Sur",
+        "razonsocial": "Bodega Volcanes del Sur S.L.",
+        "cifnif": "B38033344",
+        "tipoidfiscal": "CIF",
+        "email": "bodega@volcanesdelsur.es",
+        "telefono1": "922456789",
+        "regimeniva": "General"
+      },
+      {
+        "nombre": "Peluquería Estilo Libre",
+        "razonsocial": "Peluquería Estilo Libre S.L.",
+        "cifnif": "B38778899",
+        "tipoidfiscal": "CIF",
+        "email": "citas@estilolibre.es",
+        "telefono1": "922567890",
+        "regimeniva": "General"
+      },
+      {
+        "nombre": "Soluciones Digitales Canarias",
+        "razonsocial": "Soluciones Digitales Canarias S.L.",
+        "cifnif": "B38111222",
+        "tipoidfiscal": "CIF",
+        "email": "info@soldigican.es",
+        "telefono1": "922678901",
         "regimeniva": "General"
       }
     ],
     "products": [
       {
-        "referencia": "SERV-TELCO",
-        "descripcion": "Servicios de telecomunicaciones",
-        "precio": 49.90,
-        "tipo": "Servicio"
+        "referencia": "SERV-DESARROLLO",
+        "descripcion": "Desarrollo de software a medida",
+        "precio": 75.00
       },
       {
-        "referencia": "SERV-ELECT",
-        "descripcion": "Suministro eléctrico",
-        "precio": 120.00,
-        "tipo": "Servicio"
+        "referencia": "SERV-DISENO",
+        "descripcion": "Diseño gráfico e interfaz",
+        "precio": 60.00
       },
       {
-        "referencia": "MAT-OFICINA",
-        "descripcion": "Material de oficina",
-        "precio": 25.00,
-        "tipo": "Producto"
+        "referencia": "SERV-RRSS",
+        "descripcion": "Gestión de redes sociales",
+        "precio": 350.00
       },
       {
-        "referencia": "MAT-PAPEL-A4",
-        "descripcion": "Papel DIN A4 80g (500 hojas)",
-        "precio": 4.50,
-        "tipo": "Producto"
+        "referencia": "SERV-PUBLI",
+        "descripcion": "Campañas de publicidad digital",
+        "precio": 500.00
       },
       {
-        "referencia": "MAT-TONER",
-        "descripcion": "Tóner impresora láser negro",
-        "precio": 35.00,
-        "tipo": "Producto"
-      },
-      {
-        "referencia": "SERV-CONSULT",
-        "descripcion": "Servicios de consultoría",
-        "precio": 75.00,
-        "tipo": "Servicio"
+        "referencia": "SERV-CONSULTING",
+        "descripcion": "Consultoría y formación",
+        "precio": 80.00
       },
       {
         "referencia": "SERV-HOSTING",
-        "descripcion": "Alojamiento web y dominio",
-        "precio": 9.99,
-        "tipo": "Servicio"
+        "descripcion": "Alojamiento web y servidores",
+        "precio": 9.99
       },
       {
-        "referencia": "HW-PORTATIL",
-        "descripcion": "Portátil empresarial",
-        "precio": 899.00,
-        "tipo": "Producto"
+        "referencia": "SERV-TESTING",
+        "descripcion": "Testing y auditoría de software",
+        "precio": 65.00
       },
       {
-        "referencia": "HW-MONITOR",
-        "descripcion": "Monitor 27\" 4K",
-        "precio": 349.00,
-        "tipo": "Producto"
+        "referencia": "SERV-PACKAGING",
+        "descripcion": "Diseño de packaging y etiquetas",
+        "precio": 45.00
+      },
+      {
+        "referencia": "SERV-MIGRACION",
+        "descripcion": "Migración de datos y servidores",
+        "precio": 90.00
       },
       {
         "referencia": "GASTOS-GEN",
         "descripcion": "Gastos generales",
-        "precio": 0.00,
-        "tipo": "Servicio"
+        "precio": 0.00
       }
     ]
   }
