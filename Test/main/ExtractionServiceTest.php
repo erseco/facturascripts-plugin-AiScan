@@ -62,6 +62,7 @@ final class ExtractionServiceTest extends TestCase
         $this->assertStringContainsString('application/pdf', $prompt);
         $this->assertStringNotContainsString('{{FILE_NAME}}', $prompt);
         $this->assertStringNotContainsString('{{MIME_TYPE}}', $prompt);
+        $this->assertStringNotContainsString('{{IMPORT_MODE}}', $prompt);
     }
 
     public function testGetExecutionPromptUsesUnknownDefaults(): void

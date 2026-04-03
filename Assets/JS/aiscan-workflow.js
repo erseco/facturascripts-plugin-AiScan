@@ -1,0 +1,1185 @@
+/**
+ * This file is part of AiScan plugin for FacturaScripts.
+ * Copyright (C) 2026 Ernesto Serrano <info@ernesto.es>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ */
+
+'use strict';
+
+(() => {
+    // ── State ──────────────────────────────────────────────────────────
+    const state = {
+        documents: [],
+        currentIndex: 0,
+        importMode: 'lines',
+        useHistory: false,
+        availableProviders: [],
+        defaultProvider: null,
+        extractionPrompt: null,
+    };
+
+    const STATUS = {
+        PENDING: 'pending',
+        ANALYZING: 'analyzing',
+        ANALYZED: 'analyzed',
+        NEEDS_REVIEW: 'needs_review',
+        DISCARDED: 'discarded',
+        READY: 'ready',
+        IMPORTED: 'imported',
+        FAILED: 'failed',
+    };
+
+    const STATUS_LABELS = {
+        pending: {cls: 'text-bg-secondary', icon: 'fa-clock'},
+        analyzing: {cls: 'text-bg-info', icon: 'fa-spinner fa-spin'},
+        analyzed: {cls: 'text-bg-primary', icon: 'fa-check'},
+        needs_review: {cls: 'text-bg-warning', icon: 'fa-exclamation-triangle'},
+        discarded: {cls: 'text-bg-dark', icon: 'fa-ban'},
+        ready: {cls: 'text-bg-success', icon: 'fa-check-circle'},
+        imported: {cls: 'text-bg-success', icon: 'fa-file-invoice'},
+        failed: {cls: 'text-bg-danger', icon: 'fa-times-circle'},
+    };
+
+    // ── Helpers ────────────────────────────────────────────────────────
+
+    function trans(key, replacements) {
+        let value = key;
+        if (window.i18n && typeof window.i18n.trans === 'function') {
+            value = window.i18n.trans(key);
+        }
+        if (value === key) {
+            return key;
+        }
+        if (replacements) {
+            Object.entries(replacements).forEach(([k, v]) => {
+                value = value.replaceAll(k, v == null ? '' : String(v));
+            });
+        }
+        return value;
+    }
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function escapeAttr(value) {
+        return escapeHtml(value).replace(/"/g, '&quot;');
+    }
+
+    function currentDoc() {
+        return state.documents[state.currentIndex] || null;
+    }
+
+    // ── Initialization ─────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+        const providerSelect = document.getElementById('aiscan-provider-select');
+        if (providerSelect && providerSelect.value) {
+            state.defaultProvider = providerSelect.value;
+            state.availableProviders = Array.from(providerSelect.options)
+                .filter(o => o.value)
+                .map(o => o.value);
+        }
+        bindUploadStep();
+        bindReviewStep();
+        bindImportStep();
+        bindSplitHandle();
+    }
+
+    // ── Step 1: Upload ─────────────────────────────────────────────────
+
+    function bindUploadStep() {
+        const dropZone = document.getElementById('aiscan-drop-zone');
+        const fileInput = document.getElementById('aiscan-file-input');
+        const uploadBtn = document.getElementById('aiscan-upload-btn');
+
+        if (!dropZone || !fileInput) {
+            return;
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('aiscan-drag-over');
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            if (!dropZone.contains(e.relatedTarget)) {
+                dropZone.classList.remove('aiscan-drag-over');
+            }
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('aiscan-drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                onFilesSelected(e.dataTransfer.files);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                onFilesSelected(fileInput.files);
+            }
+        });
+
+        uploadBtn.addEventListener('click', startUploadAndAnalyze);
+
+        document.querySelectorAll('input[name="import_mode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                state.importMode = radio.value;
+            });
+        });
+
+        const historyCheckbox = document.getElementById('use-history');
+        if (historyCheckbox) {
+            historyCheckbox.addEventListener('change', () => {
+                state.useHistory = historyCheckbox.checked;
+            });
+        }
+    }
+
+    function onFilesSelected(fileList) {
+        const files = Array.from(fileList);
+        if (files.length === 0) {
+            return;
+        }
+
+        state.documents = files.map((file, index) => ({
+            index,
+            file,
+            originalName: file.name,
+            mimeType: file.type,
+            size: file.size,
+            objectUrl: URL.createObjectURL(file),
+            tmpFile: null,
+            status: STATUS.PENDING,
+            extractedData: null,
+            error: null,
+        }));
+
+        const dropZone = document.getElementById('aiscan-drop-zone');
+        dropZone.innerHTML = `
+            <div>
+                <div class="fs-3 mb-2 text-success"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="fw-semibold">${escapeHtml(trans('aiscan-files-selected', {'%count%': String(files.length)}))}</div>
+                <div class="small text-muted mt-1">${files.map(f => escapeHtml(f.name)).join(', ')}</div>
+                <div class="small text-muted mt-2">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
+            </div>
+        `;
+
+        document.getElementById('aiscan-upload-btn').disabled = false;
+        document.getElementById('aiscan-file-input').value = '';
+    }
+
+    async function startUploadAndAnalyze() {
+        const uploadBtn = document.getElementById('aiscan-upload-btn');
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-uploading-file'))}`;
+
+        const formData = new FormData();
+        state.documents.forEach(doc => formData.append('invoice_files[]', doc.file));
+
+        try {
+            const response = await fetch('AiScanInvoice?action=upload', {method: 'POST', body: formData});
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || trans('aiscan-no-file-uploaded'));
+            }
+
+            state.defaultProvider = data.provider || 'unknown';
+            state.availableProviders = data.available_providers || [data.provider];
+            state.extractionPrompt = data.extraction_prompt || '';
+
+            const uploadedFiles = data.files || [];
+            uploadedFiles.forEach(uf => {
+                const doc = state.documents[uf.client_index];
+                if (doc) {
+                    doc.tmpFile = uf.tmp_file;
+                    doc.mimeType = uf.mime_type || doc.mimeType;
+                }
+            });
+
+            if (data.errors && data.errors.length > 0) {
+                data.errors.forEach(err => {
+                    const doc = state.documents[err.client_index];
+                    if (doc) {
+                        doc.status = STATUS.FAILED;
+                        doc.error = err.error;
+                    }
+                });
+            }
+
+            buildProviderSelect();
+            showStep('review');
+            state.currentIndex = 0;
+            renderCurrentDocument();
+            analyzeAllPending();
+        } catch (error) {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up me-1"></i>${escapeHtml(trans('aiscan-upload-and-analyze'))}`;
+            alert(error.message);
+        }
+    }
+
+    async function analyzeAllPending() {
+        const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+
+        for (let i = 0; i < state.documents.length; i++) {
+            const doc = state.documents[i];
+            if (!doc.tmpFile || doc.status === STATUS.FAILED) {
+                continue;
+            }
+
+            doc.status = STATUS.ANALYZING;
+            if (i === state.currentIndex) {
+                renderCurrentDocument();
+            }
+            updateProgressBar();
+
+            try {
+                const params = new URLSearchParams({
+                    action: 'analyze',
+                    tmp_file: doc.tmpFile,
+                    mime_type: doc.mimeType,
+                    import_mode: state.importMode,
+                    use_history: state.useHistory ? '1' : '0',
+                    supplier_id: '',
+                    provider: provider,
+                });
+
+                const response = await fetch('AiScanInvoice?' + params.toString());
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                doc.extractedData = data.data;
+                doc.status = STATUS.ANALYZED;
+
+                if (state.useHistory && doc.extractedData?.supplier?.matched_supplier_id && !doc._historyAnalyzed) {
+                    doc._historyAnalyzed = true;
+                    const reParams = new URLSearchParams({
+                        action: 'analyze',
+                        tmp_file: doc.tmpFile,
+                        mime_type: doc.mimeType,
+                        import_mode: state.importMode,
+                        use_history: '1',
+                        supplier_id: doc.extractedData.supplier.matched_supplier_id,
+                        provider: provider,
+                    });
+                    const reResponse = await fetch('AiScanInvoice?' + reParams.toString());
+                    const reData = await reResponse.json();
+                    if (reData.success && reData.data) {
+                        doc.extractedData = reData.data;
+                    }
+                }
+            } catch (error) {
+                doc.status = STATUS.NEEDS_REVIEW;
+                doc.error = error.message;
+            }
+
+            if (i === state.currentIndex) {
+                renderCurrentDocument();
+            }
+            updateProgressBar();
+        }
+    }
+
+    // ── Step 2: Review ─────────────────────────────────────────────────
+
+    function bindReviewStep() {
+        document.getElementById('aiscan-back-to-upload')?.addEventListener('click', () => {
+            showStep('upload');
+            resetUploadUI();
+        });
+        document.getElementById('aiscan-prev-doc')?.addEventListener('click', () => navigateTo(state.currentIndex - 1));
+        document.getElementById('aiscan-next-doc')?.addEventListener('click', () => navigateTo(state.currentIndex + 1));
+        document.getElementById('aiscan-reanalyze-btn')?.addEventListener('click', reanalyzeCurrentDoc);
+        document.getElementById('aiscan-discard-btn')?.addEventListener('click', discardCurrentDoc);
+    }
+
+    function navigateTo(index) {
+        if (index < 0 || index >= state.documents.length) {
+            return;
+        }
+        persistCurrentFormState();
+        state.currentIndex = index;
+        renderCurrentDocument();
+    }
+
+    function renderCurrentDocument() {
+        const doc = currentDoc();
+        if (!doc) {
+            return;
+        }
+
+        renderPreview(doc);
+        renderReviewPanel(doc);
+        updateProgressBar();
+        updateNavigationButtons();
+    }
+
+    function renderPreview(doc) {
+        const area = document.getElementById('aiscan-preview-area');
+        const title = document.getElementById('aiscan-preview-title');
+        if (!area) {
+            return;
+        }
+
+        title.textContent = doc.originalName;
+        area.innerHTML = '';
+
+        if (doc.mimeType === 'application/pdf' && doc.objectUrl) {
+            area.innerHTML = `<iframe src="${doc.objectUrl}" title="${escapeAttr(doc.originalName)}"></iframe>`;
+        } else if (doc.objectUrl) {
+            area.innerHTML = `<img src="${doc.objectUrl}" alt="${escapeAttr(doc.originalName)}">`;
+        } else {
+            area.innerHTML = `<p class="text-muted text-center p-4">${escapeHtml(trans('aiscan-no-preview'))}</p>`;
+        }
+
+        const statusEl = document.getElementById('aiscan-status');
+        if (doc.error) {
+            statusEl.innerHTML = `<div class="alert alert-danger py-1 px-2 small mb-0">${escapeHtml(doc.error)}</div>`;
+        } else if (doc.status === STATUS.ANALYZING) {
+            statusEl.innerHTML = `<div class="alert alert-info py-1 px-2 small mb-0"><i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-analysis-started', {'%provider%': state.defaultProvider}))}</div>`;
+        } else if (doc.status === STATUS.ANALYZED || doc.status === STATUS.READY) {
+            statusEl.innerHTML = `<div class="alert alert-success py-1 px-2 small mb-0">${escapeHtml(trans('aiscan-analysis-completed', {'%provider%': doc.extractedData?._provider || state.defaultProvider}))}</div>`;
+        } else if (doc.status === STATUS.DISCARDED) {
+            statusEl.innerHTML = `<div class="alert alert-dark py-1 px-2 small mb-0"><i class="fa-solid fa-ban me-1"></i>${escapeHtml(trans('aiscan-doc-discarded'))}</div>`;
+        } else {
+            statusEl.innerHTML = '';
+        }
+
+        const stateBadge = document.getElementById('aiscan-doc-state-badge');
+        if (stateBadge) {
+            const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
+            stateBadge.className = `badge ${info.cls}`;
+            stateBadge.innerHTML = `<i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}`;
+        }
+    }
+
+    function renderReviewPanel(doc) {
+        const review = document.getElementById('aiscan-review');
+        if (!review) {
+            return;
+        }
+
+        if (doc.status === STATUS.DISCARDED) {
+            review.innerHTML = `<div class="text-center text-muted p-4"><i class="fa-solid fa-ban fa-2x mb-2"></i><p>${escapeHtml(trans('aiscan-doc-discarded'))}</p></div>`;
+            return;
+        }
+
+        if (!doc.extractedData) {
+            if (doc.status === STATUS.ANALYZING) {
+                review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-spinner fa-spin fa-2x text-primary mb-2"></i><p class="text-muted">${escapeHtml(trans('aiscan-analyzing'))}</p></div>`;
+            } else {
+                review.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>`;
+            }
+            return;
+        }
+
+        const data = doc.extractedData;
+        const invoice = data.invoice || {};
+        const supplier = data.supplier || {};
+        const lines = Array.isArray(data.lines) ? data.lines : [];
+        const validationErrors = Array.isArray(data._validation_errors) ? data._validation_errors : [];
+        const confidence = data.confidence || {};
+
+        review.innerHTML = '';
+
+        if (validationErrors.length > 0) {
+            review.insertAdjacentHTML('beforeend', `
+                <div class="alert alert-warning py-2">
+                    <strong class="small">${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
+                    <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
+                </div>
+            `);
+        }
+
+        review.appendChild(buildSection(trans('supplier'), `
+            ${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}
+            ${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}
+            ${buildInput(trans('email'), 'supplier_email', supplier.email || '')}
+            ${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}
+            ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
+            ${buildSupplierStatus(supplier)}
+        `));
+
+        review.appendChild(buildSection(trans('invoice'), `
+            ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
+            ${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
+            ${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}
+            ${buildInput(trans('currency'), 'invoice_currency', invoice.currency || 'EUR')}
+            ${buildInput(trans('subtotal'), 'invoice_subtotal', invoice.subtotal ?? '', 'number', '0.01')}
+            ${buildInput(trans('tax-amount'), 'invoice_tax_amount', invoice.tax_amount ?? '', 'number', '0.01')}
+            ${invoice.withholding_amount ? buildInput(trans('irpf'), 'invoice_withholding', invoice.withholding_amount, 'number', '0.01') : ''}
+            ${buildInput(trans('total'), 'invoice_total', invoice.total ?? '', 'number', '0.01', confidence.total)}
+            ${buildTextarea(trans('summary'), 'invoice_summary', invoice.summary || '')}
+            ${invoice.payment_terms ? buildInput(trans('payment-terms'), 'invoice_payment_terms', invoice.payment_terms) : ''}
+        `));
+
+        if (state.importMode === 'total') {
+            review.appendChild(buildDefaultProductSection(supplier));
+        }
+
+        if (state.importMode === 'lines') {
+            review.appendChild(buildLinesSection(lines));
+        }
+
+        review.insertAdjacentHTML('beforeend', `
+            <div class="d-flex justify-content-end gap-2 mt-3 mb-2">
+                <button type="button" class="btn btn-success" id="aiscan-mark-ready-btn">
+                    <i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-mark-ready'))}
+                </button>
+            </div>
+        `);
+
+        document.getElementById('aiscan-mark-ready-btn')?.addEventListener('click', markCurrentReady);
+        bindSupplierSearch();
+    }
+
+    function buildSection(title, bodyHtml) {
+        const section = document.createElement('div');
+        section.className = 'card mb-3';
+        section.innerHTML = `
+            <div class="card-header py-2">${escapeHtml(title)}</div>
+            <div class="card-body py-2">${bodyHtml}</div>
+        `;
+        return section;
+    }
+
+    function buildInput(label, id, value, type, step, confidence) {
+        const badge = confidence != null
+            ? ` <span class="badge ${confidence >= 0.7 ? 'text-bg-success' : confidence >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}" title="${escapeAttr(trans('confidence'))}">${Math.round(confidence * 100)}%</span>`
+            : '';
+        return `
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}${badge}</label>
+                <input class="form-control form-control-sm" id="${id}" type="${type || 'text'}" ${step ? `step="${step}"` : ''} value="${escapeAttr(value)}">
+            </div>
+        `;
+    }
+
+    function buildTextarea(label, id, value) {
+        return `
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}</label>
+                <textarea class="form-control form-control-sm" id="${id}" rows="2">${escapeHtml(value)}</textarea>
+            </div>
+        `;
+    }
+
+    function buildSupplierStatus(supplier) {
+        const status = supplier.match_status || 'not_found';
+        const variants = {
+            ambiguous: {klass: 'warning', text: trans('aiscan-supplier-ambiguous')},
+            created: {klass: 'info', text: trans('aiscan-supplier-created-on-save')},
+            matched: {klass: 'success', text: trans('aiscan-matched-with', {'%name%': supplier.matched_name || ''})},
+            not_found: {klass: 'secondary', text: trans('aiscan-supplier-not-found-on-save')},
+        };
+        const variant = variants[status] || variants.not_found;
+
+        let select = '';
+        if (status === 'ambiguous' && Array.isArray(supplier.candidates) && supplier.candidates.length > 0) {
+            select = `
+                <div class="mt-2">
+                    <select id="supplier_match_select" class="form-select form-select-sm">
+                        ${supplier.candidates.map(c => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)} (${escapeHtml(c.tax_id || '')})</option>`).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        const searchBox = `
+            <div class="mt-2">
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" id="aiscan-supplier-search" placeholder="${escapeAttr(trans('search'))}">
+                    <button class="btn btn-outline-secondary" type="button" id="aiscan-supplier-search-btn"><i class="fa-solid fa-search"></i></button>
+                </div>
+                <div id="aiscan-supplier-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
+            </div>
+        `;
+
+        return `<div class="alert alert-${variant.klass} small mb-0">${escapeHtml(variant.text)}${select}</div>${searchBox}`;
+    }
+
+    function buildDefaultProductSection(supplier) {
+        const codproveedor = supplier.matched_supplier_id || '';
+        const section = document.createElement('div');
+        section.className = 'card mb-3';
+        section.innerHTML = `
+            <div class="card-header py-2">${escapeHtml(trans('aiscan-default-product'))}</div>
+            <div class="card-body py-2">
+                <div class="mb-2">
+                    <label class="form-label small mb-1">${escapeHtml(trans('aiscan-default-product-help'))}</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="aiscan-product-search" placeholder="${escapeAttr(trans('search'))}">
+                        <button class="btn btn-outline-secondary" type="button" id="aiscan-product-search-btn"><i class="fa-solid fa-search"></i></button>
+                    </div>
+                    <div id="aiscan-product-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1" for="default_product_ref">${escapeHtml(trans('reference'))}</label>
+                    <input class="form-control form-control-sm" id="default_product_ref" type="text" value="" data-codproveedor="${escapeAttr(codproveedor)}">
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-save-default-product">
+                    <i class="fa-solid fa-floppy-disk me-1"></i>${escapeHtml(trans('aiscan-save-default-product'))}
+                </button>
+                <span class="small text-muted ms-2" id="aiscan-default-product-status"></span>
+            </div>
+        `;
+
+        setTimeout(() => {
+            if (codproveedor) {
+                loadDefaultProduct(codproveedor);
+            }
+            bindProductSearch();
+            document.getElementById('aiscan-save-default-product')?.addEventListener('click', saveDefaultProduct);
+        }, 0);
+
+        return section;
+    }
+
+    async function loadDefaultProduct(codproveedor) {
+        try {
+            const params = new URLSearchParams({action: 'get-supplier-default-product', codproveedor});
+            const response = await fetch('AiScanInvoice?' + params.toString());
+            const data = await response.json();
+            if (data.found) {
+                const refInput = document.getElementById('default_product_ref');
+                if (refInput) {
+                    refInput.value = data.referencia;
+                }
+                const statusEl = document.getElementById('aiscan-default-product-status');
+                if (statusEl) {
+                    statusEl.textContent = data.description || data.referencia;
+                }
+            }
+        } catch (e) {
+            // silent
+        }
+    }
+
+    function bindProductSearch() {
+        const searchInput = document.getElementById('aiscan-product-search');
+        const searchBtn = document.getElementById('aiscan-product-search-btn');
+        const resultsDiv = document.getElementById('aiscan-product-results');
+        if (!searchInput || !searchBtn || !resultsDiv) {
+            return;
+        }
+
+        let timer = null;
+        const doSearch = () => {
+            const query = searchInput.value.trim();
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+                .then(r => r.json())
+                .then(data => {
+                    const items = data.results || [];
+                    if (items.length === 0) {
+                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                        return;
+                    }
+                    resultsDiv.innerHTML = items.map(p =>
+                        `<button type="button" class="list-group-item list-group-item-action small py-1" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
+                            <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
+                        </button>`
+                    ).join('');
+                })
+                .catch(() => { resultsDiv.innerHTML = ''; });
+        };
+
+        searchInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 300); });
+        searchBtn.addEventListener('click', doSearch);
+        searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+
+        resultsDiv.addEventListener('click', e => {
+            const item = e.target.closest('[data-ref]');
+            if (!item) {
+                return;
+            }
+            const refInput = document.getElementById('default_product_ref');
+            if (refInput) {
+                refInput.value = item.dataset.ref;
+            }
+            resultsDiv.innerHTML = '';
+            searchInput.value = '';
+        });
+    }
+
+    async function saveDefaultProduct() {
+        const refInput = document.getElementById('default_product_ref');
+        const codproveedor = refInput?.dataset.codproveedor;
+        const referencia = refInput?.value?.trim();
+
+        if (!codproveedor || !referencia) {
+            return;
+        }
+
+        try {
+            const response = await fetch('AiScanInvoice?action=set-supplier-default-product', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({codproveedor, referencia}),
+            });
+            const data = await response.json();
+            const statusEl = document.getElementById('aiscan-default-product-status');
+            if (statusEl) {
+                statusEl.textContent = data.success ? trans('aiscan-saved') : (data.error || 'Error');
+                statusEl.className = data.success ? 'small text-success ms-2' : 'small text-danger ms-2';
+            }
+        } catch (e) {
+            // silent
+        }
+    }
+
+    function buildLinesSection(lines) {
+        const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, sku: ''}];
+
+        const rows = displayLines.map((line, index) => `
+            <tr data-line-index="${index}">
+                <td><input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}"></td>
+                <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:70px"></td>
+                <td><input class="form-control form-control-sm" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:90px"></td>
+                <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:70px"></td>
+                <td><input class="form-control form-control-sm" data-field="tax_rate" type="number" step="0.01" value="${escapeAttr(line.tax_rate ?? 0)}" style="width:70px"></td>
+                <td><input class="form-control form-control-sm" data-field="sku" value="${escapeAttr(line.sku || '')}" style="width:80px"></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
+            </tr>
+        `).join('');
+
+        const section = buildSection(trans('aiscan-line-items'), `
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>${escapeHtml(trans('description'))}</th>
+                            <th>${escapeHtml(trans('quantity'))}</th>
+                            <th>${escapeHtml(trans('price'))}</th>
+                            <th>${escapeHtml(trans('discount'))} %</th>
+                            <th>${escapeHtml(trans('tax'))} %</th>
+                            <th>SKU</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="aiscan-lines-body">${rows}</tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="aiscan-add-line-btn">
+                <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-add-line'))}
+            </button>
+        `);
+
+        section.addEventListener('click', e => {
+            const deleteBtn = e.target.closest('.aiscan-delete-line');
+            if (deleteBtn) {
+                const row = deleteBtn.closest('tr');
+                if (row && document.querySelectorAll('#aiscan-lines-body tr').length > 1) {
+                    row.remove();
+                }
+            }
+            const addBtn = e.target.closest('#aiscan-add-line-btn');
+            if (addBtn) {
+                const tbody = document.getElementById('aiscan-lines-body');
+                const newIndex = tbody.querySelectorAll('tr').length;
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr data-line-index="${newIndex}">
+                        <td><input class="form-control form-control-sm" data-field="description" value=""></td>
+                        <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="0.01" value="1" style="width:70px"></td>
+                        <td><input class="form-control form-control-sm" data-field="unit_price" type="number" step="0.01" value="0" style="width:90px"></td>
+                        <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="0" style="width:70px"></td>
+                        <td><input class="form-control form-control-sm" data-field="tax_rate" type="number" step="0.01" value="0" style="width:70px"></td>
+                        <td><input class="form-control form-control-sm" data-field="sku" value="" style="width:80px"></td>
+                        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line"><i class="fa-solid fa-trash-can"></i></button></td>
+                    </tr>
+                `);
+            }
+        });
+
+        return section;
+    }
+
+    function bindSupplierSearch() {
+        const searchInput = document.getElementById('aiscan-supplier-search');
+        const searchBtn = document.getElementById('aiscan-supplier-search-btn');
+        const resultsDiv = document.getElementById('aiscan-supplier-results');
+        if (!searchInput || !searchBtn || !resultsDiv) {
+            return;
+        }
+
+        let timer = null;
+        const doSearch = () => {
+            const query = searchInput.value.trim();
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-suppliers', query}))
+                .then(r => r.json())
+                .then(data => {
+                    const items = data.results || [];
+                    if (items.length === 0) {
+                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                        return;
+                    }
+                    resultsDiv.innerHTML = items.map(s =>
+                        `<button type="button" class="list-group-item list-group-item-action small py-1" data-id="${escapeAttr(s.id)}" data-name="${escapeAttr(s.name)}" data-taxid="${escapeAttr(s.tax_id || '')}">
+                            <strong>${escapeHtml(s.name)}</strong> <span class="text-muted">${escapeHtml(s.tax_id || '')}</span>
+                        </button>`
+                    ).join('');
+                })
+                .catch(() => { resultsDiv.innerHTML = ''; });
+        };
+
+        searchInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 300); });
+        searchBtn.addEventListener('click', doSearch);
+        searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+
+        resultsDiv.addEventListener('click', e => {
+            const item = e.target.closest('[data-id]');
+            if (!item) {
+                return;
+            }
+            const nameInput = document.getElementById('supplier_name');
+            const taxIdInput = document.getElementById('supplier_tax_id');
+            if (nameInput) {
+                nameInput.value = item.dataset.name;
+            }
+            if (taxIdInput) {
+                taxIdInput.value = item.dataset.taxid;
+            }
+
+            let matchSelect = document.getElementById('supplier_match_select');
+            if (!matchSelect) {
+                matchSelect = document.createElement('select');
+                matchSelect.id = 'supplier_match_select';
+                matchSelect.className = 'form-select form-select-sm d-none';
+                resultsDiv.parentElement.appendChild(matchSelect);
+            }
+            matchSelect.innerHTML = `<option value="${escapeAttr(item.dataset.id)}" selected>${escapeHtml(item.dataset.name)}</option>`;
+
+            resultsDiv.innerHTML = '';
+            searchInput.value = '';
+
+            const alertEl = resultsDiv.closest('.card-body')?.querySelector('.alert');
+            if (alertEl) {
+                alertEl.className = 'alert alert-success small mb-0';
+                alertEl.textContent = trans('aiscan-selected-supplier', {'%name%': item.dataset.name, '%taxId%': item.dataset.taxid});
+            }
+
+            const refInput = document.getElementById('default_product_ref');
+            if (refInput) {
+                refInput.dataset.codproveedor = item.dataset.id;
+                loadDefaultProduct(item.dataset.id);
+            }
+        });
+    }
+
+    function persistCurrentFormState() {
+        const doc = currentDoc();
+        if (!doc || !doc.extractedData) {
+            return;
+        }
+        doc.extractedData = collectFormData(doc.extractedData);
+    }
+
+    function collectFormData(baseData) {
+        const data = JSON.parse(JSON.stringify(baseData));
+        data.invoice = data.invoice || {};
+        data.supplier = data.supplier || {};
+
+        data.invoice.number = val('invoice_number');
+        data.invoice.issue_date = val('invoice_issue_date');
+        data.invoice.due_date = val('invoice_due_date');
+        data.invoice.currency = val('invoice_currency');
+        data.invoice.subtotal = parseFloat(val('invoice_subtotal') || 0);
+        data.invoice.tax_amount = parseFloat(val('invoice_tax_amount') || 0);
+        data.invoice.total = parseFloat(val('invoice_total') || 0);
+        const withholdingEl = document.getElementById('invoice_withholding');
+        if (withholdingEl) {
+            data.invoice.withholding_amount = parseFloat(withholdingEl.value || 0);
+        }
+        data.invoice.summary = val('invoice_summary');
+        const ptEl = document.getElementById('invoice_payment_terms');
+        if (ptEl) {
+            data.invoice.payment_terms = ptEl.value;
+        }
+
+        data.supplier.name = val('supplier_name');
+        data.supplier.tax_id = val('supplier_tax_id');
+        data.supplier.email = val('supplier_email');
+        data.supplier.phone = val('supplier_phone');
+        data.supplier.address = val('supplier_address');
+
+        const selectedSupplier = document.getElementById('supplier_match_select');
+        if (selectedSupplier) {
+            data.supplier.matched_supplier_id = selectedSupplier.value;
+            delete data.supplier.create_if_missing;
+        }
+
+        if (state.importMode === 'lines') {
+            data.lines = Array.from(document.querySelectorAll('#aiscan-lines-body tr')).map(row => {
+                const line = {};
+                row.querySelectorAll('[data-field]').forEach(input => {
+                    line[input.dataset.field] = input.type === 'number' ? parseFloat(input.value || 0) : input.value;
+                });
+                return line;
+            });
+        }
+
+        return data;
+    }
+
+    function val(id) {
+        return document.getElementById(id)?.value || '';
+    }
+
+    function markCurrentReady() {
+        persistCurrentFormState();
+        const doc = currentDoc();
+        if (!doc || !doc.extractedData) {
+            return;
+        }
+
+        if (!doc.extractedData.supplier?.matched_supplier_id) {
+            const selectedSupplier = document.getElementById('supplier_match_select');
+            if (!selectedSupplier) {
+                if (!window.confirm(trans('aiscan-create-new-supplier-confirm'))) {
+                    return;
+                }
+                doc.extractedData.supplier.create_if_missing = true;
+            }
+        }
+
+        doc.status = STATUS.READY;
+        updateProgressBar();
+        renderCurrentDocument();
+
+        if (state.currentIndex < state.documents.length - 1) {
+            navigateTo(state.currentIndex + 1);
+        } else {
+            checkAllReviewed();
+        }
+    }
+
+    function discardCurrentDoc() {
+        const doc = currentDoc();
+        if (!doc) {
+            return;
+        }
+        doc.status = STATUS.DISCARDED;
+        doc.extractedData = null;
+        updateProgressBar();
+        renderCurrentDocument();
+
+        if (state.currentIndex < state.documents.length - 1) {
+            navigateTo(state.currentIndex + 1);
+        }
+    }
+
+    async function reanalyzeCurrentDoc() {
+        const doc = currentDoc();
+        if (!doc || !doc.tmpFile) {
+            return;
+        }
+
+        const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+        doc.status = STATUS.ANALYZING;
+        doc.error = null;
+        renderCurrentDocument();
+
+        try {
+            const params = new URLSearchParams({
+                action: 'analyze',
+                tmp_file: doc.tmpFile,
+                mime_type: doc.mimeType,
+                import_mode: state.importMode,
+                use_history: state.useHistory ? '1' : '0',
+                supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
+                provider: provider,
+            });
+
+            const response = await fetch('AiScanInvoice?' + params.toString());
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            doc.extractedData = data.data;
+            doc.status = STATUS.ANALYZED;
+        } catch (error) {
+            doc.status = STATUS.NEEDS_REVIEW;
+            doc.error = error.message;
+        }
+
+        renderCurrentDocument();
+    }
+
+    function checkAllReviewed() {
+        const ready = state.documents.filter(d => d.status === STATUS.READY || d.status === STATUS.ANALYZED);
+        const total = state.documents.filter(d => d.status !== STATUS.DISCARDED && d.status !== STATUS.FAILED);
+        if (ready.length === total.length && total.length > 0) {
+            showStep('import');
+            buildImportSummary();
+        }
+    }
+
+    function updateProgressBar() {
+        const total = state.documents.length;
+        const progressEl = document.getElementById('aiscan-review-progress');
+        if (progressEl) {
+            progressEl.textContent = trans('aiscan-file-progress', {'%current%': String(state.currentIndex + 1), '%total%': String(total)});
+        }
+
+        const badges = document.getElementById('aiscan-doc-status-badges');
+        if (badges) {
+            badges.innerHTML = state.documents.map((doc, i) => {
+                const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
+                const active = i === state.currentIndex ? 'border border-2 border-primary' : '';
+                return `<span class="badge ${info.cls} ${active}" style="cursor:pointer" data-doc-index="${i}" title="${escapeAttr(doc.originalName)}">
+                    <i class="fa-solid ${info.icon}"></i> ${i + 1}
+                </span>`;
+            }).join('');
+
+            badges.querySelectorAll('[data-doc-index]').forEach(badge => {
+                badge.addEventListener('click', () => navigateTo(parseInt(badge.dataset.docIndex)));
+            });
+        }
+    }
+
+    function updateNavigationButtons() {
+        const prevBtn = document.getElementById('aiscan-prev-doc');
+        const nextBtn = document.getElementById('aiscan-next-doc');
+        if (prevBtn) {
+            prevBtn.disabled = state.currentIndex <= 0;
+        }
+        if (nextBtn) {
+            nextBtn.disabled = state.currentIndex >= state.documents.length - 1;
+        }
+    }
+
+    // ── Step 3: Import ─────────────────────────────────────────────────
+
+    function bindImportStep() {
+        document.getElementById('aiscan-back-to-review')?.addEventListener('click', () => {
+            showStep('review');
+            renderCurrentDocument();
+        });
+        document.getElementById('aiscan-import-all-btn')?.addEventListener('click', executeImport);
+    }
+
+    function buildImportSummary() {
+        const tbody = document.getElementById('aiscan-import-body');
+        if (!tbody) {
+            return;
+        }
+
+        tbody.innerHTML = state.documents.map((doc, i) => {
+            const invoice = doc.extractedData?.invoice || {};
+            const supplier = doc.extractedData?.supplier || {};
+            const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
+            return `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${escapeHtml(doc.originalName)}</td>
+                    <td>${escapeHtml(supplier.name || '-')}</td>
+                    <td>${escapeHtml(invoice.number || '-')}</td>
+                    <td>${escapeHtml(invoice.issue_date || '-')}</td>
+                    <td>${escapeHtml(invoice.total ?? '-')}</td>
+                    <td><span class="badge ${info.cls}"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span></td>
+                    <td>${doc.status !== STATUS.DISCARDED && doc.status !== STATUS.FAILED ? `<button class="btn btn-sm btn-outline-danger aiscan-toggle-discard" data-index="${i}"><i class="fa-solid fa-ban"></i></button>` : ''}</td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.querySelectorAll('.aiscan-toggle-discard').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index);
+                const doc = state.documents[idx];
+                if (doc) {
+                    doc.status = doc.status === STATUS.DISCARDED ? STATUS.READY : STATUS.DISCARDED;
+                    buildImportSummary();
+                }
+            });
+        });
+
+        const countEl = document.getElementById('aiscan-import-count');
+        if (countEl) {
+            const importable = state.documents.filter(d => d.status === STATUS.READY || d.status === STATUS.ANALYZED).length;
+            countEl.textContent = trans('aiscan-import-count', {'%count%': String(importable), '%total%': String(state.documents.length)});
+        }
+    }
+
+    async function executeImport() {
+        const importBtn = document.getElementById('aiscan-import-all-btn');
+        importBtn.disabled = true;
+        importBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-importing'))}`;
+
+        const documents = state.documents.map(doc => ({
+            status: doc.status,
+            extracted_data: doc.extractedData,
+            tmp_file: doc.tmpFile,
+            mime_type: doc.mimeType,
+            original_name: doc.originalName,
+        }));
+
+        try {
+            const response = await fetch('AiScanInvoice?action=import-batch', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({documents, import_mode: state.importMode}),
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Import failed');
+            }
+
+            (data.results || []).forEach(result => {
+                const doc = state.documents[result.index];
+                if (!doc) {
+                    return;
+                }
+                if (result.status === 'imported') {
+                    doc.status = STATUS.IMPORTED;
+                    doc.invoiceId = result.invoice_id;
+                } else if (result.status === 'error') {
+                    doc.status = STATUS.FAILED;
+                    doc.error = result.error;
+                } else if (result.status === 'skipped') {
+                    doc.status = STATUS.DISCARDED;
+                }
+            });
+
+            buildImportSummary();
+            showImportResults(data.results || []);
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            importBtn.disabled = false;
+            importBtn.innerHTML = `<i class="fa-solid fa-file-import me-1"></i>${escapeHtml(trans('aiscan-import-all'))}`;
+        }
+    }
+
+    function showImportResults(results) {
+        const imported = results.filter(r => r.status === 'imported');
+        const failed = results.filter(r => r.status === 'error');
+        const importBtn = document.getElementById('aiscan-import-all-btn');
+
+        if (imported.length > 0 && failed.length === 0) {
+            importBtn.classList.replace('btn-success', 'btn-outline-success');
+            importBtn.innerHTML = `<i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-import-complete'))}`;
+            importBtn.disabled = true;
+        }
+
+        if (imported.length === 1) {
+            const link = document.createElement('a');
+            link.href = 'EditFacturaProveedor?code=' + encodeURIComponent(imported[0].invoice_id);
+            link.className = 'btn btn-primary ms-2';
+            link.innerHTML = `<i class="fa-solid fa-eye me-1"></i>${escapeHtml(trans('aiscan-view-invoice'))}`;
+            importBtn.parentElement.appendChild(link);
+        }
+    }
+
+    // ── UI Navigation ──────────────────────────────────────────────────
+
+    function showStep(step) {
+        document.getElementById('aiscan-step-upload').classList.toggle('d-none', step !== 'upload');
+        document.getElementById('aiscan-step-review').classList.toggle('d-none', step !== 'review');
+        document.getElementById('aiscan-step-import').classList.toggle('d-none', step !== 'import');
+    }
+
+    function resetUploadUI() {
+        state.documents.forEach(doc => {
+            if (doc.objectUrl) {
+                URL.revokeObjectURL(doc.objectUrl);
+            }
+        });
+        state.documents = [];
+        state.currentIndex = 0;
+
+        const dropZone = document.getElementById('aiscan-drop-zone');
+        dropZone.innerHTML = `
+            <div>
+                <div class="fs-2 mb-2 text-muted"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <div class="fw-semibold">${escapeHtml(trans('aiscan-document-and-image-drop'))}</div>
+                <div class="small text-muted mt-1">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
+                <div class="small text-muted mt-1">PDF, JPG, PNG, WebP</div>
+            </div>
+        `;
+
+        document.getElementById('aiscan-file-input').value = '';
+        document.getElementById('aiscan-upload-btn').disabled = true;
+        document.getElementById('aiscan-upload-btn').innerHTML = `<i class="fa-solid fa-cloud-arrow-up me-1"></i>${escapeHtml(trans('aiscan-upload-and-analyze'))}`;
+    }
+
+    function buildProviderSelect() {
+        const select = document.getElementById('aiscan-provider-select');
+        if (!select) {
+            return;
+        }
+        select.innerHTML = '';
+        (state.availableProviders || []).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            if (p === state.defaultProvider) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    }
+
+    // ── Split handle ───────────────────────────────────────────────────
+
+    function bindSplitHandle() {
+        const handle = document.getElementById('aiscan-split-handle');
+        const split = document.getElementById('aiscan-split');
+        const left = document.getElementById('aiscan-split-left');
+        if (!handle || !split || !left) {
+            return;
+        }
+
+        let dragging = false;
+
+        handle.addEventListener('mousedown', e => {
+            e.preventDefault();
+            dragging = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            split.classList.add('aiscan-split-dragging');
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!dragging) {
+                return;
+            }
+            const rect = split.getBoundingClientRect();
+            const offset = e.clientX - rect.left;
+            const pct = Math.min(Math.max((offset / rect.width) * 100, 25), 75);
+            left.style.flexBasis = pct + '%';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                split.classList.remove('aiscan-split-dragging');
+            }
+        });
+    }
+})();

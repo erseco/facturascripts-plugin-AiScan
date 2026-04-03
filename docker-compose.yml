@@ -32,10 +32,28 @@ services:
       FS_INITIAL_PASS: admin
       FS_LANG: es_ES
       FS_TIMEZONE: Europe/Madrid
+      # Company setup (auto-completes Wizard)
+      FS_CODPAIS: ESP
+      FS_COMPANY_NAME: "Empresa Demo AiScan"
+      FS_COMPANY_CIF: "B12345678"
+      FS_COMPANY_REGIMENIVA: General
+      # Seed data: load suppliers and products from blueprint.json
+      FS_SEED_FILE: /var/www/html/Plugins/AiScan/blueprint.json
       # Debug mode (set to false in production)
       FS_DEBUG: "true"
       # Disable cron tasks in development
       RUN_CRON_TASKS: "false"
+      # AI Provider API keys (optional, read from host environment)
+      # Set these in your shell or .env file, never commit them
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      # Auto-setup: configure AiScan API keys from environment
+      POST_CONFIGURE_COMMANDS: >-
+        php84 /var/www/html/Plugins/AiScan/docker/setup-aiscan.php
     volumes:
       - facturascripts_data:/var/www/html/volume
       # Mount the plugin directory

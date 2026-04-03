@@ -43,3 +43,4 @@ themes/
 
 # Docker override files (user customizations or CI generated)
 docker-compose.override.yml
+.omc/

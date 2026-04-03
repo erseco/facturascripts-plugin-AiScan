@@ -8,14 +8,6 @@
  * License, or (at your option) any later version.
  */
 
-.aiscan-modal .modal-dialog {
-    max-width: 1200px;
-}
-
-.aiscan-modal .modal-body {
-    padding: 0;
-}
-
 /* Split pane layout */
 .aiscan-split {
     display: flex;
@@ -24,7 +16,7 @@
 }
 
 .aiscan-split-left {
-    flex: 0 0 55%;
+    flex: 0 0 50%;
     min-width: 0;
     overflow: hidden;
     display: flex;
@@ -96,8 +88,7 @@
     border: 2px dashed var(--bs-border-color);
     border-radius: 0.5rem;
     cursor: pointer;
-    height: 100%;
-    min-height: 300px;
+    min-height: 200px;
     transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
@@ -128,6 +119,18 @@
     overflow-y: auto;
 }
 
-.aiscan-modal #aiscan-wizard-progress {
-    min-width: 84px;
+/* Status badges in progress bar */
+#aiscan-doc-status-badges {
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+#aiscan-doc-status-badges .badge {
+    font-size: 0.7rem;
+    min-width: 28px;
+    transition: all 0.15s;
+}
+
+#aiscan-doc-status-badges .badge:hover {
+    opacity: 0.8;
 }

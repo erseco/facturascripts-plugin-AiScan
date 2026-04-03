@@ -31,17 +31,13 @@ final class EditFacturaProveedorExtensionTest extends TestCase
 {
     public static function setUpBeforeClass(): void
     {
-        // In Docker, tests run from /var/www/html/Test/Plugins/
-        // but the plugin lives at /var/www/html/Plugins/AiScan/
         $base = dirname(__DIR__, 2) . '/Plugins/AiScan';
         require_once $base
             . '/Extension/Controller/EditFacturaProveedor.php';
     }
 
-    public function testCreateViewsUsesMainViewNameForButton(): void
+    public function testCreateViewsAddsLinkButton(): void
     {
-        $this->defineExtensionStubs();
-
         $extension = new EditFacturaProveedor();
         $controller = new class () {
             public array $buttons = [];
@@ -63,67 +59,7 @@ final class EditFacturaProveedorExtensionTest extends TestCase
         $this->assertCount(1, $controller->buttons);
         $this->assertSame('MainView', $controller->buttons[0][0]);
         $this->assertSame('js', $controller->buttons[0][1]['type']);
-        $this->assertStringContainsString('modalaiscan', $controller->buttons[0][1]['action']);
-        $this->assertArrayNotHasKey('row', $controller->buttons[0][1]);
-    }
-
-    public function testLoadDataOnlyStoresInvoiceIdOnMainView(): void
-    {
-        $extension = new EditFacturaProveedor();
-        $controller = new class () {
-            public array $settings = [];
-
-            public function getMainViewName(): string
-            {
-                return 'MainView';
-            }
-
-            public function setSettings(string $viewName, string $property, $value): void
-            {
-                $this->settings[] = [$viewName, $property, $value];
-            }
-        };
-
-        $view = new class () {
-            public object $model;
-
-            public function __construct()
-            {
-                $this->model = new class () {
-                    public function primaryColumnValue(): int
-                    {
-                        return 42;
-                    }
-                };
-            }
-        };
-
-        $closure = $extension->loadData();
-        $closure->call($controller, 'OtherView', $view);
-        $this->assertSame([], $controller->settings);
-
-        $closure->call($controller, 'MainView', $view);
-        $this->assertSame([['MainView', 'aiscan_invoice_id', 42]], $controller->settings);
-    }
-
-    private function defineExtensionStubs(): void
-    {
-        if (false === class_exists('FacturaScripts\\Core\\Tools', false)) {
-            eval(
-                'namespace FacturaScripts\Core;'
-                . ' class Tools { public static function config(string $name)'
-                . ' { return ""; } }'
-            );
-        }
-
-        if (false === class_exists('FacturaScripts\\Dinamic\\Lib\\AssetManager', false)) {
-            eval(
-                'namespace FacturaScripts\Dinamic\Lib;'
-                . ' class AssetManager {'
-                . ' public static function addCss(string $asset): void {}'
-                . ' public static function addJs(string $asset): void {}'
-                . ' }'
-            );
-        }
+        $this->assertStringContainsString('AiScanInvoice', $controller->buttons[0][1]['action']);
+        $this->assertSame('aiscan-page-title', $controller->buttons[0][1]['label']);
     }
 }

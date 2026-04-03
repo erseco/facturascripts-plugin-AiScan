@@ -1,0 +1,192 @@
+{% extends "Master/MenuBghTemplate.html.twig" %}
+
+{% block body %}
+<div class="container-fluid" id="aiscan-app">
+    {# Step 1: Upload #}
+    <div id="aiscan-step-upload">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-wand-magic-sparkles me-2"></i>{{ i18n.trans('aiscan-page-title') }}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-lg-8">
+                                <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
+                                    <div>
+                                        <div class="fs-2 mb-2 text-muted"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                                        <div class="fw-semibold">{{ i18n.trans('aiscan-document-and-image-drop') }}</div>
+                                        <div class="small text-muted mt-1">{{ i18n.trans('aiscan-drop-or-click') }}</div>
+                                        <div class="small text-muted mt-1">PDF, JPG, PNG, WebP</div>
+                                    </div>
+                                </div>
+                                <input id="aiscan-file-input" type="file" class="d-none" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">{{ i18n.trans('aiscan-import-mode') }}</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="import_mode" id="mode-lines" value="lines" checked>
+                                        <label class="form-check-label" for="mode-lines">
+                                            <i class="fa-solid fa-list me-1"></i>{{ i18n.trans('aiscan-mode-lines') }}
+                                        </label>
+                                        <div class="form-text">{{ i18n.trans('aiscan-mode-lines-help') }}</div>
+                                    </div>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="radio" name="import_mode" id="mode-total" value="total">
+                                        <label class="form-check-label" for="mode-total">
+                                            <i class="fa-solid fa-calculator me-1"></i>{{ i18n.trans('aiscan-mode-total') }}
+                                        </label>
+                                        <div class="form-text">{{ i18n.trans('aiscan-mode-total-help') }}</div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="use-history" value="1">
+                                        <label class="form-check-label" for="use-history">
+                                            <i class="fa-solid fa-clock-rotate-left me-1"></i>{{ i18n.trans('aiscan-use-history') }}
+                                        </label>
+                                        <div class="form-text">{{ i18n.trans('aiscan-use-history-help') }}</div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold" for="aiscan-provider-select">{{ i18n.trans('default-provider') }}</label>
+                                    <select class="form-select" id="aiscan-provider-select">
+                                        {% for provider in availableProviders %}
+                                            <option value="{{ provider }}"{% if provider == defaultProvider %} selected{% endif %}>{{ provider }}</option>
+                                        {% endfor %}
+                                        {% if availableProviders is empty %}
+                                            <option value="" disabled>{{ i18n.trans('aiscan-no-providers') }}</option>
+                                        {% endif %}
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-primary w-100" id="aiscan-upload-btn" disabled>
+                                    <i class="fa-solid fa-cloud-arrow-up me-1"></i>{{ i18n.trans('aiscan-upload-and-analyze') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Step 2: Review #}
+    <div id="aiscan-step-review" class="d-none">
+        <div class="row">
+            <div class="col-12">
+                {# Progress bar #}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body py-2">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiscan-back-to-upload">
+                                    <i class="fa-solid fa-arrow-left me-1"></i>{{ i18n.trans('aiscan-back') }}
+                                </button>
+                                <span class="fw-semibold" id="aiscan-review-progress"></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2" id="aiscan-doc-status-badges"></div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiscan-prev-doc" disabled>
+                                    <i class="fa-solid fa-chevron-left"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiscan-next-doc" disabled>
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# Split view #}
+                <div class="aiscan-split" id="aiscan-split">
+                    <div class="aiscan-split-left" id="aiscan-split-left">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                <span class="fw-semibold" id="aiscan-preview-title">{{ i18n.trans('aiscan-document-preview') }}</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-reanalyze-btn">
+                                        <i class="fa-solid fa-rotate me-1"></i>{{ i18n.trans('aiscan-reanalyze') }}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" id="aiscan-discard-btn">
+                                        <i class="fa-solid fa-ban me-1"></i>{{ i18n.trans('aiscan-discard') }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="aiscan-preview-area" id="aiscan-preview-area"></div>
+                            </div>
+                            <div class="card-footer py-2">
+                                <div id="aiscan-status" class="small"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="aiscan-split-handle" id="aiscan-split-handle" title="{{ i18n.trans('aiscan-drag-to-resize') }}">
+                        <div class="aiscan-split-handle-grip"></div>
+                    </div>
+                    <div class="aiscan-split-right" id="aiscan-split-right">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold">{{ i18n.trans('aiscan-review-extracted-data') }}</span>
+                                <span class="badge" id="aiscan-doc-state-badge"></span>
+                            </div>
+                            <div class="card-body aiscan-sidebar" id="aiscan-review">
+                                <p class="text-muted mb-0">{{ i18n.trans('aiscan-initial-review-message') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Step 3: Import #}
+    <div id="aiscan-step-import" class="d-none">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-file-import me-2"></i>{{ i18n.trans('aiscan-import-summary') }}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" id="aiscan-import-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>{{ i18n.trans('aiscan-document') }}</th>
+                                        <th>{{ i18n.trans('supplier') }}</th>
+                                        <th>{{ i18n.trans('number') }}</th>
+                                        <th>{{ i18n.trans('date') }}</th>
+                                        <th>{{ i18n.trans('total') }}</th>
+                                        <th>{{ i18n.trans('status') }}</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="aiscan-import-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        <button type="button" class="btn btn-outline-secondary" id="aiscan-back-to-review">
+                            <i class="fa-solid fa-arrow-left me-1"></i>{{ i18n.trans('aiscan-back') }}
+                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted small" id="aiscan-import-count"></span>
+                            <button type="button" class="btn btn-success" id="aiscan-import-all-btn">
+                                <i class="fa-solid fa-file-import me-1"></i>{{ i18n.trans('aiscan-import-all') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

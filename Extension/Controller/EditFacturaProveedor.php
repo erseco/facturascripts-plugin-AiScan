@@ -21,40 +21,20 @@
 namespace FacturaScripts\Plugins\AiScan\Extension\Controller;
 
 use Closure;
-use FacturaScripts\Core\Tools;
-use FacturaScripts\Dinamic\Lib\AssetManager;
 
 class EditFacturaProveedor
 {
     public function createViews(): Closure
     {
         return function () {
-            $route = Tools::config('route');
             $viewName = $this->getMainViewName();
-            AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
-            AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan-flow.js');
-            AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan.js');
             $this->addButton($viewName, [
-                'action' => "var m=document.getElementById('modalaiscan');if(m){new bootstrap.Modal(m).show();}",
+                'action' => "window.location.href='AiScanInvoice';",
                 'color' => 'info',
-                'icon' => 'fa-solid fa-file-invoice',
-                'label' => 'scan-invoice',
+                'icon' => 'fa-solid fa-wand-magic-sparkles',
+                'label' => 'aiscan-page-title',
                 'type' => 'js',
             ]);
-        };
-    }
-
-    public function loadData(): Closure
-    {
-        return function (string $viewName, $view) {
-            if ($viewName !== $this->getMainViewName()) {
-                return;
-            }
-
-            $invoiceId = $view->model->primaryColumnValue();
-            if ($invoiceId !== null) {
-                $this->setSettings($viewName, 'aiscan_invoice_id', $invoiceId);
-            }
         };
     }
 }

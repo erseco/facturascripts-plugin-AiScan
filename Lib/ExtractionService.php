@@ -183,12 +183,27 @@ Context:
 - Goal: create or complete a supplier purchase invoice
 - File name: {{FILE_NAME}}
 - MIME type: {{MIME_TYPE}}
+- Import mode: {{IMPORT_MODE}}
 
 Important:
 - Prefer exact extraction from the document.
 - If a field is missing or uncertain, use null.
 - Return ONLY valid JSON matching the schema from the system prompt.
 - Do not return markdown.
+PROMPT;
+
+    private const MODE_LINES_HINT = <<<'PROMPT'
+
+Import mode is "lines": Extract every individual line item visible in the document.
+Prioritize real line extraction. If line items are not clearly visible, return an empty lines array.
+Do not invent or fabricate line items.
+PROMPT;
+
+    private const MODE_TOTAL_HINT = <<<'PROMPT'
+
+Import mode is "total": Focus on accurate invoice-level totals (subtotal, tax, total).
+Do not try to extract individual line items. Return an empty lines array.
+The operator will create a single line from the totals.
 PROMPT;
 
     public function __construct()
@@ -207,24 +222,24 @@ PROMPT;
         return self::DEFAULT_SYSTEM_PROMPT;
     }
 
-    public static function getExecutionPrompt(string $fileName = '', string $mimeType = ''): string
-    {
+    public static function getExecutionPrompt(
+        string $fileName = '',
+        string $mimeType = '',
+        string $importMode = 'lines',
+        string $historicalContext = ''
+    ): string {
         $prompt = self::DEFAULT_EXECUTION_PROMPT;
         $prompt = str_replace('{{FILE_NAME}}', $fileName ?: 'unknown', $prompt);
         $prompt = str_replace('{{MIME_TYPE}}', $mimeType ?: 'unknown', $prompt);
+        $prompt = str_replace('{{IMPORT_MODE}}', $importMode === 'total' ? 'total' : 'lines', $prompt);
+
+        $prompt .= $importMode === 'total' ? self::MODE_TOTAL_HINT : self::MODE_LINES_HINT;
+
+        if (!empty(trim($historicalContext))) {
+            $prompt .= "\n\n" . $historicalContext;
+        }
+
         return $prompt;
-    }
-
-    /** @deprecated Use getSystemPrompt() instead */
-    public static function getExtractionPrompt(): string
-    {
-        return self::getSystemPrompt();
-    }
-
-    /** @deprecated Use getDefaultSystemPrompt() instead */
-    public static function getDefaultExtractionPrompt(): string
-    {
-        return self::DEFAULT_SYSTEM_PROMPT;
     }
 
     public function getProvider(?string $providerName = null): ProviderInterface
@@ -273,8 +288,13 @@ PROMPT;
         ];
     }
 
-    public function extractFromFile(string $filePath, string $mimeType, ?string $providerName = null): array
-    {
+    public function extractFromFile(
+        string $filePath,
+        string $mimeType,
+        ?string $providerName = null,
+        string $importMode = 'lines',
+        string $historicalContext = ''
+    ): array {
         if (!file_exists($filePath)) {
             throw new \RuntimeException('File not found: ' . $filePath);
         }
@@ -287,13 +307,11 @@ PROMPT;
         if (in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'])) {
             $content = base64_encode(file_get_contents($filePath));
         } elseif ($mimeType === 'application/pdf') {
-            $pdfText = $this->extractPdfText($filePath);
+            $pdfText = self::extractPdfText($filePath);
             if (!empty(trim($pdfText))) {
-                // Got readable text from pdftotext, send as plain text
                 $content = $pdfText;
                 $actualMimeType = 'text/plain';
             } else {
-                // No text extracted, send the raw PDF as binary for vision-capable models
                 $content = base64_encode(file_get_contents($filePath));
             }
         } else {
@@ -301,7 +319,7 @@ PROMPT;
         }
 
         $systemPrompt = self::getSystemPrompt();
-        $executionPrompt = self::getExecutionPrompt($fileName, $mimeType);
+        $executionPrompt = self::getExecutionPrompt($fileName, $mimeType, $importMode, $historicalContext);
 
         $rawJson = $provider->analyzeDocument($content, $actualMimeType, $executionPrompt, $systemPrompt);
 
@@ -325,7 +343,7 @@ PROMPT;
         return $data;
     }
 
-    private function extractPdfText(string $filePath): string
+    public static function extractPdfText(string $filePath): string
     {
         $pdftotextBin = null;
         foreach (['/usr/bin/pdftotext', '/usr/local/bin/pdftotext'] as $candidate) {

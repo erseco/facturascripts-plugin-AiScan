@@ -8,7 +8,7 @@
   "debug": {
     "enabled": true
   },
-  "landingPage": "/AdminPlugins",
+  "landingPage": "/AiScanInvoice",
   "siteOptions": {
     "title": "AiScan Playground Demo",
     "locale": "es_ES",
@@ -20,5 +20,124 @@
   },
   "plugins": [
     "https://github.com/erseco/facturascripts-plugin-AiScan/archive/refs/heads/main.zip"
-  ]
+  ],
+  "install": {
+    "codpais": "ESP",
+    "empresa": "Empresa Demo AiScan",
+    "cifnif": "B12345678",
+    "tipoidfiscal": "CIF",
+    "regimeniva": "General",
+    "defaultplan": true
+  },
+  "seed": {
+    "suppliers": [
+      {
+        "nombre": "Telefónica S.A.",
+        "razonsocial": "Telefónica S.A.",
+        "cifnif": "A28015865",
+        "tipoidfiscal": "CIF",
+        "email": "facturacion@telefonica.es",
+        "telefono1": "900100100",
+        "regimeniva": "General"
+      },
+      {
+        "nombre": "Amazon EU S.à r.l.",
+        "razonsocial": "Amazon EU S.à r.l.",
+        "cifnif": "ESN0186868I",
+        "tipoidfiscal": "NIF-IVA",
+        "email": "billing@amazon.eu",
+        "telefono1": "",
+        "regimeniva": "General"
+      },
+      {
+        "nombre": "Iberdrola Clientes S.A.U.",
+        "razonsocial": "Iberdrola Clientes S.A.U.",
+        "cifnif": "A95758389",
+        "tipoidfiscal": "CIF",
+        "email": "facturacion@iberdrola.es",
+        "telefono1": "900225235",
+        "regimeniva": "General"
+      },
+      {
+        "nombre": "Papelería Central S.L.",
+        "razonsocial": "Papelería Central S.L.",
+        "cifnif": "B87654321",
+        "tipoidfiscal": "CIF",
+        "email": "info@papeleriacentral.es",
+        "telefono1": "912345678",
+        "regimeniva": "General"
+      },
+      {
+        "nombre": "García López, Juan",
+        "razonsocial": "Juan García López",
+        "cifnif": "12345678Z",
+        "tipoidfiscal": "NIF",
+        "email": "juan.garcia@autonomo.es",
+        "telefono1": "654321987",
+        "regimeniva": "General"
+      }
+    ],
+    "products": [
+      {
+        "referencia": "SERV-TELCO",
+        "descripcion": "Servicios de telecomunicaciones",
+        "precio": 49.90,
+        "tipo": "Servicio"
+      },
+      {
+        "referencia": "SERV-ELECT",
+        "descripcion": "Suministro eléctrico",
+        "precio": 120.00,
+        "tipo": "Servicio"
+      },
+      {
+        "referencia": "MAT-OFICINA",
+        "descripcion": "Material de oficina",
+        "precio": 25.00,
+        "tipo": "Producto"
+      },
+      {
+        "referencia": "MAT-PAPEL-A4",
+        "descripcion": "Papel DIN A4 80g (500 hojas)",
+        "precio": 4.50,
+        "tipo": "Producto"
+      },
+      {
+        "referencia": "MAT-TONER",
+        "descripcion": "Tóner impresora láser negro",
+        "precio": 35.00,
+        "tipo": "Producto"
+      },
+      {
+        "referencia": "SERV-CONSULT",
+        "descripcion": "Servicios de consultoría",
+        "precio": 75.00,
+        "tipo": "Servicio"
+      },
+      {
+        "referencia": "SERV-HOSTING",
+        "descripcion": "Alojamiento web y dominio",
+        "precio": 9.99,
+        "tipo": "Servicio"
+      },
+      {
+        "referencia": "HW-PORTATIL",
+        "descripcion": "Portátil empresarial",
+        "precio": 899.00,
+        "tipo": "Producto"
+      },
+      {
+        "referencia": "HW-MONITOR",
+        "descripcion": "Monitor 27\" 4K",
+        "precio": 349.00,
+        "tipo": "Producto"
+      },
+      {
+        "referencia": "GASTOS-GEN",
+        "descripcion": "Gastos generales",
+        "precio": 0.00,
+        "tipo": "Servicio"
+      }
+    ]
+  }
 }
