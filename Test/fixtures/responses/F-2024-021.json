@@ -1,0 +1,56 @@
+{
+    "document_type": "invoice",
+    "supplier": {
+        "name": "Peluquería Estilo Libre",
+        "tax_id": "B38778899",
+        "email": null,
+        "phone": null,
+        "website": null,
+        "address": null
+    },
+    "customer": {
+        "name": "Pepita Gómez",
+        "tax_id": "125478938W",
+        "address": null
+    },
+    "invoice": {
+        "number": "F-2024/021",
+        "issue_date": "2026-09-20",
+        "due_date": null,
+        "currency": "EUR",
+        "subtotal": 280.00,
+        "tax_amount": 19.60,
+        "withholding_amount": 0,
+        "total": 299.60,
+        "summary": "Gestión Instagram junio",
+        "payment_terms": null
+    },
+    "taxes": [
+        {
+            "name": "IGIC",
+            "rate": 7,
+            "base": 280.00,
+            "amount": 19.60
+        }
+    ],
+    "lines": [
+        {
+            "description": "Gestión Instagram junio",
+            "quantity": 1,
+            "unit_price": 280.00,
+            "discount": 0,
+            "tax_rate": 7,
+            "line_total": 280.00,
+            "sku": null
+        }
+    ],
+    "confidence": {
+        "supplier_name": 0.95,
+        "supplier_tax_id": 0.98,
+        "invoice_number": 0.99,
+        "issue_date": 0.97,
+        "total": 0.99,
+        "lines": 0.97
+    },
+    "warnings": []
+}

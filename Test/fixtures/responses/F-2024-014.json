@@ -1,0 +1,71 @@
+{
+    "document_type": "invoice",
+    "supplier": {
+        "name": "Bodega Volcanes del Sur",
+        "tax_id": "B38033344",
+        "email": null,
+        "phone": null,
+        "website": null,
+        "address": null
+    },
+    "customer": {
+        "name": "Pepita Gómez",
+        "tax_id": "125478938W",
+        "address": null
+    },
+    "invoice": {
+        "number": "F-2024/014",
+        "issue_date": "2026-12-19",
+        "due_date": null,
+        "currency": "EUR",
+        "subtotal": 1850.00,
+        "tax_amount": 103.50,
+        "withholding_amount": 180.00,
+        "total": 1773.50,
+        "summary": "Diseño etiquetas y packaging",
+        "payment_terms": null
+    },
+    "taxes": [
+        {
+            "name": "IGIC 7%",
+            "rate": 7,
+            "base": 1200.00,
+            "amount": 84.00
+        },
+        {
+            "name": "IGIC 3%",
+            "rate": 3,
+            "base": 650.00,
+            "amount": 19.50
+        }
+    ],
+    "lines": [
+        {
+            "description": "Diseño etiquetas vino (3 ud)",
+            "quantity": 1,
+            "unit_price": 1200.00,
+            "discount": 0,
+            "tax_rate": 7,
+            "line_total": 1200.00,
+            "sku": null
+        },
+        {
+            "description": "Packaging caja regalo",
+            "quantity": 1,
+            "unit_price": 650.00,
+            "discount": 0,
+            "tax_rate": 3,
+            "line_total": 650.00,
+            "sku": null
+        }
+    ],
+    "confidence": {
+        "supplier_name": 0.93,
+        "supplier_tax_id": 0.97,
+        "invoice_number": 0.98,
+        "issue_date": 0.96,
+        "total": 0.97,
+        "lines": 0.94
+    },
+    "warnings": []
+}
