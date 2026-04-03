@@ -39,31 +39,26 @@
         <name>coddivisa</name>
         <type>character varying(3)</type>
         <null>YES</null>
-        <default>EUR</default>
     </column>
     <column>
         <name>neto</name>
         <type>double precision</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>totaliva</name>
         <type>double precision</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>total</name>
         <type>double precision</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>status</name>
         <type>character varying(20)</type>
         <null>NO</null>
-        <default>pending</default>
     </column>
     <column>
         <name>idfactura</name>
@@ -83,8 +78,7 @@
     <column>
         <name>created_at</name>
         <type>timestamp</type>
-        <null>NO</null>
-        <default>CURRENT_TIMESTAMP</default>
+        <null>YES</null>
     </column>
     <constraint>
         <name>aiscan_import_documents_pkey</name>

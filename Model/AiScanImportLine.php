@@ -52,23 +52,6 @@ class AiScanImportLine extends ModelClass
         $this->pvptotal = 0.0;
     }
 
-    public function install(): string
-    {
-        return 'CREATE TABLE IF NOT EXISTS ' . static::tableName() . ' ('
-            . ' id int(11) NOT NULL AUTO_INCREMENT,'
-            . ' iddocument int(11) NOT NULL,'
-            . ' sortorder int(11) NOT NULL DEFAULT 0,'
-            . ' descripcion varchar(255) NOT NULL,'
-            . ' cantidad double NOT NULL DEFAULT 1,'
-            . ' pvpunitario double NOT NULL DEFAULT 0,'
-            . ' dtopor double NOT NULL DEFAULT 0,'
-            . ' iva double NOT NULL DEFAULT 0,'
-            . ' pvptotal double NOT NULL DEFAULT 0,'
-            . ' referencia varchar(30) DEFAULT NULL,'
-            . ' PRIMARY KEY (id)'
-            . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;';
-    }
-
     public static function primaryColumn(): string
     {
         return 'id';

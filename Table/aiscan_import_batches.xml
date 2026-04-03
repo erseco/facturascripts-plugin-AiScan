@@ -14,7 +14,6 @@
         <name>importmode</name>
         <type>character varying(20)</type>
         <null>NO</null>
-        <default>lines</default>
     </column>
     <column>
         <name>provider</name>
@@ -25,31 +24,26 @@
         <name>totaldocuments</name>
         <type>integer</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>importedcount</name>
         <type>integer</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>discardedcount</name>
         <type>integer</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>failedcount</name>
         <type>integer</type>
         <null>NO</null>
-        <default>0</default>
     </column>
     <column>
         <name>created_at</name>
         <type>timestamp</type>
-        <null>NO</null>
-        <default>CURRENT_TIMESTAMP</default>
+        <null>YES</null>
     </column>
     <constraint>
         <name>aiscan_import_batches_pkey</name>

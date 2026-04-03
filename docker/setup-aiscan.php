@@ -44,84 +44,16 @@ if (!in_array('AiScan', Plugins::enabled())) {
     echo "[AiScan] Plugin already enabled.\n";
 }
 
-// Ensure all AiScan plugin tables exist via raw SQL (FS DbUpdater
-// silently fails on some table XML definitions with defaults)
-$db = new \FacturaScripts\Core\Base\DataBase();
-$db->connect();
-
-$installSql = [
-    'aiscan_import_batches' => 'CREATE TABLE IF NOT EXISTS aiscan_import_batches ('
-        . ' id int(11) NOT NULL AUTO_INCREMENT,'
-        . ' nick varchar(50) DEFAULT NULL,'
-        . ' importmode varchar(20) NOT NULL DEFAULT "lines",'
-        . ' provider varchar(50) DEFAULT NULL,'
-        . ' totaldocuments int(11) NOT NULL DEFAULT 0,'
-        . ' importedcount int(11) NOT NULL DEFAULT 0,'
-        . ' discardedcount int(11) NOT NULL DEFAULT 0,'
-        . ' failedcount int(11) NOT NULL DEFAULT 0,'
-        . ' created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,'
-        . ' PRIMARY KEY (id)'
-        . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
-    'aiscan_import_documents' => 'CREATE TABLE IF NOT EXISTS aiscan_import_documents ('
-        . ' id int(11) NOT NULL AUTO_INCREMENT,'
-        . ' idbatch int(11) NOT NULL,'
-        . ' originalname varchar(255) NOT NULL,'
-        . ' codproveedor varchar(10) DEFAULT NULL,'
-        . ' suppliername varchar(100) DEFAULT NULL,'
-        . ' numproveedor varchar(50) DEFAULT NULL,'
-        . ' fecha date DEFAULT NULL,'
-        . ' coddivisa varchar(3) DEFAULT "EUR",'
-        . ' neto double NOT NULL DEFAULT 0,'
-        . ' totaliva double NOT NULL DEFAULT 0,'
-        . ' total double NOT NULL DEFAULT 0,'
-        . ' status varchar(20) NOT NULL DEFAULT "pending",'
-        . ' idfactura int(11) DEFAULT NULL,'
-        . ' codigofactura varchar(20) DEFAULT NULL,'
-        . ' errormessage text DEFAULT NULL,'
-        . ' created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,'
-        . ' PRIMARY KEY (id)'
-        . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
-    'aiscan_import_lines' => 'CREATE TABLE IF NOT EXISTS aiscan_import_lines ('
-        . ' id int(11) NOT NULL AUTO_INCREMENT,'
-        . ' iddocument int(11) NOT NULL,'
-        . ' sortorder int(11) NOT NULL DEFAULT 0,'
-        . ' descripcion varchar(255) NOT NULL,'
-        . ' cantidad double NOT NULL DEFAULT 1,'
-        . ' pvpunitario double NOT NULL DEFAULT 0,'
-        . ' dtopor double NOT NULL DEFAULT 0,'
-        . ' iva double NOT NULL DEFAULT 0,'
-        . ' pvptotal double NOT NULL DEFAULT 0,'
-        . ' referencia varchar(30) DEFAULT NULL,'
-        . ' PRIMARY KEY (id)'
-        . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
-    'aiscan_logs' => 'CREATE TABLE IF NOT EXISTS aiscan_logs ('
-        . ' id int(11) NOT NULL AUTO_INCREMENT,'
-        . ' idfactura int(11) DEFAULT NULL,'
-        . ' filename varchar(255) NOT NULL,'
-        . ' mime_type varchar(100) NOT NULL,'
-        . ' provider varchar(50) NOT NULL DEFAULT "openai",'
-        . ' model varchar(100) DEFAULT NULL,'
-        . ' status varchar(20) NOT NULL DEFAULT "pending",'
-        . ' raw_payload text DEFAULT NULL,'
-        . ' error_message text DEFAULT NULL,'
-        . ' confidence double NOT NULL DEFAULT 0,'
-        . ' created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,'
-        . ' PRIMARY KEY (id)'
-        . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
-    'aiscan_supplier_products' => 'CREATE TABLE IF NOT EXISTS aiscan_supplier_products ('
-        . ' id int(11) NOT NULL AUTO_INCREMENT,'
-        . ' codproveedor varchar(10) NOT NULL,'
-        . ' referencia varchar(30) NOT NULL,'
-        . ' description varchar(255) DEFAULT NULL,'
-        . ' created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,'
-        . ' PRIMARY KEY (id),'
-        . ' UNIQUE KEY aiscan_supplier_products_unique (codproveedor)'
-        . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
+// Ensure all AiScan model tables exist by instantiating them
+// (FS creates tables on first model instantiation via DbUpdater)
+$aiscanModels = [
+    'AiScanImportBatch', 'AiScanImportDocument', 'AiScanImportLine',
+    'AiScanLog', 'AiScanSupplierProduct',
 ];
-
-foreach ($installSql as $table => $sql) {
-    if (!$db->tableExists($table)) {
-        $db->exec($sql);
+foreach ($aiscanModels as $name) {
+    $cls = '\\FacturaScripts\\Dinamic\\Model\\' . $name;
+    if (class_exists($cls)) {
+        new $cls();
     }
 }
 echo "[AiScan] Plugin tables ensured.\n";
