@@ -782,7 +782,7 @@
                 </div>
                 <input type="hidden" id="supplier_address" value="${escapeAttr(supplier.address || '')}">
                 <select id="supplier_match_select" class="d-none"><option value="${escapeAttr(supplier.matched_supplier_id || '')}" selected></option></select>
-                ${buildInlineCreateSupplier(supplier)}`
+                ${buildSupplierStatus(supplier)}`
             : `<div class="d-flex gap-2 mb-1">
                     <div style="flex:2">${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}</div>
                     <div style="flex:1">${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}</div>
@@ -792,8 +792,7 @@
                     <div style="flex:1">${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}</div>
                 </div>
                 ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
-                ${buildSupplierStatus(supplier)}
-                ${buildInlineCreateSupplier(supplier)}`;
+                ${buildSupplierStatus(supplier)}`;
 
         review.appendChild(buildSection(trans('aiscan-section-supplier'), supplierBody,
             {collapsed: supplierMatched, headerExtra: supplierSummary}));
@@ -910,34 +909,14 @@
                 <div class="input-group input-group-sm">
                     <input type="text" class="form-control" id="aiscan-supplier-search" placeholder="${escapeAttr(trans('search'))}">
                     <button class="btn btn-outline-secondary" type="button" id="aiscan-supplier-search-btn"><i class="fa-solid fa-search"></i></button>
+                    <button class="btn btn-outline-primary" type="button" id="aiscan-create-supplier-btn"><i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-create-supplier'))}</button>
                 </div>
                 <div id="aiscan-supplier-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
+                <span class="small" id="aiscan-create-supplier-status"></span>
             </div>
         `;
 
         return `<div class="alert alert-${variant.klass} small mb-0">${escapeHtml(variant.text)}${select}</div>${searchBox}`;
-    }
-
-    function buildInlineCreateSupplier(supplier) {
-        return `
-            <div class="border rounded p-2 mt-2 bg-light">
-                <div class="small fw-semibold mb-1">${escapeHtml(trans('aiscan-create-supplier'))}</div>
-                <div class="d-flex gap-1 mb-1">
-                    <input class="form-control form-control-sm" style="flex:2" id="aiscan-new-supplier-name" placeholder="${escapeAttr(trans('name'))}" value="${escapeAttr(supplier.name || '')}">
-                    <input class="form-control form-control-sm" style="flex:1" id="aiscan-new-supplier-taxid" placeholder="${escapeAttr(trans('tax-id'))}" value="${escapeAttr(supplier.tax_id || '')}">
-                </div>
-                <div class="d-flex gap-1 mb-1">
-                    <input class="form-control form-control-sm" id="aiscan-new-supplier-email" placeholder="${escapeAttr(trans('email'))}" value="${escapeAttr(supplier.email || '')}">
-                    <input class="form-control form-control-sm" id="aiscan-new-supplier-phone" placeholder="${escapeAttr(trans('phone'))}" value="${escapeAttr(supplier.phone || '')}">
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-primary btn-sm" id="aiscan-create-supplier-btn">
-                        <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-create-supplier'))}
-                    </button>
-                    <span class="small" id="aiscan-create-supplier-status"></span>
-                </div>
-            </div>
-        `;
     }
 
     function buildDefaultProductSection(supplier) {
@@ -1209,10 +1188,10 @@
     }
 
     async function createSupplierInline() {
-        const nameEl = document.getElementById('aiscan-new-supplier-name');
-        const taxIdEl = document.getElementById('aiscan-new-supplier-taxid');
-        const emailEl = document.getElementById('aiscan-new-supplier-email');
-        const phoneEl = document.getElementById('aiscan-new-supplier-phone');
+        const nameEl = document.getElementById('supplier_name');
+        const taxIdEl = document.getElementById('supplier_tax_id');
+        const emailEl = document.getElementById('supplier_email');
+        const phoneEl = document.getElementById('supplier_phone');
         const statusEl = document.getElementById('aiscan-create-supplier-status');
         const btn = document.getElementById('aiscan-create-supplier-btn');
 
