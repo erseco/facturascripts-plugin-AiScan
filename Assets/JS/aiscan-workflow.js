@@ -1103,16 +1103,19 @@
     function buildTaxSelect(selectedRate) {
         const taxes = window.aiscanTaxTypes || [];
         const rate = parseFloat(selectedRate) || 0;
-        let best = '';
+        // Find closest matching rate
+        let bestRate = 0;
         let bestDiff = Infinity;
-        const options = taxes.map(t => {
+        for (const t of taxes) {
             const diff = Math.abs(t.rate - rate);
             if (diff < bestDiff) {
                 bestDiff = diff;
-                best = String(t.rate);
+                bestRate = t.rate;
             }
-            return `<option value="${t.rate}">${escapeHtml(t.description)}</option>`;
-        }).join('');
+        }
+        const options = taxes.map(t =>
+            `<option value="${t.rate}"${t.rate === bestRate ? ' selected' : ''}>${escapeHtml(t.description)}</option>`
+        ).join('');
         return `<select class="form-select form-select-sm" data-field="tax_rate" style="width:110px">${options}</select>`;
     }
 
@@ -1124,12 +1127,20 @@
     }
 
     function initTaxSelects(container) {
-        container.querySelectorAll('select[data-field="tax_rate"]').forEach(sel => {
-            const rate = parseFloat(sel.closest('tr')?.dataset.taxRate || 0);
-            for (const opt of sel.options) {
-                if (parseFloat(opt.value) === rate) {
-                    opt.selected = true;
-                    break;
+        container.querySelectorAll('.aiscan-line-row').forEach(row => {
+            const rate = parseFloat(row.dataset.taxRate || 0);
+            // Sync the hidden tax_rate field and modal tax select
+            const hiddenTax = row.querySelector('[data-field="tax_rate"]');
+            if (hiddenTax) {
+                hiddenTax.value = rate;
+            }
+            const modalTax = row.querySelector('.aiscan-modal-tax');
+            if (modalTax) {
+                for (const opt of modalTax.options) {
+                    if (Math.abs(parseFloat(opt.value) - rate) < 0.01) {
+                        opt.selected = true;
+                        break;
+                    }
                 }
             }
         });
