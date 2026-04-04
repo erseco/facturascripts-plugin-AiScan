@@ -696,7 +696,7 @@
         area.innerHTML = '';
 
         if (doc.mimeType === 'application/pdf' && doc.objectUrl) {
-            area.innerHTML = `<iframe src="${doc.objectUrl}" title="${escapeAttr(doc.originalName)}"></iframe>`;
+            area.innerHTML = `<iframe src="${doc.objectUrl}#navpanes=0&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
         } else if (doc.objectUrl) {
             area.innerHTML = `<img src="${doc.objectUrl}" alt="${escapeAttr(doc.originalName)}">`;
         } else {
