@@ -1691,7 +1691,6 @@
             }
             if (e.target.matches('[data-field="iva"]') || e.target.matches('[data-field="irpf"]')) {
                 calcAllLineTotals();
-                }
             }
         });
 
