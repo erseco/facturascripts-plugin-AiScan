@@ -122,15 +122,18 @@ Output schema:
   ],
   "lines": [
     {
-      "description": "string",
-      "quantity": "number|null",
-      "unit_price": "number|null",
-      "discount": "number|null",
-      "tax_rate": "number|null",
-      "tax_code": "string|null (code from available tax types list)",
-      "irpf_code": "string|null (code from available withholding types list)",
-      "line_total": "number|null",
-      "sku": "string|null"
+      "descripcion": "string (line description)",
+      "cantidad": "number (quantity, default 1)",
+      "pvpunitario": "number (unit price before tax, REQUIRED)",
+      "dtopor": "number (discount %, default 0)",
+      "dtopor2": "number (second discount %, default 0)",
+      "codimpuesto": "string|null (tax code from available tax types list, e.g. IGIC7, IVA21)",
+      "iva": "number (tax rate %, e.g. 7, 21)",
+      "recargo": "number (surcharge rate %, default 0)",
+      "irpf": "number (withholding rate %, default 0)",
+      "excepcioniva": "string|null (tax exception code if applicable)",
+      "suplido": "boolean (reimbursement, default false)",
+      "referencia": "string|null (product reference/SKU if identifiable)"
     }
   ],
   "confidence": {
@@ -157,14 +160,19 @@ Field-specific rules:
 - summary: concise one-line description of what the invoice is for, based only on document evidence
 - taxes: include each visible tax breakdown
 - lines: only include lines that are actually visible or clearly extracted
-- lines.quantity: REQUIRED for each line. Extract from the document. Default to 1 if not visible.
-- lines.unit_price: REQUIRED for each line. This is the net price per unit BEFORE tax.
+- lines.cantidad: REQUIRED. Default to 1 if not visible but a line exists.
+- lines.pvpunitario: REQUIRED. Net price per unit BEFORE tax.
   Common column names: "Base Imponible", "Importe", "Precio", "Price", "Amount", "Base".
-  If the document has a "Base Imponible" column per line, that value IS the unit_price
-  when quantity is 1. If quantity > 1, divide the base amount by quantity.
+  If the document has a "Base Imponible" column per line, that IS the pvpunitario when cantidad is 1.
+  If cantidad > 1, divide the base amount by cantidad.
   Never return 0 or null if the line has a visible monetary amount.
-- lines.line_total: the net total for this line (quantity * unit_price - discount).
-  If a "Base Imponible" column exists per line, use that value as line_total.
+- lines.codimpuesto: tax type code from the available tax types list (e.g. IGIC7, IVA21).
+  Match the visible tax rate to the closest code from the list.
+- lines.iva: the tax rate percentage matching codimpuesto.
+- lines.irpf: withholding rate percentage. Default 0. If retenciones exist, distribute proportionally.
+- lines.dtopor: discount percentage. Default 0.
+- lines.recargo: surcharge/equivalence charge percentage. Default 0.
+- lines.suplido: true only if the line is a reimbursement (suplido). Default false.
 - withholding_amount: must always be a POSITIVE number (absolute value).
   If the document shows "Retenciones: -180,00 €", store 180.00 not -180.00.
   Retenciones/withholding reduces the total: total = subtotal + tax - withholding.

@@ -896,43 +896,43 @@
             review.appendChild(buildLinesSection(lines));
         }
 
-        // Totals section below lines (like a real invoice footer)
+        // Totals section — always calculated from lines, readonly
         review.appendChild(buildSection(trans('aiscan-section-totals'), `
             <input type="hidden" id="invoice_currency" value="${escapeAttr(invoice.currency || 'EUR')}">
             <div class="d-flex gap-2">
                 <div style="flex:1">
                     <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_subtotal">${escapeHtml(trans('subtotal'))}</label>
+                        <label class="form-label small mb-1">${escapeHtml(trans('subtotal'))}</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm" id="invoice_subtotal" type="number" step="0.01" value="${escapeAttr(invoice.subtotal ?? '')}">
+                            <input class="form-control form-control-sm" id="invoice_subtotal" type="text" readonly value="0,00">
                         </div>
                     </div>
                 </div>
                 <div style="flex:1">
                     <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_tax_amount">${escapeHtml(trans('tax-amount'))}</label>
+                        <label class="form-label small mb-1">${escapeHtml(trans('tax-amount'))}</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm" id="invoice_tax_amount" type="number" step="0.01" value="${escapeAttr(invoice.tax_amount ?? '')}">
+                            <input class="form-control form-control-sm" id="invoice_tax_amount" type="text" readonly value="0,00">
                         </div>
                     </div>
                 </div>
                 <div style="flex:1">
                     <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_withholding">${escapeHtml(trans('irpf'))}</label>
+                        <label class="form-label small mb-1">${escapeHtml(trans('irpf'))}</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm" id="invoice_withholding" type="number" step="0.01" value="${escapeAttr(invoice.withholding_amount ?? 0)}">
+                            <input class="form-control form-control-sm" id="invoice_withholding" type="text" readonly value="0,00">
                         </div>
                     </div>
                 </div>
                 <div style="flex:1">
                     <div class="mb-2">
-                        <label class="form-label small mb-1 fw-bold" for="invoice_total">${escapeHtml(trans('total'))}</label>
+                        <label class="form-label small mb-1 fw-bold">${escapeHtml(trans('total'))}</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="number" step="0.01" value="${escapeAttr(invoice.total ?? '')}">
+                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="text" readonly value="0,00">
                         </div>
                     </div>
                 </div>
@@ -1210,8 +1210,8 @@
             const taxCode = row.dataset.taxCode || '';
             const irpfCode = row.dataset.irpfCode || '';
 
-            // Sync hidden tax_rate field
-            const hiddenTax = row.querySelector('[data-field="tax_rate"]');
+            // Sync hidden iva field
+            const hiddenTax = row.querySelector('[data-field="iva"]');
             if (hiddenTax) {
                 hiddenTax.value = rate;
             }
@@ -1265,10 +1265,10 @@
     }
 
     function calcLineTotal(row) {
-        const qty = parseFloat(row.querySelector('[data-field="quantity"]')?.value || 0);
-        const price = parseFloat(row.querySelector('[data-field="unit_price"]')?.value || 0);
-        const discount = parseFloat(row.querySelector('[data-field="discount"]')?.value || 0);
-        const tax = parseFloat(row.querySelector('[data-field="tax_rate"]')?.value || 0);
+        const qty = parseFloat(row.querySelector('[data-field="cantidad"]')?.value || 0);
+        const price = parseFloat(row.querySelector('[data-field="pvpunitario"]')?.value || 0);
+        const discount = parseFloat(row.querySelector('[data-field="dtopor"]')?.value || 0);
+        const tax = parseFloat(row.querySelector('[data-field="iva"]')?.value || 0);
         const irpf = parseFloat(row.querySelector('[data-field="irpf"]')?.value || 0);
         const base = qty * price * (1 - discount / 100);
         const taxAmount = base * (tax / 100);
@@ -1299,7 +1299,31 @@
     }
 
     function calcAllLineTotals() {
-        document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(calcLineTotal);
+        let totalBase = 0;
+        let totalTax = 0;
+        let totalIrpf = 0;
+        let totalFinal = 0;
+        document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(row => {
+            calcLineTotal(row);
+            const qty = parseFloat(row.querySelector('[data-field="cantidad"]')?.value || 0);
+            const price = parseFloat(row.querySelector('[data-field="pvpunitario"]')?.value || 0);
+            const discount = parseFloat(row.querySelector('[data-field="dtopor"]')?.value || 0);
+            const tax = parseFloat(row.querySelector('[data-field="iva"]')?.value || 0);
+            const irpf = parseFloat(row.querySelector('[data-field="irpf"]')?.value || 0);
+            const base = qty * price * (1 - discount / 100);
+            totalBase += base;
+            totalTax += base * (tax / 100);
+            totalIrpf += base * (irpf / 100);
+            totalFinal += base + base * (tax / 100) - base * (irpf / 100);
+        });
+        const subtotalEl = document.getElementById('invoice_subtotal');
+        if (subtotalEl) { subtotalEl.value = fmtNumber(totalBase); }
+        const taxEl = document.getElementById('invoice_tax_amount');
+        if (taxEl) { taxEl.value = fmtNumber(totalTax); }
+        const irpfEl = document.getElementById('invoice_withholding');
+        if (irpfEl) { irpfEl.value = fmtNumber(totalIrpf); }
+        const totalEl = document.getElementById('invoice_total');
+        if (totalEl) { totalEl.value = fmtNumber(totalFinal); }
     }
 
     function taxCodeToRate(code) {
@@ -1331,10 +1355,10 @@
 
     function applyModalToRow(modal, row) {
         const fields = {
-            description: '.aiscan-modal-description',
-            quantity: '.aiscan-modal-quantity',
-            unit_price: '.aiscan-modal-price',
-            discount: '.aiscan-modal-discount',
+            descripcion: '.aiscan-modal-description',
+            cantidad: '.aiscan-modal-quantity',
+            pvpunitario: '.aiscan-modal-price',
+            dtopor: '.aiscan-modal-discount',
         };
         for (const [field, sel] of Object.entries(fields)) {
             const el = modal.querySelector(sel);
@@ -1345,10 +1369,10 @@
         const taxModal = modal.querySelector('.aiscan-modal-tax');
         if (taxModal) {
             const selectedCode = taxModal.value;
-            row.querySelector('[data-field="tax_code"]').value = selectedCode;
+            row.querySelector('[data-field="codimpuesto"]').value = selectedCode;
             const taxes = window.aiscanTaxTypes || [];
             const match = taxes.find(t => t.code === selectedCode);
-            row.querySelector('[data-field="tax_rate"]').value = match ? match.rate : 0;
+            row.querySelector('[data-field="iva"]').value = match ? match.rate : 0;
         }
         const irpfModal = modal.querySelector('.aiscan-modal-irpf');
         if (irpfModal) {
@@ -1362,7 +1386,7 @@
         if (supModal) {
             row.querySelector('[data-field="suplido"]').value = supModal.value;
         }
-        calcLineTotal(row);
+        calcAllLineTotals();
     }
 
     function showJsonDebugModal(data) {
@@ -1491,24 +1515,36 @@
     }
 
     function buildLineRow(line, index) {
-        const ref = line.sku || line.referencia || '';
+        const ref = line.referencia || line.sku || '';
         const matchBadge = ref
             ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
             : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
         const modalId = 'aiscan-line-modal-' + index;
-        return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}" data-tax-code="${escapeAttr(line.tax_code || '')}" data-irpf-code="${escapeAttr(line.irpf_code || '')}">
+        const desc = line.descripcion || line.description || '';
+        const qty = line.cantidad ?? line.quantity ?? 1;
+        const price = line.pvpunitario ?? line.unit_price ?? 0;
+        const dto = line.dtopor ?? line.discount ?? 0;
+        const dto2 = line.dtopor2 ?? 0;
+        const taxRate = line.iva ?? line.tax_rate ?? 0;
+        const taxCode = line.codimpuesto || line.tax_code || '';
+        const irpfRate = line.irpf ?? 0;
+        const irpfCode = line.codretencion || line.irpf_code || '';
+        const recargo = line.recargo ?? 0;
+        const excepcion = line.excepcioniva ?? '';
+        const suplido = line.suplido ? '1' : '0';
+        return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${taxRate}" data-tax-code="${escapeAttr(taxCode)}" data-irpf-code="${escapeAttr(irpfCode)}">
             <div style="flex:4;position:relative">
                 <div class="input-group input-group-sm">
-                    <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
+                    <input class="form-control form-control-sm" data-field="descripcion" value="${escapeAttr(desc)}">
                     <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
                     <button class="btn btn-info btn-sm aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-book fa-fw"></i></button>
                     <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
                 </div>
             </div>
-            <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="any" value="${escapeAttr(line.quantity ?? 1)}" style="width:55px">
+            <input class="form-control form-control-sm aiscan-calc" data-field="cantidad" type="number" step="any" value="${escapeAttr(qty)}" style="width:55px">
             <div class="input-group input-group-sm" style="width:95px">
                 <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.65rem"></i></span>
-                <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="any" value="${escapeAttr(line.unit_price ?? 0)}">
+                <input class="form-control form-control-sm aiscan-calc" data-field="pvpunitario" type="number" step="any" value="${escapeAttr(price)}">
             </div>
             <div class="input-group input-group-sm" style="width:85px">
                 <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.65rem"></i></span>
@@ -1516,12 +1552,14 @@
             </div>
             <button type="button" class="btn btn-sm btn-light aiscan-line-detail-btn" data-bs-toggle="modal" data-bs-target="#${modalId}" title="${escapeAttr(trans('aiscan-more-options'))}"><i class="fa-solid fa-ellipsis"></i></button>
             <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
-            <input type="hidden" data-field="discount" class="aiscan-calc" value="${escapeAttr(line.discount ?? 0)}">
-            <input type="hidden" data-field="tax_code" value="${escapeAttr(line.tax_code || '')}">
-            <input type="hidden" data-field="tax_rate" class="aiscan-calc" value="${escapeAttr(line.tax_rate ?? 0)}">
-            <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(line.irpf ?? 0)}">
-            <input type="hidden" data-field="excepcioniva" value="${escapeAttr(line.excepcioniva ?? '')}">
-            <input type="hidden" data-field="suplido" value="${escapeAttr(line.suplido ?? '0')}">
+            <input type="hidden" data-field="dtopor" class="aiscan-calc" value="${escapeAttr(dto)}">
+            <input type="hidden" data-field="dtopor2" value="${escapeAttr(dto2)}">
+            <input type="hidden" data-field="codimpuesto" value="${escapeAttr(taxCode)}">
+            <input type="hidden" data-field="iva" class="aiscan-calc" value="${escapeAttr(taxRate)}">
+            <input type="hidden" data-field="recargo" value="${escapeAttr(recargo)}">
+            <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(irpfRate)}">
+            <input type="hidden" data-field="excepcioniva" value="${escapeAttr(excepcion)}">
+            <input type="hidden" data-field="suplido" value="${escapeAttr(suplido)}">
             <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
@@ -1533,57 +1571,57 @@
                             <div class="row g-2">
                                 <div class="col-12">
                                     <label class="form-label small mb-1">${escapeHtml(trans('description'))}</label>
-                                    <input type="text" class="form-control form-control-sm aiscan-modal-description" value="${escapeAttr(line.description || '')}">
+                                    <input type="text" class="form-control form-control-sm aiscan-modal-description" value="${escapeAttr(desc)}">
                                 </div>
                                 <div class="col-4">
                                     <label class="form-label small mb-1">${escapeHtml(trans('quantity'))}</label>
-                                    <input type="number" class="form-control form-control-sm aiscan-modal-quantity" step="any" value="${escapeAttr(line.quantity ?? 1)}">
+                                    <input type="number" class="form-control form-control-sm aiscan-modal-quantity" step="any" value="${escapeAttr(qty)}">
                                 </div>
                                 <div class="col-4">
                                     <label class="form-label small mb-1">${escapeHtml(trans('price'))}</label>
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                                        <input type="number" class="form-control aiscan-modal-price" step="any" value="${escapeAttr(line.unit_price ?? 0)}">
+                                        <input type="number" class="form-control aiscan-modal-price" step="any" value="${escapeAttr(price)}">
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <label class="form-label small mb-1">% ${escapeHtml(trans('discount'))}</label>
                                     <div class="input-group input-group-sm">
-                                        <input type="number" class="form-control aiscan-modal-discount" min="0" max="100" step="any" value="${escapeAttr(line.discount ?? 0)}">
+                                        <input type="number" class="form-control aiscan-modal-discount" min="0" max="100" step="any" value="${escapeAttr(dto)}">
                                         <span class="input-group-text">%</span>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('tax'))}</label>
-                                    ${buildTaxSelect(line.tax_rate, line.tax_code).replace('data-field="tax_code"', 'class="form-select form-select-sm aiscan-modal-tax"')}
+                                    ${buildTaxSelect(taxRate, taxCode).replace('data-field="tax_code"', 'class="form-select form-select-sm aiscan-modal-tax"')}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">IRPF</label>
-                                    ${buildWithholdingSelect(line.irpf, line.irpf_code).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                    ${buildWithholdingSelect(irpfRate, irpfCode).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>
                                     <select class="form-select form-select-sm aiscan-modal-excepcioniva">
-                                        <option value=""${(line.excepcioniva ?? '') === '' ? ' selected' : ''}>------</option>
-                                        <option value="ES_20"${line.excepcioniva === 'ES_20' ? ' selected' : ''}>Art. 20 LIVA</option>
-                                        <option value="ES_21"${line.excepcioniva === 'ES_21' ? ' selected' : ''}>Art. 21 LIVA</option>
-                                        <option value="ES_22"${line.excepcioniva === 'ES_22' ? ' selected' : ''}>Art. 22 LIVA</option>
-                                        <option value="ES_23_24"${line.excepcioniva === 'ES_23_24' ? ' selected' : ''}>Art. 23-24 LIVA</option>
-                                        <option value="ES_25"${line.excepcioniva === 'ES_25' ? ' selected' : ''}>Art. 25 LIVA</option>
-                                        <option value="ES_OTHER"${line.excepcioniva === 'ES_OTHER' ? ' selected' : ''}>Otras exenciones</option>
-                                        <option value="ES_PASSIVE_SUBJECT"${line.excepcioniva === 'ES_PASSIVE_SUBJECT' ? ' selected' : ''}>N6 Inversión sujeto pasivo</option>
-                                        <option value="ES_ART_7"${line.excepcioniva === 'ES_ART_7' ? ' selected' : ''}>N3 No sujeta art. 7</option>
-                                        <option value="ES_ART_14"${line.excepcioniva === 'ES_ART_14' ? ' selected' : ''}>N4 No sujeta art. 14</option>
-                                        <option value="ES_LOCATION_RULES"${line.excepcioniva === 'ES_LOCATION_RULES' ? ' selected' : ''}>N2 Reglas localización</option>
-                                        <option value="ES_N1"${line.excepcioniva === 'ES_N1' ? ' selected' : ''}>IGIC art. 10.1</option>
-                                        <option value="ES_N5"${line.excepcioniva === 'ES_N5' ? ' selected' : ''}>IGIC art. 25</option>
+                                        <option value=""${excepcion === '' ? ' selected' : ''}>------</option>
+                                        <option value="ES_20"${excepcion === 'ES_20' ? ' selected' : ''}>Art. 20 LIVA</option>
+                                        <option value="ES_21"${excepcion === 'ES_21' ? ' selected' : ''}>Art. 21 LIVA</option>
+                                        <option value="ES_22"${excepcion === 'ES_22' ? ' selected' : ''}>Art. 22 LIVA</option>
+                                        <option value="ES_23_24"${excepcion === 'ES_23_24' ? ' selected' : ''}>Art. 23-24 LIVA</option>
+                                        <option value="ES_25"${excepcion === 'ES_25' ? ' selected' : ''}>Art. 25 LIVA</option>
+                                        <option value="ES_OTHER"${excepcion === 'ES_OTHER' ? ' selected' : ''}>Otras exenciones</option>
+                                        <option value="ES_PASSIVE_SUBJECT"${excepcion === 'ES_PASSIVE_SUBJECT' ? ' selected' : ''}>N6 Inversión sujeto pasivo</option>
+                                        <option value="ES_ART_7"${excepcion === 'ES_ART_7' ? ' selected' : ''}>N3 No sujeta art. 7</option>
+                                        <option value="ES_ART_14"${excepcion === 'ES_ART_14' ? ' selected' : ''}>N4 No sujeta art. 14</option>
+                                        <option value="ES_LOCATION_RULES"${excepcion === 'ES_LOCATION_RULES' ? ' selected' : ''}>N2 Reglas localización</option>
+                                        <option value="ES_N1"${excepcion === 'ES_N1' ? ' selected' : ''}>IGIC art. 10.1</option>
+                                        <option value="ES_N5"${excepcion === 'ES_N5' ? ' selected' : ''}>IGIC art. 25</option>
                                     </select>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-suplido'))}</label>
                                     <select class="form-select form-select-sm aiscan-modal-suplido">
-                                        <option value="0"${(line.suplido ?? '0') === '0' ? ' selected' : ''}>No</option>
-                                        <option value="1"${line.suplido === '1' ? ' selected' : ''}>Si</option>
+                                        <option value="0"${suplido === '0' ? ' selected' : ''}>No</option>
+                                        <option value="1"${suplido === '1' ? ' selected' : ''}>Si</option>
                                     </select>
                                 </div>
                                 <div class="col-12">
@@ -1608,7 +1646,7 @@
     }
 
     function buildLinesSection(lines) {
-        const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}];
+        const displayLines = lines.length > 0 ? lines : [{descripcion: '', cantidad: 1, pvpunitario: 0, dtopor: 0, iva: 0, irpf: 0}];
 
         const rows = displayLines.map((line, index) => buildLineRow(line, index)).join('');
 
@@ -1633,11 +1671,8 @@
 
         // Recalculate line totals on any value change
         section.addEventListener('input', e => {
-            if (e.target.closest('.aiscan-calc') || e.target.matches('[data-field="tax_rate"]') || e.target.matches('[data-field="irpf"]')) {
-                const row = e.target.closest('.aiscan-line-row');
-                if (row) {
-                    calcLineTotal(row);
-                }
+            if (e.target.closest('.aiscan-calc')) {
+                calcAllLineTotals();
             }
         });
         // Modal: recalculate preview on input (without syncing to row)
@@ -1654,10 +1689,8 @@
                 calcModalPreview(modal);
                 return;
             }
-            if (e.target.matches('[data-field="tax_rate"]') || e.target.matches('[data-field="irpf"]')) {
-                const row = e.target.closest('.aiscan-line-row');
-                if (row) {
-                    calcLineTotal(row);
+            if (e.target.matches('[data-field="iva"]') || e.target.matches('[data-field="irpf"]')) {
+                calcAllLineTotals();
                 }
             }
         });
@@ -1675,7 +1708,7 @@
                 const container = document.getElementById('aiscan-lines-body');
                 const newIndex = container.querySelectorAll('.aiscan-line-row').length;
                 container.insertAdjacentHTML('beforeend', buildLineRow(
-                    {description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}, newIndex
+                    {descripcion: '', cantidad: 1, pvpunitario: 0, dtopor: 0, iva: 0, irpf: 0}, newIndex
                 ));
             }
 

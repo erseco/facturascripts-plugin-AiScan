@@ -116,11 +116,11 @@ final class InvoicePipelineTest extends TestCase
         $this->assertIsFloat($normalized['invoice']['total']);
 
         foreach ($normalized['lines'] as $line) {
-            if (isset($line['unit_price'])) {
-                $this->assertIsFloat($line['unit_price']);
+            if (isset($line['pvpunitario'])) {
+                $this->assertIsFloat($line['pvpunitario']);
             }
-            if (isset($line['quantity'])) {
-                $this->assertIsFloat($line['quantity']);
+            if (isset($line['cantidad'])) {
+                $this->assertIsFloat($line['cantidad']);
             }
         }
     }
@@ -216,8 +216,8 @@ final class InvoicePipelineTest extends TestCase
 
         $linesSubtotal = 0.0;
         foreach ($lines as $line) {
-            $linesSubtotal += (float) ($line['unit_price'] ?? 0)
-                * (float) ($line['quantity'] ?? 1);
+            $linesSubtotal += (float) ($line['pvpunitario'] ?? 0)
+                * (float) ($line['cantidad'] ?? 1);
         }
 
         $this->assertEqualsWithDelta(
@@ -313,7 +313,7 @@ final class InvoicePipelineTest extends TestCase
         $this->assertCount(1, $result);
         $this->assertSame('Test invoice summary', $result[0]['description']);
         $this->assertSame(1, $result[0]['quantity']);
-        $this->assertSame(800.00, $result[0]['unit_price']);
+        $this->assertSame(800.00, $result[0]['unit_price'] ?? $result[0]['pvpunitario'] ?? null);
         $this->assertSame(7.0, $result[0]['tax_rate']);
     }
 

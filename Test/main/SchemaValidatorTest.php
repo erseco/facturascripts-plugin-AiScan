@@ -487,11 +487,11 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $line = $data['lines'][0];
-        $this->assertEqualsWithDelta(2.5, $line['quantity'], 0.01);
-        $this->assertEqualsWithDelta(10.0, $line['unit_price'], 0.01);
-        $this->assertEqualsWithDelta(5.0, $line['discount'], 0.01);
-        $this->assertEqualsWithDelta(21.0, $line['tax_rate'], 0.01);
-        $this->assertEqualsWithDelta(25.0, $line['line_total'], 0.01);
+        $this->assertEqualsWithDelta(2.5, $line['cantidad'], 0.01);
+        $this->assertEqualsWithDelta(10.0, $line['pvpunitario'], 0.01);
+        $this->assertEqualsWithDelta(5.0, $line['dtopor'], 0.01);
+        $this->assertEqualsWithDelta(21.0, $line['iva'], 0.01);
+        $this->assertEqualsWithDelta(25.0, $line['pvptotal'], 0.01);
     }
 
     public function testNormalizeTaxDecimals(): void
@@ -553,12 +553,12 @@ final class SchemaValidatorTest extends TestCase
         $this->assertCount(2, $data['lines']);
         $this->assertEqualsWithDelta(
             1.0,
-            $data['lines'][0]['quantity'],
+            $data['lines'][0]['cantidad'],
             0.01
         );
         $this->assertEqualsWithDelta(
             3.5,
-            $data['lines'][1]['quantity'],
+            $data['lines'][1]['cantidad'],
             0.01
         );
     }

@@ -145,19 +145,52 @@ class SchemaValidator
 
         if (isset($data['lines']) && is_array($data['lines'])) {
             foreach ($data['lines'] as &$line) {
-                foreach (['quantity', 'unit_price', 'discount', 'tax_rate', 'line_total'] as $field) {
+                // Map old field names to FS field names
+                $aliases = [
+                    'description' => 'descripcion',
+                    'quantity' => 'cantidad',
+                    'unit_price' => 'pvpunitario',
+                    'discount' => 'dtopor',
+                    'tax_rate' => 'iva',
+                    'tax_code' => 'codimpuesto',
+                    'irpf_code' => 'codretencion',
+                    'line_total' => 'pvptotal',
+                    'sku' => 'referencia',
+                ];
+                foreach ($aliases as $old => $new) {
+                    if (isset($line[$old]) && !isset($line[$new])) {
+                        $line[$new] = $line[$old];
+                    }
+                }
+
+                // Normalize decimal fields
+                $decimalFields = ['cantidad', 'pvpunitario', 'dtopor', 'dtopor2',
+                    'iva', 'recargo', 'irpf', 'pvptotal'];
+                foreach ($decimalFields as $field) {
                     if (isset($line[$field])) {
                         $line[$field] = $this->normalizeDecimal($line[$field]);
                     }
                 }
-                // Default quantity to 1 if missing
-                if (empty($line['quantity'])) {
-                    $line['quantity'] = 1.0;
+
+                // Default cantidad to 1 if missing
+                if (empty($line['cantidad'])) {
+                    $line['cantidad'] = 1.0;
                 }
-                // Try to compute unit_price from line_total if missing
-                if (empty($line['unit_price']) && !empty($line['line_total'])) {
-                    $qty = (float) ($line['quantity'] ?: 1);
-                    $line['unit_price'] = $qty > 0 ? $line['line_total'] / $qty : $line['line_total'];
+
+                // Default numeric fields
+                $line['dtopor'] = (float) ($line['dtopor'] ?? 0);
+                $line['dtopor2'] = (float) ($line['dtopor2'] ?? 0);
+                $line['iva'] = (float) ($line['iva'] ?? 0);
+                $line['recargo'] = (float) ($line['recargo'] ?? 0);
+                $line['irpf'] = (float) ($line['irpf'] ?? 0);
+                $line['suplido'] = !empty($line['suplido']);
+
+                // Try to compute pvpunitario from pvptotal if missing
+                if (empty($line['pvpunitario']) && !empty($line['pvptotal'])) {
+                    $qty = (float) ($line['cantidad'] ?: 1);
+                    $line['pvpunitario'] = $qty > 0
+                        ? $line['pvptotal'] / $qty
+                        : $line['pvptotal'];
                 }
             }
         }
