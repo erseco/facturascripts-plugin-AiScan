@@ -1150,9 +1150,13 @@
         const irpfAmount = base * (irpf / 100);
         const total = base + taxAmount - irpfAmount;
 
-        const totalLabel = row.querySelector('.aiscan-line-total');
-        if (totalLabel) {
-            totalLabel.textContent = fmtNumber(total);
+        const totalInput = row.querySelector('.aiscan-line-total');
+        if (totalInput) {
+            totalInput.value = fmtNumber(total);
+        }
+        const modalTotal = row.querySelector('.aiscan-modal-total');
+        if (modalTotal) {
+            modalTotal.textContent = fmtNumber(total);
         }
         // Update modal summary if present
         const modalBase = row.querySelector('.aiscan-modal-base');
@@ -1194,14 +1198,17 @@
                 <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.65rem"></i></span>
                 <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="any" value="${escapeAttr(line.unit_price ?? 0)}">
             </div>
-            <span class="small fw-bold text-nowrap aiscan-line-total" style="min-width:50px;text-align:right">0,00</span>
+            <div class="input-group input-group-sm" style="width:85px">
+                <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.65rem"></i></span>
+                <input class="form-control form-control-sm fw-bold aiscan-line-total" type="text" readonly value="0,00">
+            </div>
             <button type="button" class="btn btn-sm btn-light aiscan-line-detail-btn" data-bs-toggle="modal" data-bs-target="#${modalId}" title="${escapeAttr(trans('aiscan-more-options'))}"><i class="fa-solid fa-ellipsis"></i></button>
             <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
             <input type="hidden" data-field="discount" class="aiscan-calc" value="${escapeAttr(line.discount ?? 0)}">
             <input type="hidden" data-field="tax_rate" class="aiscan-calc" value="${escapeAttr(line.tax_rate ?? 0)}">
             <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(line.irpf ?? 0)}">
             <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-sm">
+                <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <div class="modal-header py-2">
                             <h6 class="modal-title"><i class="fa-solid fa-pen-to-square fa-fw me-1"></i>${escapeHtml(trans('aiscan-more-options'))}</h6>
@@ -1209,7 +1216,22 @@
                         </div>
                         <div class="modal-body">
                             <div class="row g-2">
-                                <div class="col-6">
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">${escapeHtml(trans('description'))}</label>
+                                    <input type="text" class="form-control form-control-sm aiscan-modal-description" value="${escapeAttr(line.description || '')}">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small mb-1">${escapeHtml(trans('quantity'))}</label>
+                                    <input type="number" class="form-control form-control-sm aiscan-modal-quantity" step="any" value="${escapeAttr(line.quantity ?? 1)}">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small mb-1">${escapeHtml(trans('price'))}</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                                        <input type="number" class="form-control aiscan-modal-price" step="any" value="${escapeAttr(line.unit_price ?? 0)}">
+                                    </div>
+                                </div>
+                                <div class="col-4">
                                     <label class="form-label small mb-1">% ${escapeHtml(trans('discount'))}</label>
                                     <div class="input-group input-group-sm">
                                         <input type="number" class="form-control aiscan-modal-discount" min="0" max="100" step="any" value="${escapeAttr(line.discount ?? 0)}">
@@ -1224,16 +1246,19 @@
                                     <label class="form-label small mb-1">IRPF</label>
                                     ${buildWithholdingSelect(line.irpf).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
                                 </div>
-                                <div class="col-6">
-                                    <div class="mt-3 small">
-                                        <div>${escapeHtml(trans('subtotal'))}: <strong class="aiscan-modal-base">0,00</strong></div>
-                                        <div>${escapeHtml(trans('tax'))}: <strong class="aiscan-modal-tax-amount">0,00</strong></div>
-                                        <div>IRPF: <strong class="aiscan-modal-irpf-amount">0,00</strong></div>
+                                <div class="col-12">
+                                    <hr class="my-1">
+                                    <div class="d-flex justify-content-between small">
+                                        <span>${escapeHtml(trans('subtotal'))}: <strong class="aiscan-modal-base">0,00</strong></span>
+                                        <span>${escapeHtml(trans('tax'))}: <strong class="aiscan-modal-tax-amount">0,00</strong></span>
+                                        <span>IRPF: <strong class="aiscan-modal-irpf-amount">0,00</strong></span>
+                                        <span class="fw-bold">${escapeHtml(trans('total'))}: <strong class="aiscan-modal-total">0,00</strong></span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div class="modal-footer py-1">
+                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">${escapeHtml(trans('cancel'))}</button>
                             <button type="button" class="btn btn-sm btn-primary aiscan-modal-accept" data-bs-dismiss="modal">${escapeHtml(trans('accept'))}</button>
                         </div>
                     </div>
@@ -1252,7 +1277,7 @@
                 <div style="flex:4">${escapeHtml(trans('description'))}</div>
                 <div style="width:55px">${escapeHtml(trans('quantity'))}</div>
                 <div style="width:95px">${escapeHtml(trans('price'))}</div>
-                <div style="min-width:50px;text-align:right">${escapeHtml(trans('total'))}</div>
+                <div style="width:85px">${escapeHtml(trans('total'))}</div>
                 <div style="width:56px"></div>
             </div>
             <div id="aiscan-lines-body">${rows}</div>
@@ -1284,6 +1309,18 @@
             const row = modal.closest('.aiscan-line-row');
             if (!row) {
                 return;
+            }
+            const descModal = modal.querySelector('.aiscan-modal-description');
+            if (descModal) {
+                row.querySelector('[data-field="description"]').value = descModal.value;
+            }
+            const qtyModal = modal.querySelector('.aiscan-modal-quantity');
+            if (qtyModal) {
+                row.querySelector('[data-field="quantity"]').value = qtyModal.value;
+            }
+            const priceModal = modal.querySelector('.aiscan-modal-price');
+            if (priceModal) {
+                row.querySelector('[data-field="unit_price"]').value = priceModal.value;
             }
             const discountModal = modal.querySelector('.aiscan-modal-discount');
             if (discountModal) {
