@@ -155,6 +155,14 @@ Field-specific rules:
 - summary: concise one-line description of what the invoice is for, based only on document evidence
 - taxes: include each visible tax breakdown
 - lines: only include lines that are actually visible or clearly extracted
+- lines.quantity: REQUIRED for each line. Extract from the document. Default to 1 if not visible but a line exists.
+- lines.unit_price: REQUIRED for each line. This is the base price per unit BEFORE tax.
+  Extract from the "Base Imponible" or "Importe" column in the line items table.
+  If the document shows a line total, divide by quantity to get unit_price.
+  Never return 0 or null if the line has a visible amount.
+- lines.line_total: the net total for this line (quantity * unit_price - discount)
+- withholding_amount: must always be a POSITIVE number (absolute value).
+  If the document shows retenciones as negative (e.g. -180,00), store 180.00 not -180.00.
 
 Arithmetic rules:
 - If subtotal, tax_amount, and total are present and inconsistent by more

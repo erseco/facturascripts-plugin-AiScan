@@ -133,6 +133,11 @@ class SchemaValidator
             }
         }
 
+        // Ensure withholding is always positive (absolute value)
+        if (isset($data['invoice']['withholding_amount']) && $data['invoice']['withholding_amount'] < 0) {
+            $data['invoice']['withholding_amount'] = abs($data['invoice']['withholding_amount']);
+        }
+
         if (!empty($data['invoice']['currency'])) {
             $raw = strtoupper(trim((string) $data['invoice']['currency']));
             $data['invoice']['currency'] = $this->normalizeCurrencySymbol($raw);
@@ -144,6 +149,15 @@ class SchemaValidator
                     if (isset($line[$field])) {
                         $line[$field] = $this->normalizeDecimal($line[$field]);
                     }
+                }
+                // Default quantity to 1 if missing
+                if (empty($line['quantity'])) {
+                    $line['quantity'] = 1.0;
+                }
+                // Try to compute unit_price from line_total if missing
+                if (empty($line['unit_price']) && !empty($line['line_total'])) {
+                    $qty = (float) ($line['quantity'] ?: 1);
+                    $line['unit_price'] = $qty > 0 ? $line['line_total'] / $qty : $line['line_total'];
                 }
             }
         }
