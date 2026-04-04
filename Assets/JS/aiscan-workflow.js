@@ -766,16 +766,22 @@
             `);
         }
 
-        review.appendChild(buildSection(trans('supplier'), `
+        const supplierMatched = supplier.match_status === 'matched';
+        const supplierSummary = supplierMatched
+            ? ` <span class="text-muted fw-normal ms-2">&middot; ${escapeHtml(supplier.matched_name || supplier.name || '')} (${escapeHtml(supplier.tax_id || '')})</span> <span class="badge text-bg-success ms-1">${escapeHtml(trans('aiscan-detected'))}</span>`
+            : (supplier.match_status === 'not_found' ? ` <span class="badge text-bg-warning ms-2">${escapeHtml(trans('aiscan-no-supplier-matched'))}</span>` : '');
+
+        review.appendChild(buildSection(trans('aiscan-section-supplier'), `
             ${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}
             ${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}
             ${buildInput(trans('email'), 'supplier_email', supplier.email || '')}
             ${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}
             ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
             ${buildSupplierStatus(supplier)}
-        `));
+            ${buildInlineCreateSupplier(supplier)}
+        `, {collapsed: supplierMatched, headerExtra: supplierSummary}));
 
-        review.appendChild(buildSection(trans('invoice'), `
+        review.appendChild(buildSection(trans('aiscan-section-invoice'), `
             ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
             ${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
             ${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}
@@ -808,13 +814,33 @@
         bindSupplierSearch();
     }
 
-    function buildSection(title, bodyHtml) {
+    let collapseCounter = 0;
+
+    function buildSection(title, bodyHtml, {collapsed = false, headerExtra = ''} = {}) {
+        const id = 'aiscan-collapse-' + (++collapseCounter);
         const section = document.createElement('div');
-        section.className = 'card mb-3';
+        section.className = 'card mb-2';
         section.innerHTML = `
-            <div class="card-header py-2">${escapeHtml(title)}</div>
-            <div class="card-body py-2">${bodyHtml}</div>
+            <div class="card-header py-1 px-2" role="button" data-bs-toggle="collapse" data-bs-target="#${id}" aria-expanded="${!collapsed}" aria-controls="${id}" style="cursor:pointer">
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="small fw-semibold"><i class="fa-solid fa-chevron-${collapsed ? 'right' : 'down'} me-1 aiscan-collapse-icon" style="font-size:0.65rem;transition:transform 0.2s"></i>${escapeHtml(title)}${headerExtra}</span>
+                </div>
+            </div>
+            <div class="collapse ${collapsed ? '' : 'show'}" id="${id}">
+                <div class="card-body py-2 px-2">${bodyHtml}</div>
+            </div>
         `;
+        const header = section.querySelector('.card-header');
+        const icon = section.querySelector('.aiscan-collapse-icon');
+        const collapseEl = section.querySelector('.collapse');
+        if (header && icon && collapseEl) {
+            collapseEl.addEventListener('show.bs.collapse', () => {
+                icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+            });
+            collapseEl.addEventListener('hide.bs.collapse', () => {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+            });
+        }
         return section;
     }
 
@@ -871,6 +897,39 @@
         `;
 
         return `<div class="alert alert-${variant.klass} small mb-0">${escapeHtml(variant.text)}${select}</div>${searchBox}`;
+    }
+
+    function buildInlineCreateSupplier(supplier) {
+        if (supplier.match_status === 'matched') {
+            return '';
+        }
+        return `
+            <div class="border rounded p-2 mt-2 bg-light">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="small fw-semibold">${escapeHtml(trans('aiscan-create-supplier'))}</span>
+                </div>
+                <div class="row g-1">
+                    <div class="col-6">
+                        <input class="form-control form-control-sm" id="aiscan-new-supplier-name" placeholder="${escapeAttr(trans('name'))}" value="${escapeAttr(supplier.name || '')}">
+                    </div>
+                    <div class="col-6">
+                        <input class="form-control form-control-sm" id="aiscan-new-supplier-taxid" placeholder="${escapeAttr(trans('tax-id'))}" value="${escapeAttr(supplier.tax_id || '')}">
+                    </div>
+                    <div class="col-6">
+                        <input class="form-control form-control-sm" id="aiscan-new-supplier-email" placeholder="${escapeAttr(trans('email'))}" value="${escapeAttr(supplier.email || '')}">
+                    </div>
+                    <div class="col-6">
+                        <input class="form-control form-control-sm" id="aiscan-new-supplier-phone" placeholder="${escapeAttr(trans('phone'))}" value="${escapeAttr(supplier.phone || '')}">
+                    </div>
+                </div>
+                <div class="mt-2 d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" id="aiscan-create-supplier-btn">
+                        <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-create-supplier'))}
+                    </button>
+                    <span class="small" id="aiscan-create-supplier-status"></span>
+                </div>
+            </div>
+        `;
     }
 
     function buildDefaultProductSection(supplier) {
@@ -1021,7 +1080,7 @@
             </tr>
         `).join('');
 
-        const section = buildSection(trans('aiscan-line-items'), `
+        const section = buildSection(trans('aiscan-section-products'), `
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>
@@ -1146,6 +1205,81 @@
                 loadDefaultProduct(item.dataset.id);
             }
         });
+
+        // Bind inline create supplier button
+        const createBtn = document.getElementById('aiscan-create-supplier-btn');
+        if (createBtn) {
+            createBtn.addEventListener('click', createSupplierInline);
+        }
+    }
+
+    async function createSupplierInline() {
+        const nameEl = document.getElementById('aiscan-new-supplier-name');
+        const taxIdEl = document.getElementById('aiscan-new-supplier-taxid');
+        const emailEl = document.getElementById('aiscan-new-supplier-email');
+        const phoneEl = document.getElementById('aiscan-new-supplier-phone');
+        const statusEl = document.getElementById('aiscan-create-supplier-status');
+        const btn = document.getElementById('aiscan-create-supplier-btn');
+
+        const name = nameEl?.value?.trim();
+        if (!name) {
+            if (statusEl) {
+                statusEl.className = 'small text-danger';
+                statusEl.textContent = trans('aiscan-supplier-name-required');
+            }
+            return;
+        }
+
+        btn.disabled = true;
+        if (statusEl) {
+            statusEl.className = 'small text-muted';
+            statusEl.textContent = '...';
+        }
+
+        try {
+            const response = await fetch('AiScanInvoice?action=create-supplier', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name,
+                    tax_id: taxIdEl?.value?.trim() || '',
+                    email: emailEl?.value?.trim() || '',
+                    phone: phoneEl?.value?.trim() || '',
+                }),
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Update current document's supplier data
+            const doc = currentDoc();
+            if (doc?.extractedData?.supplier) {
+                doc.extractedData.supplier.matched_supplier_id = data.supplier.id;
+                doc.extractedData.supplier.matched_name = data.supplier.name;
+                doc.extractedData.supplier.match_status = 'matched';
+                doc.extractedData.supplier.name = data.supplier.name;
+                doc.extractedData.supplier.tax_id = data.supplier.tax_id;
+            }
+
+            // Re-render to show collapsed matched state
+            renderReviewPanel(doc);
+
+            if (statusEl) {
+                statusEl.className = 'small text-success';
+                statusEl.textContent = trans('aiscan-supplier-created-success');
+            }
+        } catch (error) {
+            if (statusEl) {
+                statusEl.className = 'small text-danger';
+                statusEl.textContent = error.message || trans('aiscan-supplier-create-error');
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+            }
+        }
     }
 
     function persistCurrentFormState() {

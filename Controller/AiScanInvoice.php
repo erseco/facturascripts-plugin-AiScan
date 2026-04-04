@@ -101,6 +101,9 @@ class AiScanInvoice extends Controller
                 case 'search-suppliers':
                     $this->handleSearchSuppliers();
                     break;
+                case 'create-supplier':
+                    $this->handleCreateSupplier();
+                    break;
                 case 'search-products':
                     $this->handleSearchProducts();
                     break;
@@ -440,6 +443,51 @@ class AiScanInvoice extends Controller
         ], array_slice($results, 0, 20));
 
         echo json_encode(['results' => $items]);
+    }
+
+    private function handleCreateSupplier(): void
+    {
+        $body = file_get_contents('php://input');
+        $data = json_decode($body, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            http_response_code(400);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-json-payload')]);
+            return;
+        }
+
+        $name = trim((string) ($data['name'] ?? ''));
+        if (empty($name)) {
+            http_response_code(400);
+            echo json_encode([
+                'error' => Tools::lang()->trans('aiscan-supplier-name-required'),
+            ]);
+            return;
+        }
+
+        $supplier = new \FacturaScripts\Dinamic\Model\Proveedor();
+        $supplier->nombre = $name;
+        $supplier->razonsocial = $name;
+        $supplier->cifnif = trim((string) ($data['tax_id'] ?? ''));
+        $supplier->email = trim((string) ($data['email'] ?? ''));
+        $supplier->telefono1 = trim((string) ($data['phone'] ?? ''));
+        $supplier->personafisica = false;
+
+        if ($supplier->save()) {
+            echo json_encode([
+                'success' => true,
+                'supplier' => [
+                    'id' => $supplier->codproveedor,
+                    'name' => $supplier->nombre,
+                    'tax_id' => $supplier->cifnif,
+                ],
+            ]);
+        } else {
+            http_response_code(422);
+            echo json_encode([
+                'error' => Tools::lang()->trans('aiscan-supplier-create-error'),
+            ]);
+        }
     }
 
     private function handleSearchProducts(): void
