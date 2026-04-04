@@ -766,9 +766,15 @@
             `);
         }
 
-        const supplierMatched = supplier.match_status === 'matched';
+        const supplierMatched = supplier.match_status === 'matched' || supplier.match_status === 'selected' || supplier.match_status === 'created';
+        const badgeLabels = {
+            matched: trans('aiscan-detected'),
+            selected: trans('aiscan-selected'),
+            created: trans('aiscan-supplier-created'),
+        };
+        const badgeLabel = badgeLabels[supplier.match_status] || badgeLabels.matched;
         const supplierSummary = supplierMatched
-            ? ` <span class="text-muted fw-normal ms-2">&middot; ${escapeHtml(supplier.matched_name || supplier.name || '')} (${escapeHtml(supplier.tax_id || '')})</span> <span class="badge text-bg-success ms-1">${escapeHtml(trans('aiscan-detected'))}</span>`
+            ? ` <span class="text-muted fw-normal ms-2">&middot; ${escapeHtml(supplier.matched_name || supplier.name || '')} (${escapeHtml(supplier.tax_id || '')})</span> <span class="badge text-bg-success ms-1">${escapeHtml(badgeLabel)}</span>`
             : (supplier.match_status === 'not_found' ? ` <span class="badge text-bg-warning ms-2">${escapeHtml(trans('aiscan-no-supplier-matched'))}</span>` : '');
 
         const supplierBody = supplierMatched
@@ -1173,7 +1179,7 @@
             if (doc?.extractedData?.supplier) {
                 doc.extractedData.supplier.matched_supplier_id = item.dataset.id;
                 doc.extractedData.supplier.matched_name = item.dataset.name;
-                doc.extractedData.supplier.match_status = 'matched';
+                doc.extractedData.supplier.match_status = 'selected';
                 doc.extractedData.supplier.name = item.dataset.name;
                 doc.extractedData.supplier.tax_id = item.dataset.taxid;
             }
@@ -1232,7 +1238,7 @@
             if (doc?.extractedData?.supplier) {
                 doc.extractedData.supplier.matched_supplier_id = data.supplier.id;
                 doc.extractedData.supplier.matched_name = data.supplier.name;
-                doc.extractedData.supplier.match_status = 'matched';
+                doc.extractedData.supplier.match_status = 'created';
                 doc.extractedData.supplier.name = data.supplier.name;
                 doc.extractedData.supplier.tax_id = data.supplier.tax_id;
             }

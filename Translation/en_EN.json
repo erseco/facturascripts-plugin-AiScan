@@ -17,6 +17,8 @@
     "aiscan-config": "AiScan",
     "aiscan-create-supplier": "Create supplier",
     "aiscan-detected": "Detected",
+    "aiscan-selected": "Selected",
+    "aiscan-supplier-created": "Created",
     "aiscan-no-supplier-matched": "No supplier matched",
     "aiscan-section-invoice": "Invoice info",
     "aiscan-section-products": "Products",
