@@ -1177,6 +1177,99 @@
         document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(calcLineTotal);
     }
 
+    let productSearchTargetRow = null;
+
+    function ensureProductSearchModal() {
+        if (document.getElementById('aiscan-find-product-modal')) {
+            return;
+        }
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal fade" id="aiscan-find-product-modal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header py-2">
+                            <h6 class="modal-title"><i class="fa-solid fa-book fa-fw me-1"></i>${escapeHtml(trans('aiscan-search-product'))}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="text" class="form-control" id="aiscan-product-modal-input" placeholder="${escapeAttr(trans('search'))}...">
+                                <button class="btn btn-outline-secondary" type="button" id="aiscan-product-modal-search-btn"><i class="fa-solid fa-search"></i></button>
+                            </div>
+                            <div id="aiscan-product-modal-results" class="list-group" style="max-height:250px;overflow-y:auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+
+        const input = document.getElementById('aiscan-product-modal-input');
+        const searchBtn = document.getElementById('aiscan-product-modal-search-btn');
+        const resultsDiv = document.getElementById('aiscan-product-modal-results');
+        let timer = null;
+
+        const doSearch = () => {
+            const query = input.value.trim();
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+                .then(r => r.json())
+                .then(data => {
+                    const items = data.results || [];
+                    if (items.length === 0) {
+                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                    } else {
+                        resultsDiv.innerHTML = items.map(p =>
+                            `<button type="button" class="list-group-item list-group-item-action small py-1 aiscan-product-modal-pick" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
+                                <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
+                            </button>`
+                        ).join('');
+                    }
+                })
+                .catch(() => { resultsDiv.innerHTML = ''; });
+        };
+
+        input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 300); });
+        searchBtn.addEventListener('click', doSearch);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+
+        resultsDiv.addEventListener('click', e => {
+            const pick = e.target.closest('.aiscan-product-modal-pick');
+            if (!pick || !productSearchTargetRow) {
+                return;
+            }
+            const refInput = productSearchTargetRow.querySelector('[data-field="referencia"]');
+            if (refInput) {
+                refInput.value = pick.dataset.ref;
+            }
+            const badge = productSearchTargetRow.querySelector('.aiscan-ref-badge');
+            if (badge) {
+                badge.innerHTML = `<span class="badge text-bg-success" title="${escapeAttr(pick.dataset.ref)}"><i class="fa-solid fa-link"></i></span>`;
+            }
+            bootstrap.Modal.getInstance(document.getElementById('aiscan-find-product-modal'))?.hide();
+            productSearchTargetRow = null;
+        });
+    }
+
+    function openProductSearchModal(row) {
+        ensureProductSearchModal();
+        productSearchTargetRow = row;
+        const input = document.getElementById('aiscan-product-modal-input');
+        const resultsDiv = document.getElementById('aiscan-product-modal-results');
+        const desc = row.querySelector('[data-field="description"]')?.value || '';
+        input.value = desc;
+        resultsDiv.innerHTML = '';
+        const modal = new bootstrap.Modal(document.getElementById('aiscan-find-product-modal'));
+        modal.show();
+        setTimeout(() => { input.select(); }, 300);
+        // Auto-search with current description
+        if (desc.length >= 2) {
+            input.dispatchEvent(new Event('input'));
+        }
+    }
+
     function buildLineRow(line, index) {
         const ref = line.sku || line.referencia || '';
         const matchBadge = ref
@@ -1186,12 +1279,11 @@
         return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
             <div style="flex:4;position:relative">
                 <div class="input-group input-group-sm">
-                    <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
+                    <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}" readonly>
                     <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
-                    <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
+                    <button class="btn btn-info btn-sm aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-book fa-fw"></i></button>
                     <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
                 </div>
-                <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
             </div>
             <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="any" value="${escapeAttr(line.quantity ?? 1)}" style="width:55px">
             <div class="input-group input-group-sm" style="width:95px">
@@ -1370,54 +1462,11 @@
                 ));
             }
 
-            // Product search button
+            // Product search button — open shared modal
             const matchBtn = e.target.closest('.aiscan-product-match-btn');
             if (matchBtn) {
-                const td = matchBtn.closest('.aiscan-line-row');
-                const descInput = td.querySelector('[data-field="description"]');
-                const resultsDiv = td.querySelector('.aiscan-product-results-row');
-                if (descInput && resultsDiv) {
-                    const query = descInput.value.trim();
-                    if (query.length < 2) {
-                        resultsDiv.style.display = 'none';
-                        return;
-                    }
-                    fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                        .then(r => r.json())
-                        .then(data => {
-                            const items = data.results || [];
-                            if (items.length === 0) {
-                                resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
-                            } else {
-                                resultsDiv.innerHTML = items.map(p =>
-                                    `<button type="button" class="list-group-item list-group-item-action small py-1 aiscan-product-pick" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
-                                        <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
-                                    </button>`
-                                ).join('');
-                            }
-                            resultsDiv.style.display = '';
-                        })
-                        .catch(() => { resultsDiv.style.display = 'none'; });
-                }
-            }
-
-            // Product pick from results
-            const pickBtn = e.target.closest('.aiscan-product-pick');
-            if (pickBtn) {
-                const td = pickBtn.closest('.aiscan-line-row');
-                const refInput = td.querySelector('[data-field="referencia"]');
-                const badge = td.querySelector('.aiscan-ref-badge');
-                const resultsDiv = td.querySelector('.aiscan-product-results-row');
-                if (refInput) {
-                    refInput.value = pickBtn.dataset.ref;
-                }
-                if (badge) {
-                    badge.innerHTML = `<span class="badge text-bg-success" title="${escapeAttr(pickBtn.dataset.ref)}"><i class="fa-solid fa-link"></i></span>`;
-                }
-                if (resultsDiv) {
-                    resultsDiv.style.display = 'none';
-                    resultsDiv.innerHTML = '';
-                }
+                const row = matchBtn.closest('.aiscan-line-row');
+                openProductSearchModal(row);
             }
         });
 
