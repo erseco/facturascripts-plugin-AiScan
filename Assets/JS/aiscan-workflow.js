@@ -1374,7 +1374,7 @@
             const response = await fetch('AiScanInvoice?action=import-batch', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({documents, import_mode: state.importMode}),
+                body: JSON.stringify({documents, import_mode: state.importMode, provider: state.defaultProvider}),
             });
             const data = await response.json();
 
