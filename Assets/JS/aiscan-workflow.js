@@ -1117,30 +1117,35 @@
         }
     }
 
-    function buildTaxSelect(selectedRate) {
+    function buildTaxSelect(selectedRate, selectedCode) {
         const taxes = window.aiscanTaxTypes || [];
         const rate = parseFloat(selectedRate) || 0;
-        // Find closest matching rate
-        let bestRate = 0;
-        let bestDiff = Infinity;
+        const code = selectedCode || '';
+        let options = '<option value="">------</option>';
+        let found = false;
         for (const t of taxes) {
-            const diff = Math.abs(t.rate - rate);
-            if (diff < bestDiff) {
-                bestDiff = diff;
-                bestRate = t.rate;
+            const sel = (code && t.code === code) || (!code && !found && Math.abs(t.rate - rate) < 0.01);
+            if (sel) {
+                found = true;
             }
+            options += `<option value="${escapeAttr(t.code)}"${sel ? ' selected' : ''}>${escapeHtml(t.description)}</option>`;
         }
-        const options = taxes.map(t =>
-            `<option value="${t.rate}"${t.rate === bestRate ? ' selected' : ''}>${escapeHtml(t.description)}</option>`
-        ).join('');
-        return `<select class="form-select form-select-sm" data-field="tax_rate" style="width:110px">${options}</select>`;
+        return `<select class="form-select form-select-sm" data-field="tax_code" style="width:120px">${options}</select>`;
     }
 
-    function buildWithholdingSelect(selectedRate) {
-        const types = window.aiscanWithholdingTypes || [{code: '', description: '------', rate: 0}];
-        return `<select class="form-select form-select-sm" data-field="irpf" style="width:110px">${types.map(t =>
-            `<option value="${t.rate}"${parseFloat(selectedRate || 0) === t.rate ? ' selected' : ''}>${escapeHtml(t.description)}</option>`
-        ).join('')}</select>`;
+    function buildWithholdingSelect(selectedRate, selectedCode) {
+        const types = window.aiscanWithholdingTypes || [];
+        const rate = parseFloat(selectedRate) || 0;
+        const code = selectedCode || '';
+        let options = '<option value="">------</option>';
+        for (const t of types) {
+            if (!t.code) {
+                continue;
+            }
+            const sel = (code && t.code === code) || (!code && rate > 0 && Math.abs(t.rate - rate) < 0.01);
+            options += `<option value="${escapeAttr(t.rate)}"${sel ? ' selected' : ''}>${escapeHtml(t.description)}</option>`;
+        }
+        return `<select class="form-select form-select-sm" data-field="irpf" style="width:120px">${options}</select>`;
     }
 
     function initTaxSelects(container) {
@@ -1241,11 +1246,18 @@
         document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(calcLineTotal);
     }
 
+    function taxCodeToRate(code) {
+        const taxes = window.aiscanTaxTypes || [];
+        const match = taxes.find(t => t.code === code);
+        return match ? match.rate : 0;
+    }
+
     function calcModalPreview(modal) {
         const qty = parseFloat(modal.querySelector('.aiscan-modal-quantity')?.value || 0);
         const price = parseFloat(modal.querySelector('.aiscan-modal-price')?.value || 0);
         const discount = parseFloat(modal.querySelector('.aiscan-modal-discount')?.value || 0);
-        const tax = parseFloat(modal.querySelector('.aiscan-modal-tax')?.value || 0);
+        const taxCode = modal.querySelector('.aiscan-modal-tax')?.value || '';
+        const tax = taxCodeToRate(taxCode);
         const irpf = parseFloat(modal.querySelector('.aiscan-modal-irpf')?.value || 0);
         const base = qty * price * (1 - discount / 100);
         const taxAmt = base * (tax / 100);
@@ -1276,7 +1288,11 @@
         }
         const taxModal = modal.querySelector('.aiscan-modal-tax');
         if (taxModal) {
-            row.querySelector('[data-field="tax_rate"]').value = taxModal.value;
+            const selectedCode = taxModal.value;
+            row.querySelector('[data-field="tax_code"]').value = selectedCode;
+            const taxes = window.aiscanTaxTypes || [];
+            const match = taxes.find(t => t.code === selectedCode);
+            row.querySelector('[data-field="tax_rate"]').value = match ? match.rate : 0;
         }
         const irpfModal = modal.querySelector('.aiscan-modal-irpf');
         if (irpfModal) {
@@ -1445,6 +1461,7 @@
             <button type="button" class="btn btn-sm btn-light aiscan-line-detail-btn" data-bs-toggle="modal" data-bs-target="#${modalId}" title="${escapeAttr(trans('aiscan-more-options'))}"><i class="fa-solid fa-ellipsis"></i></button>
             <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
             <input type="hidden" data-field="discount" class="aiscan-calc" value="${escapeAttr(line.discount ?? 0)}">
+            <input type="hidden" data-field="tax_code" value="${escapeAttr(line.tax_code || '')}">
             <input type="hidden" data-field="tax_rate" class="aiscan-calc" value="${escapeAttr(line.tax_rate ?? 0)}">
             <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(line.irpf ?? 0)}">
             <input type="hidden" data-field="excepcioniva" value="${escapeAttr(line.excepcioniva ?? '')}">
@@ -1482,11 +1499,11 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('tax'))}</label>
-                                    ${buildTaxSelect(line.tax_rate).replace('data-field="tax_rate"', 'class="form-select form-select-sm aiscan-modal-tax"')}
+                                    ${buildTaxSelect(line.tax_rate, line.tax_code).replace('data-field="tax_code"', 'class="form-select form-select-sm aiscan-modal-tax"')}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">IRPF</label>
-                                    ${buildWithholdingSelect(line.irpf).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                    ${buildWithholdingSelect(line.irpf, line.irpf_code).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>
