@@ -78,6 +78,31 @@
         return escapeHtml(value).replace(/"/g, '&quot;');
     }
 
+    function checkInBatchDuplicate(doc) {
+        const inv = doc.extractedData?.invoice;
+        if (!inv?.number) {
+            return null;
+        }
+        const supplierId = doc.extractedData?.supplier?.matched_supplier_id || '';
+        for (const other of state.documents) {
+            if (other === doc || !other.extractedData?.invoice?.number) {
+                continue;
+            }
+            const otherInv = other.extractedData.invoice;
+            const otherSupplier = other.extractedData.supplier?.matched_supplier_id || '';
+            if (
+                otherInv.number === inv.number
+                && otherInv.issue_date === inv.issue_date
+                && otherSupplier === supplierId
+                && Math.abs((otherInv.total || 0) - (inv.total || 0)) < 0.02
+                && (other.status === STATUS.ANALYZED || other.status === STATUS.READY || other.status === STATUS.NEEDS_REVIEW)
+            ) {
+                return trans('aiscan-duplicate-in-batch', {'%name%': other.originalName});
+            }
+        }
+        return null;
+    }
+
     function currentDoc() {
         return state.documents[state.currentIndex] || null;
     }
@@ -331,7 +356,22 @@
                 }
 
                 const warnings = doc.extractedData?._validation_errors || [];
-                doc.status = warnings.length > 0 ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
+                let needsReview = warnings.length > 0;
+
+                // Server-side duplicate: invoice already exists in FS
+                if (doc.extractedData?._duplicate) {
+                    needsReview = true;
+                }
+
+                // In-batch duplicate: same invoice already analyzed in this batch
+                const batchDup = checkInBatchDuplicate(doc);
+                if (batchDup) {
+                    doc.extractedData._validation_errors = warnings;
+                    doc.extractedData._validation_errors.push(batchDup);
+                    needsReview = true;
+                }
+
+                doc.status = needsReview ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
             } catch (error) {
                 doc.status = STATUS.FAILED;
                 doc.error = error.message;

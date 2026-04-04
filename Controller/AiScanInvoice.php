@@ -365,6 +365,13 @@ class AiScanInvoice extends Controller
             }
         }
 
+        // Check for duplicate invoice already in FacturaScripts
+        $duplicateWarning = $this->checkDuplicateInvoice($extracted);
+        if ($duplicateWarning) {
+            $extracted['_duplicate'] = $duplicateWarning;
+            $extracted['warnings'][] = $duplicateWarning['message'];
+        }
+
         echo json_encode(['success' => true, 'data' => $extracted]);
     }
 
@@ -760,6 +767,56 @@ class AiScanInvoice extends Controller
             $histLine->referencia = $line['sku'] ?? null;
             $histLine->save();
         }
+    }
+
+    private function checkDuplicateInvoice(array $extracted): ?array
+    {
+        $invoice = $extracted['invoice'] ?? [];
+        $supplier = $extracted['supplier'] ?? [];
+
+        $numproveedor = trim((string) ($invoice['number'] ?? ''));
+        $fecha = trim((string) ($invoice['issue_date'] ?? ''));
+        $codproveedor = $supplier['matched_supplier_id'] ?? '';
+        $total = (float) ($invoice['total'] ?? 0);
+
+        if (empty($numproveedor) || empty($codproveedor)) {
+            return null;
+        }
+
+        $factura = new \FacturaScripts\Dinamic\Model\FacturaProveedor();
+        $where = [
+            new \FacturaScripts\Core\Base\DataBase\DataBaseWhere(
+                'numproveedor',
+                $numproveedor
+            ),
+            new \FacturaScripts\Core\Base\DataBase\DataBaseWhere(
+                'codproveedor',
+                $codproveedor
+            ),
+        ];
+
+        if (!empty($fecha)) {
+            $where[] = new \FacturaScripts\Core\Base\DataBase\DataBaseWhere(
+                'fecha',
+                $fecha
+            );
+        }
+
+        $matches = $factura->all($where, [], 0, 1);
+        if (empty($matches)) {
+            return null;
+        }
+
+        $existing = $matches[0];
+        return [
+            'type' => 'existing_invoice',
+            'invoice_id' => $existing->idfactura,
+            'invoice_code' => $existing->codigo,
+            'message' => Tools::lang()->trans(
+                'aiscan-duplicate-invoice-exists',
+                ['%code%' => $existing->codigo]
+            ),
+        ];
     }
 
     private function resolveInvoiceCode(?int $invoiceId): ?string

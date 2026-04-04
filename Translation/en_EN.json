@@ -28,6 +28,8 @@
     "aiscan-document-type": "Document type",
     "aiscan-drag-to-resize": "Drag to resize",
     "aiscan-drop-or-click": "or click to select files",
+    "aiscan-duplicate-in-batch": "This invoice was already analyzed in this batch (same as %name%).",
+    "aiscan-duplicate-invoice-exists": "A purchase invoice with this number already exists: %code%. Review before importing.",
     "aiscan-failed-to-calculate-invoice-lines": "Failed to calculate invoice lines.",
     "aiscan-failed-to-store-uploaded-file": "Failed to store uploaded file.",
     "aiscan-file-progress": "File %current% of %total%",
