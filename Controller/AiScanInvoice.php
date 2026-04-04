@@ -62,9 +62,13 @@ class AiScanInvoice extends Controller
         if (empty($action)) {
             $this->loadPageAssets();
             $service = new ExtractionService();
+            $impuesto = new \FacturaScripts\Dinamic\Model\Impuesto();
+            $retencion = new \FacturaScripts\Dinamic\Model\Retencion();
             $this->view('AiScanInvoice.html.twig', [
                 'availableProviders' => $service->getAvailableProviderNames(),
                 'defaultProvider' => AiScanSettings::getDefaultProvider(),
+                'taxTypes' => $impuesto->all([], ['iva' => 'ASC'], 0, 0),
+                'withholdingTypes' => $retencion->all([], ['porcentaje' => 'ASC'], 0, 0),
             ]);
             return;
         }

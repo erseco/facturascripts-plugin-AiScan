@@ -825,6 +825,7 @@
 
         // Totals section below lines (like a real invoice footer)
         review.appendChild(buildSection(trans('aiscan-section-totals'), `
+            <input type="hidden" id="invoice_currency" value="${escapeAttr(invoice.currency || 'EUR')}">
             <div class="d-flex gap-2">
                 <div style="flex:1">
                     <div class="mb-2">
@@ -844,32 +845,22 @@
                         </div>
                     </div>
                 </div>
-                ${invoice.withholding_amount ? `<div style="flex:1">
+                <div style="flex:1">
                     <div class="mb-2">
                         <label class="form-label small mb-1" for="invoice_withholding">${escapeHtml(trans('irpf'))}</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm" id="invoice_withholding" type="number" step="0.01" value="${escapeAttr(invoice.withholding_amount)}">
-                        </div>
-                    </div>
-                </div>` : ''}
-                <div style="flex:1">
-                    <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_total">${escapeHtml(trans('total'))}</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="number" step="0.01" value="${escapeAttr(invoice.total ?? '')}">
+                            <input class="form-control form-control-sm" id="invoice_withholding" type="number" step="0.01" value="${escapeAttr(invoice.withholding_amount ?? 0)}">
                         </div>
                     </div>
                 </div>
                 <div style="flex:1">
                     <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_currency">${escapeHtml(trans('currency'))}</label>
-                        <select class="form-select form-select-sm" id="invoice_currency">
-                            <option value="EUR"${(invoice.currency || 'EUR') === 'EUR' ? ' selected' : ''}>EUR</option>
-                            <option value="USD"${invoice.currency === 'USD' ? ' selected' : ''}>USD</option>
-                            <option value="GBP"${invoice.currency === 'GBP' ? ' selected' : ''}>GBP</option>
-                        </select>
+                        <label class="form-label small mb-1 fw-bold" for="invoice_total">${escapeHtml(trans('total'))}</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="number" step="0.01" value="${escapeAttr(invoice.total ?? '')}">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1109,17 +1100,52 @@
         }
     }
 
+    function buildTaxSelect(selectedRate) {
+        const taxes = window.aiscanTaxTypes || [];
+        const rate = parseFloat(selectedRate) || 0;
+        let best = '';
+        let bestDiff = Infinity;
+        const options = taxes.map(t => {
+            const diff = Math.abs(t.rate - rate);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = String(t.rate);
+            }
+            return `<option value="${t.rate}">${escapeHtml(t.description)}</option>`;
+        }).join('');
+        return `<select class="form-select form-select-sm" data-field="tax_rate" style="width:110px">${options}</select>`;
+    }
+
+    function buildWithholdingSelect(selectedRate) {
+        const types = window.aiscanWithholdingTypes || [{code: '', description: '------', rate: 0}];
+        return `<select class="form-select form-select-sm" data-field="irpf" style="width:110px">${types.map(t =>
+            `<option value="${t.rate}"${parseFloat(selectedRate || 0) === t.rate ? ' selected' : ''}>${escapeHtml(t.description)}</option>`
+        ).join('')}</select>`;
+    }
+
+    function initTaxSelects(container) {
+        container.querySelectorAll('select[data-field="tax_rate"]').forEach(sel => {
+            const rate = parseFloat(sel.closest('tr')?.dataset.taxRate || 0);
+            for (const opt of sel.options) {
+                if (parseFloat(opt.value) === rate) {
+                    opt.selected = true;
+                    break;
+                }
+            }
+        });
+    }
+
     function buildLinesSection(lines) {
-        const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, sku: ''}];
+        const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}];
 
         const rows = displayLines.map((line, index) => `
-            <tr data-line-index="${index}">
+            <tr data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
                 <td><input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}"></td>
                 <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:70px"></td>
                 <td><input class="form-control form-control-sm" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:90px"></td>
-                <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:70px"></td>
-                <td><input class="form-control form-control-sm" data-field="tax_rate" type="number" step="0.01" value="${escapeAttr(line.tax_rate ?? 0)}" style="width:70px"></td>
-                <td><input class="form-control form-control-sm" data-field="sku" value="${escapeAttr(line.sku || '')}" style="width:80px"></td>
+                <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:60px"></td>
+                <td>${buildTaxSelect(line.tax_rate)}</td>
+                <td>${buildWithholdingSelect(line.irpf)}</td>
                 <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
             </tr>
         `).join('');
@@ -1133,8 +1159,8 @@
                             <th>${escapeHtml(trans('quantity'))}</th>
                             <th>${escapeHtml(trans('price'))}</th>
                             <th>${escapeHtml(trans('discount'))} %</th>
-                            <th>${escapeHtml(trans('tax'))} %</th>
-                            <th>SKU</th>
+                            <th>${escapeHtml(trans('tax'))}</th>
+                            <th>IRPF</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -1145,6 +1171,8 @@
                 <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-add-line'))}
             </button>
         `);
+
+        setTimeout(() => initTaxSelects(section), 0);
 
         section.addEventListener('click', e => {
             const deleteBtn = e.target.closest('.aiscan-delete-line');
@@ -1159,13 +1187,13 @@
                 const tbody = document.getElementById('aiscan-lines-body');
                 const newIndex = tbody.querySelectorAll('tr').length;
                 tbody.insertAdjacentHTML('beforeend', `
-                    <tr data-line-index="${newIndex}">
+                    <tr data-line-index="${newIndex}" data-tax-rate="0">
                         <td><input class="form-control form-control-sm" data-field="description" value=""></td>
                         <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="0.01" value="1" style="width:70px"></td>
                         <td><input class="form-control form-control-sm" data-field="unit_price" type="number" step="0.01" value="0" style="width:90px"></td>
-                        <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="0" style="width:70px"></td>
-                        <td><input class="form-control form-control-sm" data-field="tax_rate" type="number" step="0.01" value="0" style="width:70px"></td>
-                        <td><input class="form-control form-control-sm" data-field="sku" value="" style="width:80px"></td>
+                        <td><input class="form-control form-control-sm" data-field="discount" type="number" step="0.01" value="0" style="width:60px"></td>
+                        <td>${buildTaxSelect(0)}</td>
+                        <td>${buildWithholdingSelect(0)}</td>
                         <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line"><i class="fa-solid fa-trash-can"></i></button></td>
                     </tr>
                 `);

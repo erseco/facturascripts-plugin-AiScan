@@ -242,6 +242,17 @@
     </div>
 </div>
 <script>
+    window.aiscanTaxTypes = [
+        {% for tax in taxTypes %}
+            {code: '{{ tax.codimpuesto }}', description: '{{ tax.descripcion|e('js') }}', rate: {{ tax.iva }}},
+        {% endfor %}
+    ];
+    window.aiscanWithholdingTypes = [
+        {code: '', description: '------', rate: 0},
+        {% for ret in withholdingTypes %}
+            {code: '{{ ret.codretencion }}', description: '{{ ret.descripcion|e('js') }}', rate: {{ ret.porcentaje }}},
+        {% endfor %}
+    ];
     window.aiscanI18n = {
         'aiscan-analysis-completed': '{{ i18n.trans('aiscan-analysis-completed')|e('js') }}',
         'aiscan-analysis-started': '{{ i18n.trans('aiscan-analysis-started')|e('js') }}',
