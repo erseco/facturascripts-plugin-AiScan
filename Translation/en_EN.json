@@ -24,6 +24,8 @@
     "aiscan-section-products": "Products",
     "aiscan-search-product": "Search product",
     "aiscan-section-supplier": "Supplier",
+    "aiscan-suplido": "Reimbursement",
+    "aiscan-tax-exception": "Tax exception",
     "aiscan-section-totals": "Totals",
     "aiscan-supplier-create-error": "Error creating supplier.",
     "aiscan-supplier-created-success": "Supplier created successfully.",

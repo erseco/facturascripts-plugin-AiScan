@@ -1177,6 +1177,58 @@
         document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(calcLineTotal);
     }
 
+    function calcModalPreview(modal) {
+        const qty = parseFloat(modal.querySelector('.aiscan-modal-quantity')?.value || 0);
+        const price = parseFloat(modal.querySelector('.aiscan-modal-price')?.value || 0);
+        const discount = parseFloat(modal.querySelector('.aiscan-modal-discount')?.value || 0);
+        const tax = parseFloat(modal.querySelector('.aiscan-modal-tax')?.value || 0);
+        const irpf = parseFloat(modal.querySelector('.aiscan-modal-irpf')?.value || 0);
+        const base = qty * price * (1 - discount / 100);
+        const taxAmt = base * (tax / 100);
+        const irpfAmt = base * (irpf / 100);
+        const total = base + taxAmt - irpfAmt;
+        const b = modal.querySelector('.aiscan-modal-base');
+        if (b) { b.textContent = fmtNumber(base); }
+        const t = modal.querySelector('.aiscan-modal-tax-amount');
+        if (t) { t.textContent = fmtNumber(taxAmt); }
+        const i = modal.querySelector('.aiscan-modal-irpf-amount');
+        if (i) { i.textContent = fmtNumber(irpfAmt); }
+        const tot = modal.querySelector('.aiscan-modal-total');
+        if (tot) { tot.textContent = fmtNumber(total); }
+    }
+
+    function applyModalToRow(modal, row) {
+        const fields = {
+            description: '.aiscan-modal-description',
+            quantity: '.aiscan-modal-quantity',
+            unit_price: '.aiscan-modal-price',
+            discount: '.aiscan-modal-discount',
+        };
+        for (const [field, sel] of Object.entries(fields)) {
+            const el = modal.querySelector(sel);
+            if (el) {
+                row.querySelector(`[data-field="${field}"]`).value = el.value;
+            }
+        }
+        const taxModal = modal.querySelector('.aiscan-modal-tax');
+        if (taxModal) {
+            row.querySelector('[data-field="tax_rate"]').value = taxModal.value;
+        }
+        const irpfModal = modal.querySelector('.aiscan-modal-irpf');
+        if (irpfModal) {
+            row.querySelector('[data-field="irpf"]').value = irpfModal.value;
+        }
+        const excModal = modal.querySelector('.aiscan-modal-excepcioniva');
+        if (excModal) {
+            row.querySelector('[data-field="excepcioniva"]').value = excModal.value;
+        }
+        const supModal = modal.querySelector('.aiscan-modal-suplido');
+        if (supModal) {
+            row.querySelector('[data-field="suplido"]').value = supModal.value;
+        }
+        calcLineTotal(row);
+    }
+
     let productSearchTargetRow = null;
 
     function ensureProductSearchModal() {
@@ -1279,7 +1331,7 @@
         return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
             <div style="flex:4;position:relative">
                 <div class="input-group input-group-sm">
-                    <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}" readonly>
+                    <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
                     <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
                     <button class="btn btn-info btn-sm aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-book fa-fw"></i></button>
                     <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
@@ -1299,6 +1351,8 @@
             <input type="hidden" data-field="discount" class="aiscan-calc" value="${escapeAttr(line.discount ?? 0)}">
             <input type="hidden" data-field="tax_rate" class="aiscan-calc" value="${escapeAttr(line.tax_rate ?? 0)}">
             <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(line.irpf ?? 0)}">
+            <input type="hidden" data-field="excepcioniva" value="${escapeAttr(line.excepcioniva ?? '')}">
+            <input type="hidden" data-field="suplido" value="${escapeAttr(line.suplido ?? '0')}">
             <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
@@ -1337,6 +1391,31 @@
                                 <div class="col-6">
                                     <label class="form-label small mb-1">IRPF</label>
                                     ${buildWithholdingSelect(line.irpf).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>
+                                    <select class="form-select form-select-sm aiscan-modal-excepcioniva">
+                                        <option value=""${(line.excepcioniva ?? '') === '' ? ' selected' : ''}>------</option>
+                                        <option value="ES_20"${line.excepcioniva === 'ES_20' ? ' selected' : ''}>Art. 20 LIVA</option>
+                                        <option value="ES_21"${line.excepcioniva === 'ES_21' ? ' selected' : ''}>Art. 21 LIVA</option>
+                                        <option value="ES_22"${line.excepcioniva === 'ES_22' ? ' selected' : ''}>Art. 22 LIVA</option>
+                                        <option value="ES_23_24"${line.excepcioniva === 'ES_23_24' ? ' selected' : ''}>Art. 23-24 LIVA</option>
+                                        <option value="ES_25"${line.excepcioniva === 'ES_25' ? ' selected' : ''}>Art. 25 LIVA</option>
+                                        <option value="ES_OTHER"${line.excepcioniva === 'ES_OTHER' ? ' selected' : ''}>Otras exenciones</option>
+                                        <option value="ES_PASSIVE_SUBJECT"${line.excepcioniva === 'ES_PASSIVE_SUBJECT' ? ' selected' : ''}>N6 Inversión sujeto pasivo</option>
+                                        <option value="ES_ART_7"${line.excepcioniva === 'ES_ART_7' ? ' selected' : ''}>N3 No sujeta art. 7</option>
+                                        <option value="ES_ART_14"${line.excepcioniva === 'ES_ART_14' ? ' selected' : ''}>N4 No sujeta art. 14</option>
+                                        <option value="ES_LOCATION_RULES"${line.excepcioniva === 'ES_LOCATION_RULES' ? ' selected' : ''}>N2 Reglas localización</option>
+                                        <option value="ES_N1"${line.excepcioniva === 'ES_N1' ? ' selected' : ''}>IGIC art. 10.1</option>
+                                        <option value="ES_N5"${line.excepcioniva === 'ES_N5' ? ' selected' : ''}>IGIC art. 25</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">${escapeHtml(trans('aiscan-suplido'))}</label>
+                                    <select class="form-select form-select-sm aiscan-modal-suplido">
+                                        <option value="0"${(line.suplido ?? '0') === '0' ? ' selected' : ''}>No</option>
+                                        <option value="1"${line.suplido === '1' ? ' selected' : ''}>Si</option>
+                                    </select>
                                 </div>
                                 <div class="col-12">
                                     <hr class="my-1">
@@ -1392,49 +1471,18 @@
                 }
             }
         });
-        // Sync modal inputs to hidden fields and recalculate
+        // Modal: recalculate preview on input (without syncing to row)
         section.addEventListener('input', e => {
             const modal = e.target.closest('.modal');
-            if (!modal) {
+            if (modal) {
+                calcModalPreview(modal);
                 return;
             }
-            const row = modal.closest('.aiscan-line-row');
-            if (!row) {
-                return;
-            }
-            const descModal = modal.querySelector('.aiscan-modal-description');
-            if (descModal) {
-                row.querySelector('[data-field="description"]').value = descModal.value;
-            }
-            const qtyModal = modal.querySelector('.aiscan-modal-quantity');
-            if (qtyModal) {
-                row.querySelector('[data-field="quantity"]').value = qtyModal.value;
-            }
-            const priceModal = modal.querySelector('.aiscan-modal-price');
-            if (priceModal) {
-                row.querySelector('[data-field="unit_price"]').value = priceModal.value;
-            }
-            const discountModal = modal.querySelector('.aiscan-modal-discount');
-            if (discountModal) {
-                row.querySelector('[data-field="discount"]').value = discountModal.value;
-            }
-            calcLineTotal(row);
         });
         section.addEventListener('change', e => {
             const modal = e.target.closest('.modal');
             if (modal) {
-                const row = modal.closest('.aiscan-line-row');
-                if (row) {
-                    const taxModal = modal.querySelector('.aiscan-modal-tax');
-                    if (taxModal) {
-                        row.querySelector('[data-field="tax_rate"]').value = taxModal.value;
-                    }
-                    const irpfModal = modal.querySelector('.aiscan-modal-irpf');
-                    if (irpfModal) {
-                        row.querySelector('[data-field="irpf"]').value = irpfModal.value;
-                    }
-                    calcLineTotal(row);
-                }
+                calcModalPreview(modal);
                 return;
             }
             if (e.target.matches('[data-field="tax_rate"]') || e.target.matches('[data-field="irpf"]')) {
@@ -1460,6 +1508,16 @@
                 container.insertAdjacentHTML('beforeend', buildLineRow(
                     {description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}, newIndex
                 ));
+            }
+
+            // Modal accept — sync values to row
+            const acceptBtn = e.target.closest('.aiscan-modal-accept');
+            if (acceptBtn) {
+                const modal = acceptBtn.closest('.modal');
+                const row = modal?.closest('.aiscan-line-row');
+                if (modal && row) {
+                    applyModalToRow(modal, row);
+                }
             }
 
             // Product search button — open shared modal

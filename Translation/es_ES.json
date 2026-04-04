@@ -24,6 +24,8 @@
     "aiscan-section-products": "Productos",
     "aiscan-search-product": "Buscar producto",
     "aiscan-section-supplier": "Proveedor",
+    "aiscan-suplido": "Suplido",
+    "aiscan-tax-exception": "Excepción de IVA",
     "aiscan-section-totals": "Totales",
     "aiscan-supplier-create-error": "Error al crear proveedor.",
     "aiscan-supplier-created-success": "Proveedor creado correctamente.",
