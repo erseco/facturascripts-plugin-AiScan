@@ -781,7 +781,8 @@
                     <div style="flex:1">${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}</div>
                 </div>
                 <input type="hidden" id="supplier_address" value="${escapeAttr(supplier.address || '')}">
-                <select id="supplier_match_select" class="d-none"><option value="${escapeAttr(supplier.matched_supplier_id || '')}" selected></option></select>`
+                <select id="supplier_match_select" class="d-none"><option value="${escapeAttr(supplier.matched_supplier_id || '')}" selected></option></select>
+                ${buildInlineCreateSupplier(supplier)}`
             : `<div class="d-flex gap-2 mb-1">
                     <div style="flex:2">${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}</div>
                     <div style="flex:1">${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}</div>
@@ -918,9 +919,6 @@
     }
 
     function buildInlineCreateSupplier(supplier) {
-        if (supplier.match_status === 'matched') {
-            return '';
-        }
         return `
             <div class="border rounded p-2 mt-2 bg-light">
                 <div class="small fw-semibold mb-1">${escapeHtml(trans('aiscan-create-supplier'))}</div>
