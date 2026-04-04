@@ -155,14 +155,18 @@ Field-specific rules:
 - summary: concise one-line description of what the invoice is for, based only on document evidence
 - taxes: include each visible tax breakdown
 - lines: only include lines that are actually visible or clearly extracted
-- lines.quantity: REQUIRED for each line. Extract from the document. Default to 1 if not visible but a line exists.
-- lines.unit_price: REQUIRED for each line. This is the base price per unit BEFORE tax.
-  Extract from the "Base Imponible" or "Importe" column in the line items table.
-  If the document shows a line total, divide by quantity to get unit_price.
-  Never return 0 or null if the line has a visible amount.
-- lines.line_total: the net total for this line (quantity * unit_price - discount)
+- lines.quantity: REQUIRED for each line. Extract from the document. Default to 1 if not visible.
+- lines.unit_price: REQUIRED for each line. This is the net price per unit BEFORE tax.
+  Common column names: "Base Imponible", "Importe", "Precio", "Price", "Amount", "Base".
+  If the document has a "Base Imponible" column per line, that value IS the unit_price
+  when quantity is 1. If quantity > 1, divide the base amount by quantity.
+  Never return 0 or null if the line has a visible monetary amount.
+- lines.line_total: the net total for this line (quantity * unit_price - discount).
+  If a "Base Imponible" column exists per line, use that value as line_total.
 - withholding_amount: must always be a POSITIVE number (absolute value).
-  If the document shows retenciones as negative (e.g. -180,00), store 180.00 not -180.00.
+  If the document shows "Retenciones: -180,00 €", store 180.00 not -180.00.
+  Retenciones/withholding reduces the total: total = subtotal + tax - withholding.
+  If retenciones is 0,00 €, set withholding_amount to 0.
 
 Arithmetic rules:
 - If subtotal, tax_amount, and total are present and inconsistent by more
