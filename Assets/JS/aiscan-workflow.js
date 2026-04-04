@@ -1180,20 +1180,27 @@
                     </div>
                     <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
                 </div>
-                <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:60px" placeholder="${escapeAttr(trans('quantity'))}">
-                <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:80px" placeholder="${escapeAttr(trans('price'))}">
-                <span class="small fw-bold text-nowrap aiscan-line-total" style="min-width:60px;text-align:right">0.00</span>
+                <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:60px">
+                <div class="input-group input-group-sm" style="width:100px">
+                    <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.7rem"></i></span>
+                    <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}">
+                </div>
+                <span class="small fw-bold text-nowrap aiscan-line-total" style="min-width:55px;text-align:right">0.00</span>
                 <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
             </div>
             <div class="d-flex gap-1 align-items-center ps-1">
-                <span class="small text-muted">${escapeHtml(trans('discount'))}:</span>
-                <input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:55px">
-                <span class="small text-muted ms-1">${escapeHtml(trans('tax'))}:</span>
-                ${buildTaxSelect(line.tax_rate)}
-                <span class="small text-success text-nowrap aiscan-tax-label">+0.00</span>
-                <span class="small text-muted ms-1">IRPF:</span>
-                ${buildWithholdingSelect(line.irpf)}
-                <span class="small text-danger text-nowrap aiscan-irpf-label">-0.00</span>
+                <div class="input-group input-group-sm" style="width:85px">
+                    <input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}">
+                    <span class="input-group-text p-1">%</span>
+                </div>
+                <div class="input-group input-group-sm" style="flex:1">
+                    ${buildTaxSelect(line.tax_rate)}
+                    <span class="input-group-text p-1 text-success small aiscan-tax-label">+0.00</span>
+                </div>
+                <div class="input-group input-group-sm" style="flex:1">
+                    ${buildWithholdingSelect(line.irpf)}
+                    <span class="input-group-text p-1 text-danger small aiscan-irpf-label">-0.00</span>
+                </div>
             </div>
         </div>`;
     }
