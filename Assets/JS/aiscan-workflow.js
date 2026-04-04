@@ -1146,17 +1146,19 @@
         const irpfAmount = base * (irpf / 100);
         const total = base + taxAmount - irpfAmount;
 
-        const taxLabel = row.querySelector('.aiscan-tax-amount');
-        if (taxLabel) {
-            taxLabel.textContent = '+' + taxAmount.toFixed(2);
-        }
-        const irpfLabel = row.querySelector('.aiscan-irpf-amount');
-        if (irpfLabel) {
-            irpfLabel.textContent = '-' + irpfAmount.toFixed(2);
-        }
         const totalLabel = row.querySelector('.aiscan-line-total');
         if (totalLabel) {
             totalLabel.textContent = total.toFixed(2);
+            const tip = `${trans('subtotal')}: ${base.toFixed(2)}\n+${trans('tax')}: ${taxAmount.toFixed(2)}\n-IRPF: ${irpfAmount.toFixed(2)}`;
+            totalLabel.setAttribute('title', tip);
+            totalLabel.setAttribute('data-bs-toggle', 'tooltip');
+            totalLabel.setAttribute('data-bs-placement', 'left');
+            // Refresh Bootstrap tooltip
+            const existing = bootstrap.Tooltip.getInstance(totalLabel);
+            if (existing) {
+                existing.dispose();
+            }
+            new bootstrap.Tooltip(totalLabel);
         }
     }
 
@@ -1185,8 +1187,8 @@
                 <td><input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:70px"></td>
                 <td><input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:90px"></td>
                 <td><input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:60px"></td>
-                <td><div class="d-flex align-items-center gap-1">${buildTaxSelect(line.tax_rate)}<span class="small text-success text-nowrap aiscan-tax-amount">+0.00</span></div></td>
-                <td><div class="d-flex align-items-center gap-1">${buildWithholdingSelect(line.irpf)}<span class="small text-danger text-nowrap aiscan-irpf-amount">-0.00</span></div></td>
+                <td>${buildTaxSelect(line.tax_rate)}</td>
+                <td>${buildWithholdingSelect(line.irpf)}</td>
                 <td class="text-end text-nowrap"><span class="small fw-semibold aiscan-line-total">0.00</span></td>
                 <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
             </tr>`;
@@ -1264,8 +1266,8 @@
                         <td><input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="1" style="width:70px"></td>
                         <td><input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="0" style="width:90px"></td>
                         <td><input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="0" style="width:60px"></td>
-                        <td><div class="d-flex align-items-center gap-1">${buildTaxSelect(0)}<span class="small text-success text-nowrap aiscan-tax-amount">+0.00</span></div></td>
-                        <td><div class="d-flex align-items-center gap-1">${buildWithholdingSelect(0)}<span class="small text-danger text-nowrap aiscan-irpf-amount">-0.00</span></div></td>
+                        <td>${buildTaxSelect(0)}</td>
+                        <td>${buildWithholdingSelect(0)}</td>
                         <td class="text-end text-nowrap"><span class="small fw-semibold aiscan-line-total">0.00</span></td>
                         <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line"><i class="fa-solid fa-trash-can"></i></button></td>
                     </tr>
