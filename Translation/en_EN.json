@@ -15,6 +15,7 @@
     "aiscan-browser-ai-error": "Browser AI error: %message%",
     "aiscan-browser-prompt-not-available": "Browser Prompt API is not available in this browser.",
     "aiscan-config": "AiScan",
+    "aiscan-copy-json": "Copy JSON",
     "aiscan-create-supplier": "Create supplier",
     "aiscan-detected": "Detected",
     "aiscan-selected": "Selected",

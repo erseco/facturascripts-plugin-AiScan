@@ -159,7 +159,7 @@
                 <div class="aiscan-split-left" id="aiscan-split-left">
                     <div class="card h-100 shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center py-2">
-                            <span class="fw-semibold" id="aiscan-preview-title">{{ i18n.trans('aiscan-document-preview') }}</span>
+                            <span class="fw-semibold text-truncate d-inline-block" id="aiscan-preview-title" style="max-width:250px" title="">{{ i18n.trans('aiscan-document-preview') }}</span>
                             <div class="d-flex align-items-center gap-2">
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-reanalyze-btn">
                                     <i class="fa-solid fa-rotate me-1"></i>{{ i18n.trans('aiscan-reanalyze') }}
@@ -259,6 +259,7 @@
         'aiscan-analyzing': '{{ i18n.trans('aiscan-analyzing')|e('js') }}',
         'aiscan-create-new-supplier-confirm': '{{ i18n.trans('aiscan-create-new-supplier-confirm')|e('js') }}',
         'aiscan-doc-discarded': '{{ i18n.trans('aiscan-doc-discarded')|e('js') }}',
+        'aiscan-copy-json': '{{ i18n.trans('aiscan-copy-json')|e('js') }}',
         'aiscan-create-supplier': '{{ i18n.trans('aiscan-create-supplier')|e('js') }}',
         'aiscan-detected': '{{ i18n.trans('aiscan-detected')|e('js') }}',
         'aiscan-selected': '{{ i18n.trans('aiscan-selected')|e('js') }}',

@@ -703,17 +703,34 @@
             area.innerHTML = `<p class="text-muted text-center p-4">${escapeHtml(trans('aiscan-no-preview'))}</p>`;
         }
 
+        const titleEl = document.getElementById('aiscan-preview-title');
+        if (titleEl) {
+            titleEl.textContent = doc.originalName;
+            titleEl.title = doc.originalName;
+        }
+
         const statusEl = document.getElementById('aiscan-status');
+        const jsonBtn = doc.extractedData
+            ? ` <button class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1 aiscan-debug-json-btn" type="button" title="JSON"><i class="fa-solid fa-code"></i></button>`
+            : '';
         if (doc.error) {
-            statusEl.innerHTML = `<div class="alert alert-danger py-1 px-2 small mb-0">${escapeHtml(doc.error)}</div>`;
+            statusEl.innerHTML = `<div class="alert alert-danger py-1 px-2 small mb-0">${escapeHtml(doc.error)}${jsonBtn}</div>`;
         } else if (doc.status === STATUS.ANALYZING) {
             statusEl.innerHTML = `<div class="alert alert-info py-1 px-2 small mb-0"><i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-analysis-started', {'%provider%': state.defaultProvider}))}</div>`;
-        } else if (doc.status === STATUS.ANALYZED || doc.status === STATUS.READY) {
-            statusEl.innerHTML = `<div class="alert alert-success py-1 px-2 small mb-0">${escapeHtml(trans('aiscan-analysis-completed', {'%provider%': doc.extractedData?._provider || state.defaultProvider}))}</div>`;
+        } else if (doc.status === STATUS.ANALYZED || doc.status === STATUS.READY || doc.status === STATUS.NEEDS_REVIEW) {
+            statusEl.innerHTML = `<div class="alert alert-success py-1 px-2 small mb-0 d-flex align-items-center justify-content-between">${escapeHtml(trans('aiscan-analysis-completed', {'%provider%': doc.extractedData?._provider || state.defaultProvider}))}${jsonBtn}</div>`;
         } else if (doc.status === STATUS.DISCARDED) {
             statusEl.innerHTML = `<div class="alert alert-dark py-1 px-2 small mb-0"><i class="fa-solid fa-ban me-1"></i>${escapeHtml(trans('aiscan-doc-discarded'))}</div>`;
         } else {
             statusEl.innerHTML = '';
+        }
+
+        // Bind JSON debug button
+        const debugBtn = statusEl.querySelector('.aiscan-debug-json-btn');
+        if (debugBtn) {
+            debugBtn.addEventListener('click', () => {
+                showJsonDebugModal(doc.extractedData);
+            });
         }
 
         const stateBadge = document.getElementById('aiscan-doc-state-badge');
@@ -1238,6 +1255,38 @@
             row.querySelector('[data-field="suplido"]').value = supModal.value;
         }
         calcLineTotal(row);
+    }
+
+    function showJsonDebugModal(data) {
+        let modal = document.getElementById('aiscan-json-debug-modal');
+        if (!modal) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="aiscan-json-debug-modal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header py-2">
+                                <h6 class="modal-title"><i class="fa-solid fa-code fa-fw me-1"></i>JSON</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-0">
+                                <pre class="m-0 p-3 small" id="aiscan-json-debug-content" style="max-height:70vh;overflow:auto;white-space:pre-wrap;word-break:break-all"></pre>
+                            </div>
+                            <div class="modal-footer py-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="aiscan-json-copy-btn"><i class="fa-solid fa-copy me-1"></i>${escapeHtml(trans('aiscan-copy-json'))}</button>
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">${escapeHtml(trans('close'))}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+            modal = document.getElementById('aiscan-json-debug-modal');
+            document.getElementById('aiscan-json-copy-btn').addEventListener('click', () => {
+                const text = document.getElementById('aiscan-json-debug-content').textContent;
+                navigator.clipboard.writeText(text).catch(() => {});
+            });
+        }
+        document.getElementById('aiscan-json-debug-content').textContent = JSON.stringify(data, null, 2);
+        new bootstrap.Modal(modal).show();
     }
 
     let productSearchTargetRow = null;
