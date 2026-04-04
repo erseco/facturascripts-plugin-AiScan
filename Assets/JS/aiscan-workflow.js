@@ -830,17 +830,19 @@
                 <div class="card-body py-2 px-2">${bodyHtml}</div>
             </div>
         `;
-        const header = section.querySelector('.card-header');
-        const icon = section.querySelector('.aiscan-collapse-icon');
-        const collapseEl = section.querySelector('.collapse');
-        if (header && icon && collapseEl) {
-            collapseEl.addEventListener('show.bs.collapse', () => {
-                icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
-            });
-            collapseEl.addEventListener('hide.bs.collapse', () => {
-                icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
-            });
-        }
+        // Defer event binding until after DOM insertion
+        setTimeout(() => {
+            const icon = section.querySelector('.aiscan-collapse-icon');
+            const collapseEl = section.querySelector('.collapse');
+            if (icon && collapseEl) {
+                collapseEl.addEventListener('show.bs.collapse', () => {
+                    icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+                });
+                collapseEl.addEventListener('hide.bs.collapse', () => {
+                    icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+                });
+            }
+        }, 0);
         return section;
     }
 
