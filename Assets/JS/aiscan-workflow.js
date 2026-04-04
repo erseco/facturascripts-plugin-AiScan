@@ -1146,72 +1146,65 @@
         const irpfAmount = base * (irpf / 100);
         const total = base + taxAmount - irpfAmount;
 
+        const taxLabel = row.querySelector('.aiscan-tax-label');
+        if (taxLabel) {
+            taxLabel.textContent = '+' + taxAmount.toFixed(2);
+        }
+        const irpfLabel = row.querySelector('.aiscan-irpf-label');
+        if (irpfLabel) {
+            irpfLabel.textContent = '-' + irpfAmount.toFixed(2);
+        }
         const totalLabel = row.querySelector('.aiscan-line-total');
         if (totalLabel) {
             totalLabel.textContent = total.toFixed(2);
-            const existing = bootstrap.Tooltip.getInstance(totalLabel);
-            if (existing) {
-                existing.dispose();
-            }
-            totalLabel.setAttribute('data-bs-toggle', 'tooltip');
-            totalLabel.setAttribute('data-bs-placement', 'top');
-            totalLabel.setAttribute('data-bs-html', 'true');
-            const tipHtml = `${escapeHtml(trans('subtotal'))}: ${base.toFixed(2)}<br>+${escapeHtml(trans('tax'))}: ${taxAmount.toFixed(2)}<br>-IRPF: ${irpfAmount.toFixed(2)}`;
-            totalLabel.setAttribute('data-bs-title', tipHtml);
-            new bootstrap.Tooltip(totalLabel);
         }
     }
 
     function calcAllLineTotals() {
-        document.querySelectorAll('#aiscan-lines-body tr').forEach(calcLineTotal);
+        document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(calcLineTotal);
     }
 
-    function buildLinesSection(lines) {
-        const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}];
-
-        const rows = displayLines.map((line, index) => {
-            const ref = line.sku || line.referencia || '';
-            const matchBadge = ref
-                ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
-                : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
-            return `<tr data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
-                <td style="position:relative">
+    function buildLineRow(line, index) {
+        const ref = line.sku || line.referencia || '';
+        const matchBadge = ref
+            ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
+            : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
+        return `<div class="border rounded mb-1 p-1 aiscan-line-row" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
+            <div class="d-flex gap-1 align-items-center mb-1">
+                <div style="flex:4;position:relative">
                     <div class="input-group input-group-sm">
-                        <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
+                        <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}" placeholder="${escapeAttr(trans('description'))}">
                         <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
                         <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
                         <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
                     </div>
                     <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
-                </td>
-                <td><input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:70px"></td>
-                <td><input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:90px"></td>
-                <td><input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:60px"></td>
-                <td>${buildTaxSelect(line.tax_rate)}</td>
-                <td>${buildWithholdingSelect(line.irpf)}</td>
-                <td class="text-end text-nowrap"><span class="small fw-semibold aiscan-line-total">0.00</span></td>
-                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
-            </tr>`;
-        }).join('');
+                </div>
+                <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:60px" placeholder="${escapeAttr(trans('quantity'))}">
+                <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:80px" placeholder="${escapeAttr(trans('price'))}">
+                <span class="small fw-bold text-nowrap aiscan-line-total" style="min-width:60px;text-align:right">0.00</span>
+                <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+            <div class="d-flex gap-1 align-items-center ps-1">
+                <span class="small text-muted">${escapeHtml(trans('discount'))}:</span>
+                <input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:55px">
+                <span class="small text-muted ms-1">${escapeHtml(trans('tax'))}:</span>
+                ${buildTaxSelect(line.tax_rate)}
+                <span class="small text-success text-nowrap aiscan-tax-label">+0.00</span>
+                <span class="small text-muted ms-1">IRPF:</span>
+                ${buildWithholdingSelect(line.irpf)}
+                <span class="small text-danger text-nowrap aiscan-irpf-label">-0.00</span>
+            </div>
+        </div>`;
+    }
+
+    function buildLinesSection(lines) {
+        const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}];
+
+        const rows = displayLines.map((line, index) => buildLineRow(line, index)).join('');
 
         const section = buildSection(trans('aiscan-section-products'), `
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>${escapeHtml(trans('description'))}</th>
-                            <th>${escapeHtml(trans('quantity'))}</th>
-                            <th>${escapeHtml(trans('price'))}</th>
-                            <th>${escapeHtml(trans('discount'))} %</th>
-                            <th>${escapeHtml(trans('tax'))}</th>
-                            <th>IRPF</th>
-                            <th class="text-end">${escapeHtml(trans('total'))}</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="aiscan-lines-body">${rows}</tbody>
-                </table>
-            </div>
+            <div id="aiscan-lines-body">${rows}</div>
             <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="aiscan-add-line-btn">
                 <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-add-line'))}
             </button>
@@ -1225,7 +1218,7 @@
         // Recalculate line totals on any value change
         section.addEventListener('input', e => {
             if (e.target.closest('.aiscan-calc') || e.target.matches('[data-field="tax_rate"]') || e.target.matches('[data-field="irpf"]')) {
-                const row = e.target.closest('tr');
+                const row = e.target.closest('.aiscan-line-row');
                 if (row) {
                     calcLineTotal(row);
                 }
@@ -1233,7 +1226,7 @@
         });
         section.addEventListener('change', e => {
             if (e.target.matches('[data-field="tax_rate"]') || e.target.matches('[data-field="irpf"]')) {
-                const row = e.target.closest('tr');
+                const row = e.target.closest('.aiscan-line-row');
                 if (row) {
                     calcLineTotal(row);
                 }
@@ -1243,41 +1236,24 @@
         section.addEventListener('click', e => {
             const deleteBtn = e.target.closest('.aiscan-delete-line');
             if (deleteBtn) {
-                const row = deleteBtn.closest('tr');
-                if (row && document.querySelectorAll('#aiscan-lines-body tr').length > 1) {
+                const row = deleteBtn.closest('.aiscan-line-row');
+                if (row && document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').length > 1) {
                     row.remove();
                 }
             }
             const addBtn = e.target.closest('#aiscan-add-line-btn');
             if (addBtn) {
-                const tbody = document.getElementById('aiscan-lines-body');
-                const newIndex = tbody.querySelectorAll('tr').length;
-                tbody.insertAdjacentHTML('beforeend', `
-                    <tr data-line-index="${newIndex}" data-tax-rate="0">
-                        <td style="position:relative">
-                            <div class="input-group input-group-sm">
-                                <input class="form-control form-control-sm" data-field="description" value="">
-                                <input type="hidden" data-field="referencia" value="">
-                                <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
-                                <span class="input-group-text p-0 px-1 aiscan-ref-badge"><span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span></span>
-                            </div>
-                            <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
-                        </td>
-                        <td><input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="1" style="width:70px"></td>
-                        <td><input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="0" style="width:90px"></td>
-                        <td><input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="0" style="width:60px"></td>
-                        <td>${buildTaxSelect(0)}</td>
-                        <td>${buildWithholdingSelect(0)}</td>
-                        <td class="text-end text-nowrap"><span class="small fw-semibold aiscan-line-total">0.00</span></td>
-                        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line"><i class="fa-solid fa-trash-can"></i></button></td>
-                    </tr>
-                `);
+                const container = document.getElementById('aiscan-lines-body');
+                const newIndex = container.querySelectorAll('.aiscan-line-row').length;
+                container.insertAdjacentHTML('beforeend', buildLineRow(
+                    {description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}, newIndex
+                ));
             }
 
             // Product search button
             const matchBtn = e.target.closest('.aiscan-product-match-btn');
             if (matchBtn) {
-                const td = matchBtn.closest('td');
+                const td = matchBtn.closest('.aiscan-line-row');
                 const descInput = td.querySelector('[data-field="description"]');
                 const resultsDiv = td.querySelector('.aiscan-product-results-row');
                 if (descInput && resultsDiv) {
@@ -1308,7 +1284,7 @@
             // Product pick from results
             const pickBtn = e.target.closest('.aiscan-product-pick');
             if (pickBtn) {
-                const td = pickBtn.closest('td');
+                const td = pickBtn.closest('.aiscan-line-row');
                 const refInput = td.querySelector('[data-field="referencia"]');
                 const badge = td.querySelector('.aiscan-ref-badge');
                 const resultsDiv = td.querySelector('.aiscan-product-results-row');
@@ -1531,7 +1507,7 @@
         }
 
         if (state.importMode === 'lines') {
-            data.lines = Array.from(document.querySelectorAll('#aiscan-lines-body tr')).map(row => {
+            data.lines = Array.from(document.querySelectorAll('#aiscan-lines-body .aiscan-line-row')).map(row => {
                 const line = {};
                 row.querySelectorAll('[data-field]').forEach(input => {
                     line[input.dataset.field] = input.type === 'number' ? parseFloat(input.value || 0) : input.value;
