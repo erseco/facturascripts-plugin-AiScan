@@ -369,7 +369,7 @@ class AiScanInvoice extends Controller
         $duplicateWarning = $this->checkDuplicateInvoice($extracted);
         if ($duplicateWarning) {
             $extracted['_duplicate'] = $duplicateWarning;
-            $extracted['warnings'][] = $duplicateWarning['message'];
+            $extracted['_validation_errors'][] = $duplicateWarning['message'];
         }
 
         echo json_encode(['success' => true, 'data' => $extracted]);
