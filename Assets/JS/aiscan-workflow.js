@@ -803,24 +803,29 @@
         review.appendChild(buildSection(trans('aiscan-section-supplier'), supplierBody,
             {collapsed: supplierMatched, headerExtra: supplierSummary}));
 
-        const invoiceSummaryText = `${escapeHtml(invoice.number || '?')} · ${escapeHtml(invoice.issue_date || '')} · ${escapeHtml(String(invoice.total ?? 0))} ${escapeHtml(invoice.currency || 'EUR')}`;
-        const invoiceHeaderExtra = ` <span class="text-muted fw-normal ms-2">&middot; ${invoiceSummaryText}</span>`;
-
         review.appendChild(buildSection(trans('aiscan-section-invoice'), `
             <div class="d-flex gap-2 mb-1">
                 <div style="flex:2">${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}</div>
                 <div style="flex:1">${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}</div>
-                <div style="flex:1">
-                    <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_total">${escapeHtml(trans('total'))}${confidence.total != null ? ` <span class="badge ${confidence.total >= 0.7 ? 'text-bg-success' : confidence.total >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}">${Math.round(confidence.total * 100)}%</span>` : ''}</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
-                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="number" step="0.01" value="${escapeAttr(invoice.total ?? '')}">
-                        </div>
-                    </div>
-                </div>
+                <div style="flex:1">${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}</div>
             </div>
-            <div class="d-flex gap-2 mb-1">
+            <div class="mb-1">
+                <input class="form-control form-control-sm text-truncate" id="invoice_summary" type="text" value="${escapeAttr(invoice.summary || '')}" placeholder="${escapeAttr(trans('summary'))}">
+            </div>
+            ${invoice.payment_terms ? `<input type="hidden" id="invoice_payment_terms" value="${escapeAttr(invoice.payment_terms)}">` : ''}
+        `));
+
+        if (state.importMode === 'total') {
+            review.appendChild(buildDefaultProductSection(supplier));
+        }
+
+        if (state.importMode === 'lines') {
+            review.appendChild(buildLinesSection(lines));
+        }
+
+        // Totals section below lines (like a real invoice footer)
+        review.appendChild(buildSection(trans('aiscan-section-totals'), `
+            <div class="d-flex gap-2">
                 <div style="flex:1">
                     <div class="mb-2">
                         <label class="form-label small mb-1" for="invoice_subtotal">${escapeHtml(trans('subtotal'))}</label>
@@ -850,6 +855,15 @@
                 </div>` : ''}
                 <div style="flex:1">
                     <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_total">${escapeHtml(trans('total'))}</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="number" step="0.01" value="${escapeAttr(invoice.total ?? '')}">
+                        </div>
+                    </div>
+                </div>
+                <div style="flex:1">
+                    <div class="mb-2">
                         <label class="form-label small mb-1" for="invoice_currency">${escapeHtml(trans('currency'))}</label>
                         <select class="form-select form-select-sm" id="invoice_currency">
                             <option value="EUR"${(invoice.currency || 'EUR') === 'EUR' ? ' selected' : ''}>EUR</option>
@@ -859,25 +873,7 @@
                     </div>
                 </div>
             </div>
-            <div class="d-flex gap-2">
-                <div style="flex:3">
-                    <div class="mb-2">
-                        <label class="form-label small mb-1" for="invoice_summary">${escapeHtml(trans('summary'))}</label>
-                        <input class="form-control form-control-sm text-truncate" id="invoice_summary" type="text" value="${escapeAttr(invoice.summary || '')}">
-                    </div>
-                </div>
-                <div style="flex:1">${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}</div>
-            </div>
-            ${invoice.payment_terms ? `<input type="hidden" id="invoice_payment_terms" value="${escapeAttr(invoice.payment_terms)}">` : ''}
-        `, {collapsed: true, headerExtra: invoiceHeaderExtra}));
-
-        if (state.importMode === 'total') {
-            review.appendChild(buildDefaultProductSection(supplier));
-        }
-
-        if (state.importMode === 'lines') {
-            review.appendChild(buildLinesSection(lines));
-        }
+        `));
 
         review.insertAdjacentHTML('beforeend', `
             <div class="d-flex justify-content-end gap-2 mt-3 mb-2">
@@ -1240,6 +1236,28 @@
             }
             renderReviewPanel(doc);
         });
+
+        // Bind ambiguous supplier dropdown selection
+        const matchSelect = document.getElementById('supplier_match_select');
+        if (matchSelect && matchSelect.options.length > 1) {
+            matchSelect.addEventListener('change', () => {
+                const opt = matchSelect.selectedOptions[0];
+                if (!opt) {
+                    return;
+                }
+                const doc = currentDoc();
+                if (doc?.extractedData?.supplier) {
+                    const text = opt.textContent.trim();
+                    const nameMatch = text.match(/^(.+?)\s*\(([^)]*)\)$/);
+                    doc.extractedData.supplier.matched_supplier_id = opt.value;
+                    doc.extractedData.supplier.matched_name = nameMatch ? nameMatch[1] : text;
+                    doc.extractedData.supplier.match_status = 'selected';
+                    doc.extractedData.supplier.tax_id = nameMatch ? nameMatch[2] : '';
+                    doc.extractedData.supplier.name = doc.extractedData.supplier.matched_name;
+                }
+                renderReviewPanel(doc);
+            });
+        }
 
         // Bind inline create supplier button
         const createBtn = document.getElementById('aiscan-create-supplier-btn');

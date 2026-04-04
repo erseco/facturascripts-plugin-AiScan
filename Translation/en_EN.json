@@ -23,6 +23,7 @@
     "aiscan-section-invoice": "Invoice info",
     "aiscan-section-products": "Products",
     "aiscan-section-supplier": "Supplier",
+    "aiscan-section-totals": "Totals",
     "aiscan-supplier-create-error": "Error creating supplier.",
     "aiscan-supplier-created-success": "Supplier created successfully.",
     "aiscan-supplier-name-required": "Supplier name is required.",
