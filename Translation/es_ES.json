@@ -85,6 +85,7 @@
     "aiscan-line-items": "Líneas",
     "aiscan-loading-provider": "Cargando...",
     "aiscan-mark-ready": "Marcar como lista para importar",
+    "aiscan-more-options": "Más opciones",
     "aiscan-matched-with": "Coincide con: %name%",
     "aiscan-mode-lines": "Interpretar por líneas de factura",
     "aiscan-mode-lines-help": "Extrae e importa cada línea individualmente.",

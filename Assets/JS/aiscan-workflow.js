@@ -1135,6 +1135,10 @@
         });
     }
 
+    function fmtNumber(n) {
+        return n.toLocaleString(document.documentElement.lang || 'es', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
     function calcLineTotal(row) {
         const qty = parseFloat(row.querySelector('[data-field="quantity"]')?.value || 0);
         const price = parseFloat(row.querySelector('[data-field="unit_price"]')?.value || 0);
@@ -1146,17 +1150,22 @@
         const irpfAmount = base * (irpf / 100);
         const total = base + taxAmount - irpfAmount;
 
-        const taxLabel = row.querySelector('.aiscan-tax-label');
-        if (taxLabel) {
-            taxLabel.textContent = '+' + taxAmount.toFixed(2);
-        }
-        const irpfLabel = row.querySelector('.aiscan-irpf-label');
-        if (irpfLabel) {
-            irpfLabel.textContent = '-' + irpfAmount.toFixed(2);
-        }
         const totalLabel = row.querySelector('.aiscan-line-total');
         if (totalLabel) {
-            totalLabel.textContent = total.toFixed(2);
+            totalLabel.textContent = fmtNumber(total);
+        }
+        // Update modal summary if present
+        const modalBase = row.querySelector('.aiscan-modal-base');
+        if (modalBase) {
+            modalBase.textContent = fmtNumber(base);
+        }
+        const modalTax = row.querySelector('.aiscan-modal-tax-amount');
+        if (modalTax) {
+            modalTax.textContent = fmtNumber(taxAmount);
+        }
+        const modalIrpf = row.querySelector('.aiscan-modal-irpf-amount');
+        if (modalIrpf) {
+            modalIrpf.textContent = fmtNumber(irpfAmount);
         }
     }
 
@@ -1169,37 +1178,65 @@
         const matchBadge = ref
             ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
             : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
-        return `<div class="border rounded mb-1 p-1 aiscan-line-row" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
-            <div class="d-flex gap-1 align-items-center mb-1">
-                <div style="flex:4;position:relative">
-                    <div class="input-group input-group-sm">
-                        <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}" placeholder="${escapeAttr(trans('description'))}">
-                        <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
-                        <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
-                        <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
-                    </div>
-                    <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
+        const modalId = 'aiscan-line-modal-' + index;
+        return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
+            <div style="flex:4;position:relative">
+                <div class="input-group input-group-sm">
+                    <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
+                    <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
+                    <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
+                    <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
                 </div>
-                <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:60px">
-                <div class="input-group input-group-sm" style="width:100px">
-                    <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.7rem"></i></span>
-                    <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}">
-                </div>
-                <span class="small fw-bold text-nowrap aiscan-line-total" style="min-width:55px;text-align:right">0.00</span>
-                <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
+                <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
             </div>
-            <div class="d-flex gap-1 align-items-center ps-1">
-                <div class="input-group input-group-sm" style="width:85px">
-                    <input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}">
-                    <span class="input-group-text p-1">%</span>
-                </div>
-                <div class="input-group input-group-sm" style="flex:1">
-                    ${buildTaxSelect(line.tax_rate)}
-                    <span class="input-group-text p-1 text-success small aiscan-tax-label">+0.00</span>
-                </div>
-                <div class="input-group input-group-sm" style="flex:1">
-                    ${buildWithholdingSelect(line.irpf)}
-                    <span class="input-group-text p-1 text-danger small aiscan-irpf-label">-0.00</span>
+            <input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="any" value="${escapeAttr(line.quantity ?? 1)}" style="width:55px">
+            <div class="input-group input-group-sm" style="width:95px">
+                <span class="input-group-text p-1"><i class="fa-solid fa-euro-sign fa-fw" style="font-size:0.65rem"></i></span>
+                <input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="any" value="${escapeAttr(line.unit_price ?? 0)}">
+            </div>
+            <span class="small fw-bold text-nowrap aiscan-line-total" style="min-width:50px;text-align:right">0,00</span>
+            <button type="button" class="btn btn-sm btn-light aiscan-line-detail-btn" data-bs-toggle="modal" data-bs-target="#${modalId}" title="${escapeAttr(trans('aiscan-more-options'))}"><i class="fa-solid fa-ellipsis"></i></button>
+            <button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button>
+            <input type="hidden" data-field="discount" class="aiscan-calc" value="${escapeAttr(line.discount ?? 0)}">
+            <input type="hidden" data-field="tax_rate" class="aiscan-calc" value="${escapeAttr(line.tax_rate ?? 0)}">
+            <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(line.irpf ?? 0)}">
+            <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header py-2">
+                            <h6 class="modal-title"><i class="fa-solid fa-pen-to-square fa-fw me-1"></i>${escapeHtml(trans('aiscan-more-options'))}</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">% ${escapeHtml(trans('discount'))}</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" class="form-control aiscan-modal-discount" min="0" max="100" step="any" value="${escapeAttr(line.discount ?? 0)}">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">${escapeHtml(trans('tax'))}</label>
+                                    ${buildTaxSelect(line.tax_rate).replace('data-field="tax_rate"', 'class="form-select form-select-sm aiscan-modal-tax"')}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">IRPF</label>
+                                    ${buildWithholdingSelect(line.irpf).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                </div>
+                                <div class="col-6">
+                                    <div class="mt-3 small">
+                                        <div>${escapeHtml(trans('subtotal'))}: <strong class="aiscan-modal-base">0,00</strong></div>
+                                        <div>${escapeHtml(trans('tax'))}: <strong class="aiscan-modal-tax-amount">0,00</strong></div>
+                                        <div>IRPF: <strong class="aiscan-modal-irpf-amount">0,00</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer py-1">
+                            <button type="button" class="btn btn-sm btn-primary aiscan-modal-accept" data-bs-dismiss="modal">${escapeHtml(trans('accept'))}</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>`;
@@ -1211,6 +1248,13 @@
         const rows = displayLines.map((line, index) => buildLineRow(line, index)).join('');
 
         const section = buildSection(trans('aiscan-section-products'), `
+            <div class="d-flex gap-1 align-items-center py-1 border-bottom mb-1 small text-muted">
+                <div style="flex:4">${escapeHtml(trans('description'))}</div>
+                <div style="width:55px">${escapeHtml(trans('quantity'))}</div>
+                <div style="width:95px">${escapeHtml(trans('price'))}</div>
+                <div style="min-width:50px;text-align:right">${escapeHtml(trans('total'))}</div>
+                <div style="width:56px"></div>
+            </div>
             <div id="aiscan-lines-body">${rows}</div>
             <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="aiscan-add-line-btn">
                 <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-add-line'))}
@@ -1231,7 +1275,39 @@
                 }
             }
         });
+        // Sync modal inputs to hidden fields and recalculate
+        section.addEventListener('input', e => {
+            const modal = e.target.closest('.modal');
+            if (!modal) {
+                return;
+            }
+            const row = modal.closest('.aiscan-line-row');
+            if (!row) {
+                return;
+            }
+            const discountModal = modal.querySelector('.aiscan-modal-discount');
+            if (discountModal) {
+                row.querySelector('[data-field="discount"]').value = discountModal.value;
+            }
+            calcLineTotal(row);
+        });
         section.addEventListener('change', e => {
+            const modal = e.target.closest('.modal');
+            if (modal) {
+                const row = modal.closest('.aiscan-line-row');
+                if (row) {
+                    const taxModal = modal.querySelector('.aiscan-modal-tax');
+                    if (taxModal) {
+                        row.querySelector('[data-field="tax_rate"]').value = taxModal.value;
+                    }
+                    const irpfModal = modal.querySelector('.aiscan-modal-irpf');
+                    if (irpfModal) {
+                        row.querySelector('[data-field="irpf"]').value = irpfModal.value;
+                    }
+                    calcLineTotal(row);
+                }
+                return;
+            }
             if (e.target.matches('[data-field="tax_rate"]') || e.target.matches('[data-field="irpf"]')) {
                 const row = e.target.closest('.aiscan-line-row');
                 if (row) {

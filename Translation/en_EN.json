@@ -85,6 +85,7 @@
     "aiscan-line-items": "Line items",
     "aiscan-loading-provider": "Loading...",
     "aiscan-mark-ready": "Mark as ready to import",
+    "aiscan-more-options": "More options",
     "aiscan-matched-with": "Matched with: %name%",
     "aiscan-mode-lines": "Interpret by invoice lines",
     "aiscan-mode-lines-help": "Extract and import each line item individually.",
