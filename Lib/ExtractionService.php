@@ -127,6 +127,8 @@ Output schema:
       "unit_price": "number|null",
       "discount": "number|null",
       "tax_rate": "number|null",
+      "tax_code": "string|null (code from available tax types list)",
+      "irpf_code": "string|null (code from available withholding types list)",
       "line_total": "number|null",
       "sku": "string|null"
     }
@@ -271,6 +273,9 @@ PROMPT;
             . ' MUST be written in ' . $langName . '.'
             . ' Do not use English unless the application language is English.';
 
+        // Add available tax types and withholding types for matching
+        $prompt .= self::buildTaxTypesHint();
+
         $prompt .= $importMode === 'total' ? self::MODE_TOTAL_HINT : self::MODE_LINES_HINT;
 
         if (!empty(trim($historicalContext))) {
@@ -278,6 +283,34 @@ PROMPT;
         }
 
         return $prompt;
+    }
+
+    private static function buildTaxTypesHint(): string
+    {
+        $hint = "\n\nAvailable tax types (use the code in lines.tax_code):\n";
+        try {
+            $impuesto = new \FacturaScripts\Dinamic\Model\Impuesto();
+            foreach ($impuesto->all([], ['iva' => 'ASC'], 0, 0) as $tax) {
+                $hint .= "- {$tax->codimpuesto}: {$tax->descripcion} ({$tax->iva}%)\n";
+            }
+        } catch (\Throwable $e) {
+            $hint .= "- IVA21: IVA 21%, IVA10: IVA 10%, IVA4: IVA 4%, IVA0: IVA 0%\n";
+        }
+
+        $hint .= "\nAvailable withholding types (use the code in lines.irpf_code):\n";
+        try {
+            $retencion = new \FacturaScripts\Dinamic\Model\Retencion();
+            foreach ($retencion->all([], ['porcentaje' => 'ASC'], 0, 0) as $ret) {
+                $hint .= "- {$ret->codretencion}: {$ret->descripcion} ({$ret->porcentaje}%)\n";
+            }
+        } catch (\Throwable $e) {
+            $hint .= "- IRPF15: IRPF 15%, IRPF7: IRPF 7%\n";
+        }
+
+        $hint .= "\nFor each line, return tax_code (matching a code above) and irpf_code if withholding applies.\n";
+        $hint .= "Match the tax rate to the closest available tax type code.\n";
+
+        return $hint;
     }
 
     public function getProvider(?string $providerName = null): ProviderInterface

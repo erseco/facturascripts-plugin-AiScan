@@ -696,7 +696,7 @@
         area.innerHTML = '';
 
         if (doc.mimeType === 'application/pdf' && doc.objectUrl) {
-            area.innerHTML = `<iframe src="${doc.objectUrl}#navpanes=0&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
+            area.innerHTML = `<iframe src="${doc.objectUrl}#navpanes=0&toolbar=1&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
         } else if (doc.objectUrl) {
             area.innerHTML = `<img src="${doc.objectUrl}" alt="${escapeAttr(doc.originalName)}">`;
         } else {
@@ -1146,17 +1146,53 @@
     function initTaxSelects(container) {
         container.querySelectorAll('.aiscan-line-row').forEach(row => {
             const rate = parseFloat(row.dataset.taxRate || 0);
-            // Sync the hidden tax_rate field and modal tax select
+            const taxCode = row.dataset.taxCode || '';
+            const irpfCode = row.dataset.irpfCode || '';
+
+            // Sync hidden tax_rate field
             const hiddenTax = row.querySelector('[data-field="tax_rate"]');
             if (hiddenTax) {
                 hiddenTax.value = rate;
             }
+
+            // Select tax in modal — prefer code match, fallback to rate match
             const modalTax = row.querySelector('.aiscan-modal-tax');
             if (modalTax) {
-                for (const opt of modalTax.options) {
-                    if (Math.abs(parseFloat(opt.value) - rate) < 0.01) {
-                        opt.selected = true;
-                        break;
+                let found = false;
+                if (taxCode) {
+                    const taxes = window.aiscanTaxTypes || [];
+                    const match = taxes.find(t => t.code === taxCode);
+                    if (match) {
+                        for (const opt of modalTax.options) {
+                            if (parseFloat(opt.value) === match.rate) {
+                                opt.selected = true;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!found) {
+                    for (const opt of modalTax.options) {
+                        if (Math.abs(parseFloat(opt.value) - rate) < 0.01) {
+                            opt.selected = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Select IRPF in modal — prefer code match
+            const modalIrpf = row.querySelector('.aiscan-modal-irpf');
+            if (modalIrpf && irpfCode) {
+                const types = window.aiscanWithholdingTypes || [];
+                const match = types.find(t => t.code === irpfCode);
+                if (match) {
+                    for (const opt of modalIrpf.options) {
+                        if (parseFloat(opt.value) === match.rate) {
+                            opt.selected = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -1388,7 +1424,7 @@
             ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
             : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
         const modalId = 'aiscan-line-modal-' + index;
-        return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
+        return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}" data-tax-code="${escapeAttr(line.tax_code || '')}" data-irpf-code="${escapeAttr(line.irpf_code || '')}">
             <div style="flex:4;position:relative">
                 <div class="input-group input-group-sm">
                     <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
