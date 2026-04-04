@@ -1156,9 +1156,21 @@
     function buildLinesSection(lines) {
         const displayLines = lines.length > 0 ? lines : [{description: '', quantity: 1, unit_price: 0, discount: 0, tax_rate: 0, irpf: 0}];
 
-        const rows = displayLines.map((line, index) => `
-            <tr data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
-                <td><input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}"></td>
+        const rows = displayLines.map((line, index) => {
+            const ref = line.sku || line.referencia || '';
+            const matchBadge = ref
+                ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
+                : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
+            return `<tr data-line-index="${index}" data-tax-rate="${line.tax_rate ?? 0}">
+                <td style="position:relative">
+                    <div class="input-group input-group-sm">
+                        <input class="form-control form-control-sm" data-field="description" value="${escapeAttr(line.description || '')}">
+                        <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
+                        <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
+                        <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
+                    </div>
+                    <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
+                </td>
                 <td><input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="${escapeAttr(line.quantity ?? 1)}" style="width:70px"></td>
                 <td><input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="${escapeAttr(line.unit_price ?? 0)}" style="width:90px"></td>
                 <td><input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="${escapeAttr(line.discount ?? 0)}" style="width:60px"></td>
@@ -1166,8 +1178,8 @@
                 <td>${buildWithholdingSelect(line.irpf)}</td>
                 <td class="text-end text-nowrap"><span class="small fw-semibold aiscan-line-total">0.00</span></td>
                 <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line" title="${escapeAttr(trans('aiscan-delete-line'))}"><i class="fa-solid fa-trash-can"></i></button></td>
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
 
         const section = buildSection(trans('aiscan-section-products'), `
             <div class="table-responsive">
@@ -1229,7 +1241,15 @@
                 const newIndex = tbody.querySelectorAll('tr').length;
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr data-line-index="${newIndex}" data-tax-rate="0">
-                        <td><input class="form-control form-control-sm" data-field="description" value=""></td>
+                        <td style="position:relative">
+                            <div class="input-group input-group-sm">
+                                <input class="form-control form-control-sm" data-field="description" value="">
+                                <input type="hidden" data-field="referencia" value="">
+                                <button class="btn btn-outline-secondary aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-search"></i></button>
+                                <span class="input-group-text p-0 px-1 aiscan-ref-badge"><span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span></span>
+                            </div>
+                            <div class="aiscan-product-results-row list-group position-absolute" style="z-index:10;max-height:150px;overflow-y:auto;display:none;left:0;right:0"></div>
+                        </td>
                         <td><input class="form-control form-control-sm aiscan-calc" data-field="quantity" type="number" step="0.01" value="1" style="width:70px"></td>
                         <td><input class="form-control form-control-sm aiscan-calc" data-field="unit_price" type="number" step="0.01" value="0" style="width:90px"></td>
                         <td><input class="form-control form-control-sm aiscan-calc" data-field="discount" type="number" step="0.01" value="0" style="width:60px"></td>
@@ -1239,6 +1259,56 @@
                         <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger aiscan-delete-line"><i class="fa-solid fa-trash-can"></i></button></td>
                     </tr>
                 `);
+            }
+
+            // Product search button
+            const matchBtn = e.target.closest('.aiscan-product-match-btn');
+            if (matchBtn) {
+                const td = matchBtn.closest('td');
+                const descInput = td.querySelector('[data-field="description"]');
+                const resultsDiv = td.querySelector('.aiscan-product-results-row');
+                if (descInput && resultsDiv) {
+                    const query = descInput.value.trim();
+                    if (query.length < 2) {
+                        resultsDiv.style.display = 'none';
+                        return;
+                    }
+                    fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+                        .then(r => r.json())
+                        .then(data => {
+                            const items = data.results || [];
+                            if (items.length === 0) {
+                                resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                            } else {
+                                resultsDiv.innerHTML = items.map(p =>
+                                    `<button type="button" class="list-group-item list-group-item-action small py-1 aiscan-product-pick" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
+                                        <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
+                                    </button>`
+                                ).join('');
+                            }
+                            resultsDiv.style.display = '';
+                        })
+                        .catch(() => { resultsDiv.style.display = 'none'; });
+                }
+            }
+
+            // Product pick from results
+            const pickBtn = e.target.closest('.aiscan-product-pick');
+            if (pickBtn) {
+                const td = pickBtn.closest('td');
+                const refInput = td.querySelector('[data-field="referencia"]');
+                const badge = td.querySelector('.aiscan-ref-badge');
+                const resultsDiv = td.querySelector('.aiscan-product-results-row');
+                if (refInput) {
+                    refInput.value = pickBtn.dataset.ref;
+                }
+                if (badge) {
+                    badge.innerHTML = `<span class="badge text-bg-success" title="${escapeAttr(pickBtn.dataset.ref)}"><i class="fa-solid fa-link"></i></span>`;
+                }
+                if (resultsDiv) {
+                    resultsDiv.style.display = 'none';
+                    resultsDiv.innerHTML = '';
+                }
             }
         });
 

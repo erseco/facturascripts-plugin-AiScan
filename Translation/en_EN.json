@@ -22,6 +22,7 @@
     "aiscan-no-supplier-matched": "No supplier matched",
     "aiscan-section-invoice": "Invoice info",
     "aiscan-section-products": "Products",
+    "aiscan-search-product": "Search product",
     "aiscan-section-supplier": "Supplier",
     "aiscan-section-totals": "Totals",
     "aiscan-supplier-create-error": "Error creating supplier.",
