@@ -905,24 +905,16 @@
         }
         return `
             <div class="border rounded p-2 mt-2 bg-light">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="small fw-semibold">${escapeHtml(trans('aiscan-create-supplier'))}</span>
+                <div class="small fw-semibold mb-1">${escapeHtml(trans('aiscan-create-supplier'))}</div>
+                <div class="d-flex gap-1 mb-1">
+                    <input class="form-control form-control-sm" style="flex:2" id="aiscan-new-supplier-name" placeholder="${escapeAttr(trans('name'))}" value="${escapeAttr(supplier.name || '')}">
+                    <input class="form-control form-control-sm" style="flex:1" id="aiscan-new-supplier-taxid" placeholder="${escapeAttr(trans('tax-id'))}" value="${escapeAttr(supplier.tax_id || '')}">
                 </div>
-                <div class="row g-1">
-                    <div class="col-6">
-                        <input class="form-control form-control-sm" id="aiscan-new-supplier-name" placeholder="${escapeAttr(trans('name'))}" value="${escapeAttr(supplier.name || '')}">
-                    </div>
-                    <div class="col-6">
-                        <input class="form-control form-control-sm" id="aiscan-new-supplier-taxid" placeholder="${escapeAttr(trans('tax-id'))}" value="${escapeAttr(supplier.tax_id || '')}">
-                    </div>
-                    <div class="col-6">
-                        <input class="form-control form-control-sm" id="aiscan-new-supplier-email" placeholder="${escapeAttr(trans('email'))}" value="${escapeAttr(supplier.email || '')}">
-                    </div>
-                    <div class="col-6">
-                        <input class="form-control form-control-sm" id="aiscan-new-supplier-phone" placeholder="${escapeAttr(trans('phone'))}" value="${escapeAttr(supplier.phone || '')}">
-                    </div>
+                <div class="d-flex gap-1 mb-1">
+                    <input class="form-control form-control-sm" id="aiscan-new-supplier-email" placeholder="${escapeAttr(trans('email'))}" value="${escapeAttr(supplier.email || '')}">
+                    <input class="form-control form-control-sm" id="aiscan-new-supplier-phone" placeholder="${escapeAttr(trans('phone'))}" value="${escapeAttr(supplier.phone || '')}">
                 </div>
-                <div class="mt-2 d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
                     <button type="button" class="btn btn-primary btn-sm" id="aiscan-create-supplier-btn">
                         <i class="fa-solid fa-plus me-1"></i>${escapeHtml(trans('aiscan-create-supplier'))}
                     </button>
