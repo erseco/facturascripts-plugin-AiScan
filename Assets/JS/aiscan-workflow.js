@@ -1181,29 +1181,16 @@
                 taxIdInput.value = item.dataset.taxid;
             }
 
-            let matchSelect = document.getElementById('supplier_match_select');
-            if (!matchSelect) {
-                matchSelect = document.createElement('select');
-                matchSelect.id = 'supplier_match_select';
-                matchSelect.className = 'form-select form-select-sm d-none';
-                resultsDiv.parentElement.appendChild(matchSelect);
+            // Update document supplier data and re-render collapsed
+            const doc = currentDoc();
+            if (doc?.extractedData?.supplier) {
+                doc.extractedData.supplier.matched_supplier_id = item.dataset.id;
+                doc.extractedData.supplier.matched_name = item.dataset.name;
+                doc.extractedData.supplier.match_status = 'matched';
+                doc.extractedData.supplier.name = item.dataset.name;
+                doc.extractedData.supplier.tax_id = item.dataset.taxid;
             }
-            matchSelect.innerHTML = `<option value="${escapeAttr(item.dataset.id)}" selected>${escapeHtml(item.dataset.name)}</option>`;
-
-            resultsDiv.innerHTML = '';
-            searchInput.value = '';
-
-            const alertEl = resultsDiv.closest('.card-body')?.querySelector('.alert');
-            if (alertEl) {
-                alertEl.className = 'alert alert-success small mb-0';
-                alertEl.textContent = trans('aiscan-selected-supplier', {'%name%': item.dataset.name, '%taxId%': item.dataset.taxid});
-            }
-
-            const refInput = document.getElementById('default_product_ref');
-            if (refInput) {
-                refInput.dataset.codproveedor = item.dataset.id;
-                loadDefaultProduct(item.dataset.id);
-            }
+            renderReviewPanel(doc);
         });
 
         // Bind inline create supplier button
