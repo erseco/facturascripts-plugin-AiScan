@@ -771,15 +771,31 @@
             ? ` <span class="text-muted fw-normal ms-2">&middot; ${escapeHtml(supplier.matched_name || supplier.name || '')} (${escapeHtml(supplier.tax_id || '')})</span> <span class="badge text-bg-success ms-1">${escapeHtml(trans('aiscan-detected'))}</span>`
             : (supplier.match_status === 'not_found' ? ` <span class="badge text-bg-warning ms-2">${escapeHtml(trans('aiscan-no-supplier-matched'))}</span>` : '');
 
-        review.appendChild(buildSection(trans('aiscan-section-supplier'), `
-            ${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}
-            ${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}
-            ${buildInput(trans('email'), 'supplier_email', supplier.email || '')}
-            ${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}
-            ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
-            ${buildSupplierStatus(supplier)}
-            ${buildInlineCreateSupplier(supplier)}
-        `, {collapsed: supplierMatched, headerExtra: supplierSummary}));
+        const supplierBody = supplierMatched
+            ? `<div class="d-flex gap-2 mb-1">
+                    <div style="flex:2">${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}</div>
+                    <div style="flex:1">${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <div style="flex:1">${buildInput(trans('email'), 'supplier_email', supplier.email || '')}</div>
+                    <div style="flex:1">${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}</div>
+                </div>
+                <input type="hidden" id="supplier_address" value="${escapeAttr(supplier.address || '')}">
+                <select id="supplier_match_select" class="d-none"><option value="${escapeAttr(supplier.matched_supplier_id || '')}" selected></option></select>`
+            : `<div class="d-flex gap-2 mb-1">
+                    <div style="flex:2">${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}</div>
+                    <div style="flex:1">${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <div style="flex:1">${buildInput(trans('email'), 'supplier_email', supplier.email || '')}</div>
+                    <div style="flex:1">${buildInput(trans('phone'), 'supplier_phone', supplier.phone || '')}</div>
+                </div>
+                ${buildTextarea(trans('address'), 'supplier_address', supplier.address || '')}
+                ${buildSupplierStatus(supplier)}
+                ${buildInlineCreateSupplier(supplier)}`;
+
+        review.appendChild(buildSection(trans('aiscan-section-supplier'), supplierBody,
+            {collapsed: supplierMatched, headerExtra: supplierSummary}));
 
         review.appendChild(buildSection(trans('aiscan-section-invoice'), `
             ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
