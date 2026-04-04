@@ -245,7 +245,7 @@ final class SchemaValidatorTest extends TestCase
         $this->assertContains('Lines must be an array', $errors);
     }
 
-    public function testValidateIncludesAiWarnings(): void
+    public function testValidateDoesNotIncludeAiWarnings(): void
     {
         $errors = $this->validator->validate([
             'invoice' => [
@@ -258,8 +258,8 @@ final class SchemaValidatorTest extends TestCase
                 'Date inferred from context',
             ],
         ]);
-        $this->assertContains('Ambiguous supplier name', $errors);
-        $this->assertContains('Date inferred from context', $errors);
+        $this->assertNotContains('Ambiguous supplier name', $errors);
+        $this->assertNotContains('Date inferred from context', $errors);
     }
 
     public function testValidateIgnoresEmptyWarnings(): void

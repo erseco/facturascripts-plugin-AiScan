@@ -52,7 +52,7 @@ class SchemaValidator
 
         $lines = is_array($data['lines'] ?? null) ? $data['lines'] : [];
         foreach ($lines as $index => $line) {
-            if (empty($line['description'])) {
+            if (empty($line['description']) && empty($line['descripcion'])) {
                 $errors[] = 'Missing line description at index ' . $index;
             }
         }
@@ -98,14 +98,9 @@ class SchemaValidator
             }
         }
 
-        // Include AI-generated warnings
-        if (!empty($data['warnings']) && is_array($data['warnings'])) {
-            foreach ($data['warnings'] as $warning) {
-                if (is_string($warning) && !empty($warning)) {
-                    $errors[] = $warning;
-                }
-            }
-        }
+        // AI-generated warnings are informational only, not validation errors.
+        // They are preserved in data['warnings'] for display but do not
+        // block the review workflow.
 
         return $errors;
     }
@@ -191,6 +186,31 @@ class SchemaValidator
                     $line['pvpunitario'] = $qty > 0
                         ? $line['pvptotal'] / $qty
                         : $line['pvptotal'];
+                }
+            }
+            unset($line);
+
+            // Distribute withholding to lines if invoice has it but lines don't
+            $withholding = (float) ($data['invoice']['withholding_amount'] ?? 0);
+            if ($withholding > 0 && !empty($data['lines'])) {
+                $allZero = true;
+                foreach ($data['lines'] as $line) {
+                    if ((float) ($line['irpf'] ?? 0) > 0) {
+                        $allZero = false;
+                        break;
+                    }
+                }
+                if ($allZero) {
+                    $subtotal = (float) ($data['invoice']['subtotal'] ?? 0);
+                    $irpfRate = $subtotal > 0
+                        ? round(($withholding / $subtotal) * 100, 0)
+                        : 0;
+                    if ($irpfRate > 0) {
+                        foreach ($data['lines'] as &$line) {
+                            $line['irpf'] = (float) $irpfRate;
+                        }
+                        unset($line);
+                    }
                 }
             }
         }
