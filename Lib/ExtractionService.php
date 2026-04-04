@@ -202,6 +202,9 @@ Important:
 - If a field is missing or uncertain, use null.
 - Return ONLY valid JSON matching the schema from the system prompt.
 - Do not return markdown.
+- MUST return all text fields (summary, warnings, descriptions) in {{LANG}}.
+  If the app language is Spanish, write summaries and warnings in Spanish.
+  If the app language is English, write them in English.
 PROMPT;
 
     private const MODE_LINES_HINT = <<<'PROMPT'
@@ -251,6 +254,9 @@ PROMPT;
         $prompt = str_replace('{{FILE_NAME}}', $fileName ?: 'unknown', $prompt);
         $prompt = str_replace('{{MIME_TYPE}}', $mimeType ?: 'unknown', $prompt);
         $prompt = str_replace('{{IMPORT_MODE}}', $importMode === 'total' ? 'total' : 'lines', $prompt);
+        $lang = Tools::config('lang', 'es_ES');
+        $langName = str_starts_with($lang, 'es') ? 'Spanish' : 'English';
+        $prompt = str_replace('{{LANG}}', $langName, $prompt);
 
         $langCode = Tools::settings('default', 'codpais', '');
         $langMap = [
