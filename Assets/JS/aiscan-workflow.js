@@ -1149,15 +1149,15 @@
         const totalLabel = row.querySelector('.aiscan-line-total');
         if (totalLabel) {
             totalLabel.textContent = total.toFixed(2);
-            const tip = `${trans('subtotal')}: ${base.toFixed(2)}\n+${trans('tax')}: ${taxAmount.toFixed(2)}\n-IRPF: ${irpfAmount.toFixed(2)}`;
-            totalLabel.setAttribute('title', tip);
-            totalLabel.setAttribute('data-bs-toggle', 'tooltip');
-            totalLabel.setAttribute('data-bs-placement', 'left');
-            // Refresh Bootstrap tooltip
             const existing = bootstrap.Tooltip.getInstance(totalLabel);
             if (existing) {
                 existing.dispose();
             }
+            totalLabel.setAttribute('data-bs-toggle', 'tooltip');
+            totalLabel.setAttribute('data-bs-placement', 'top');
+            totalLabel.setAttribute('data-bs-html', 'true');
+            const tipHtml = `${escapeHtml(trans('subtotal'))}: ${base.toFixed(2)}<br>+${escapeHtml(trans('tax'))}: ${taxAmount.toFixed(2)}<br>-IRPF: ${irpfAmount.toFixed(2)}`;
+            totalLabel.setAttribute('data-bs-title', tipHtml);
             new bootstrap.Tooltip(totalLabel);
         }
     }
