@@ -698,14 +698,15 @@
         if (doc.mimeType === 'application/pdf' && doc.objectUrl) {
             area.innerHTML = `<iframe src="${doc.objectUrl}#navpanes=0&toolbar=1&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
         } else if (doc.objectUrl) {
+            area.style.position = 'relative';
             area.innerHTML = `
-                <div class="aiscan-img-container" style="height:100%;overflow:auto;cursor:grab;position:relative">
+                <div class="aiscan-img-container" style="height:100%;overflow:auto;cursor:grab">
                     <img src="${doc.objectUrl}" alt="${escapeAttr(doc.originalName)}" style="transform-origin:top left;transition:transform 0.2s" class="aiscan-zoom-img">
-                    <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-1" style="z-index:2">
-                        <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-out" title="Zoom -"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-                        <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-reset" title="Reset"><i class="fa-solid fa-expand"></i></button>
-                        <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-in" title="Zoom +"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-                    </div>
+                </div>
+                <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-1" style="z-index:2">
+                    <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-out" title="Zoom -"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-reset" title="Reset"><i class="fa-solid fa-expand"></i></button>
+                    <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-in" title="Zoom +"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
                 </div>`;
             let zoomLevel = 1;
             const img = area.querySelector('.aiscan-zoom-img');
@@ -729,9 +730,6 @@
             let scrollLeft = 0;
             let scrollTop = 0;
             container.addEventListener('mousedown', e => {
-                if (e.target.closest('button')) {
-                    return;
-                }
                 isDragging = true;
                 container.style.cursor = 'grabbing';
                 startX = e.pageX - container.offsetLeft;
