@@ -803,18 +803,73 @@
         review.appendChild(buildSection(trans('aiscan-section-supplier'), supplierBody,
             {collapsed: supplierMatched, headerExtra: supplierSummary}));
 
+        const invoiceSummaryText = `${escapeHtml(invoice.number || '?')} · ${escapeHtml(invoice.issue_date || '')} · ${escapeHtml(String(invoice.total ?? 0))} ${escapeHtml(invoice.currency || 'EUR')}`;
+        const invoiceHeaderExtra = ` <span class="text-muted fw-normal ms-2">&middot; ${invoiceSummaryText}</span>`;
+
         review.appendChild(buildSection(trans('aiscan-section-invoice'), `
-            ${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}
-            ${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}
-            ${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}
-            ${buildInput(trans('currency'), 'invoice_currency', invoice.currency || 'EUR')}
-            ${buildInput(trans('subtotal'), 'invoice_subtotal', invoice.subtotal ?? '', 'number', '0.01')}
-            ${buildInput(trans('tax-amount'), 'invoice_tax_amount', invoice.tax_amount ?? '', 'number', '0.01')}
-            ${invoice.withholding_amount ? buildInput(trans('irpf'), 'invoice_withholding', invoice.withholding_amount, 'number', '0.01') : ''}
-            ${buildInput(trans('total'), 'invoice_total', invoice.total ?? '', 'number', '0.01', confidence.total)}
-            ${buildTextarea(trans('summary'), 'invoice_summary', invoice.summary || '')}
-            ${invoice.payment_terms ? buildInput(trans('payment-terms'), 'invoice_payment_terms', invoice.payment_terms) : ''}
-        `));
+            <div class="d-flex gap-2 mb-1">
+                <div style="flex:2">${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}</div>
+                <div style="flex:1">${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}</div>
+                <div style="flex:1">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_total">${escapeHtml(trans('total'))}${confidence.total != null ? ` <span class="badge ${confidence.total >= 0.7 ? 'text-bg-success' : confidence.total >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}">${Math.round(confidence.total * 100)}%</span>` : ''}</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                            <input class="form-control form-control-sm fw-bold" id="invoice_total" type="number" step="0.01" value="${escapeAttr(invoice.total ?? '')}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2 mb-1">
+                <div style="flex:1">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_subtotal">${escapeHtml(trans('subtotal'))}</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                            <input class="form-control form-control-sm" id="invoice_subtotal" type="number" step="0.01" value="${escapeAttr(invoice.subtotal ?? '')}">
+                        </div>
+                    </div>
+                </div>
+                <div style="flex:1">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_tax_amount">${escapeHtml(trans('tax-amount'))}</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                            <input class="form-control form-control-sm" id="invoice_tax_amount" type="number" step="0.01" value="${escapeAttr(invoice.tax_amount ?? '')}">
+                        </div>
+                    </div>
+                </div>
+                ${invoice.withholding_amount ? `<div style="flex:1">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_withholding">${escapeHtml(trans('irpf'))}</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                            <input class="form-control form-control-sm" id="invoice_withholding" type="number" step="0.01" value="${escapeAttr(invoice.withholding_amount)}">
+                        </div>
+                    </div>
+                </div>` : ''}
+                <div style="flex:1">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_currency">${escapeHtml(trans('currency'))}</label>
+                        <select class="form-select form-select-sm" id="invoice_currency">
+                            <option value="EUR"${(invoice.currency || 'EUR') === 'EUR' ? ' selected' : ''}>EUR</option>
+                            <option value="USD"${invoice.currency === 'USD' ? ' selected' : ''}>USD</option>
+                            <option value="GBP"${invoice.currency === 'GBP' ? ' selected' : ''}>GBP</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <div style="flex:3">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="invoice_summary">${escapeHtml(trans('summary'))}</label>
+                        <input class="form-control form-control-sm text-truncate" id="invoice_summary" type="text" value="${escapeAttr(invoice.summary || '')}">
+                    </div>
+                </div>
+                <div style="flex:1">${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}</div>
+            </div>
+            ${invoice.payment_terms ? `<input type="hidden" id="invoice_payment_terms" value="${escapeAttr(invoice.payment_terms)}">` : ''}
+        `, {collapsed: true, headerExtra: invoiceHeaderExtra}));
 
         if (state.importMode === 'total') {
             review.appendChild(buildDefaultProductSection(supplier));
