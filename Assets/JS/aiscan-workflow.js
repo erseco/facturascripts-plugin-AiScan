@@ -1727,7 +1727,7 @@
             <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
-                        <div class="modal-header py-2">
+                        <div class="modal-header py-2" style="cursor:grab">
                             <h6 class="modal-title"><i class="fa-solid fa-pen-to-square fa-fw me-1"></i>${escapeHtml(trans('aiscan-more-options'))}</h6>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
@@ -1872,10 +1872,46 @@
             });
         }, 0);
 
+        // Make line detail modals draggable by their header
+        section.addEventListener('mousedown', e => {
+            const header = e.target.closest('.modal-header');
+            if (!header) { return; }
+            const dialog = header.closest('.modal-dialog');
+            if (!dialog) { return; }
+            e.preventDefault();
+            const startX = e.clientX, startY = e.clientY;
+            const rect = dialog.getBoundingClientRect();
+            const origLeft = rect.left, origTop = rect.top;
+            dialog.style.margin = '0';
+            dialog.style.position = 'fixed';
+            dialog.style.left = origLeft + 'px';
+            dialog.style.top = origTop + 'px';
+            header.style.cursor = 'grabbing';
+            function onMove(ev) {
+                dialog.style.left = (origLeft + ev.clientX - startX) + 'px';
+                dialog.style.top = (origTop + ev.clientY - startY) + 'px';
+            }
+            function onUp() {
+                header.style.cursor = '';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
         // Save modal state on open, restore on cancel/dismiss
         section.addEventListener('show.bs.modal', e => {
             const modal = e.target;
             if (!modal) { return; }
+            // Reset drag position
+            const dialog = modal.querySelector('.modal-dialog');
+            if (dialog) {
+                dialog.style.position = '';
+                dialog.style.left = '';
+                dialog.style.top = '';
+                dialog.style.margin = '';
+            }
             // Sync current row values into modal before opening
             const row = modal.closest('.aiscan-line-row');
             if (row) {
