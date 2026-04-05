@@ -22,6 +22,7 @@
         extractionPrompt: null,
         maxParallelRequests: 5,
         selectedIndices: new Set(),
+        selectionAnchorIndex: null,
         sortField: 'upload_order',
     };
 
@@ -133,6 +134,28 @@
 
     function currentDoc() {
         return state.documents[state.currentIndex] || null;
+    }
+
+    function applySelectionRange(selectedIndices, sortedIndices, anchorIndex, targetIndex, checked) {
+        const anchorPos = sortedIndices.indexOf(anchorIndex);
+        const targetPos = sortedIndices.indexOf(targetIndex);
+        if (anchorPos === -1 || targetPos === -1) {
+            return false;
+        }
+
+        const start = Math.min(anchorPos, targetPos);
+        const end = Math.max(anchorPos, targetPos);
+
+        for (let position = start; position <= end; position++) {
+            const index = sortedIndices[position];
+            if (checked) {
+                selectedIndices.add(index);
+            } else {
+                selectedIndices.delete(index);
+            }
+        }
+
+        return end > start;
     }
 
     // ── Initialization ─────────────────────────────────────────────────
@@ -482,6 +505,7 @@
             } else {
                 state.selectedIndices.clear();
             }
+            state.selectionAnchorIndex = null;
             renderSidebar();
         });
 
@@ -626,13 +650,33 @@
         });
 
         listEl.querySelectorAll('.aiscan-row-check').forEach(cb => {
-            cb.addEventListener('change', () => {
-                const idx = parseInt(cb.dataset.index);
-                if (cb.checked) {
-                    state.selectedIndices.add(idx);
-                } else {
-                    state.selectedIndices.delete(idx);
+            cb.addEventListener('click', (e) => {
+                const idx = parseInt(cb.dataset.index, 10);
+                const usedRangeSelection = e.shiftKey
+                    && state.selectionAnchorIndex !== null
+                    && applySelectionRange(
+                        state.selectedIndices,
+                        sorted,
+                        state.selectionAnchorIndex,
+                        idx,
+                        cb.checked
+                    );
+
+                if (!usedRangeSelection) {
+                    if (cb.checked) {
+                        state.selectedIndices.add(idx);
+                    } else {
+                        state.selectedIndices.delete(idx);
+                    }
                 }
+
+                state.selectionAnchorIndex = idx;
+
+                if (usedRangeSelection) {
+                    renderSidebar();
+                    return;
+                }
+
                 updateSelectAll();
             });
         });
@@ -693,6 +737,7 @@
         });
 
         state.selectedIndices.clear();
+        state.selectionAnchorIndex = null;
         if (actionSelect) {
             actionSelect.value = '';
         }
@@ -2586,6 +2631,7 @@
         state.documents = [];
         state.currentIndex = 0;
         state.selectedIndices.clear();
+        state.selectionAnchorIndex = null;
 
         const dropZone = document.getElementById('aiscan-drop-zone');
         dropZone.innerHTML = `
@@ -2687,5 +2733,13 @@
                 container.classList.remove('aiscan-split-dragging');
             }
         });
+    }
+
+    if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
+        globalThis.__aiscanWorkflowTestHooks = {
+            applySelectionRange,
+            renderSidebar,
+            state,
+        };
     }
 })();
