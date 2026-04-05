@@ -14,7 +14,7 @@ AiScan tiene su propia pantalla dentro del menú **Compras**. Desde ella puedes 
 Cada documento se procesa de forma independiente y el resultado se presenta en un panel de revisión donde puedes validar o corregir proveedor, cabecera, impuestos y líneas antes de importar la factura. Si subes varios archivos, un asistente te guía documento a documento.
 
 <p align="center">
-  <img src=".github/scan.png" alt="Ventana de escaneo y revisión de factura" width="700">
+  <img src=".github/screenshot2.png" alt="Ventana de escaneo y revisión de factura" width="700">
 </p>
 
 ## Características
