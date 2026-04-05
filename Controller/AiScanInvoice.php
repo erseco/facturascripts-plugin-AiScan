@@ -721,7 +721,8 @@ class AiScanInvoice extends Controller
                 'original_name' => $doc['original_name'] ?? '',
             ];
 
-            $result = $mapper->mapToInvoice($extracted, null, $importMode);
+            $docImportMode = $doc['import_mode'] ?? $importMode;
+            $result = $mapper->mapToInvoice($extracted, null, $docImportMode);
 
             if ($result['success']) {
                 $invoiceCode = $this->resolveInvoiceCode($result['invoice_id']);

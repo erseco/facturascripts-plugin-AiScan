@@ -139,7 +139,8 @@
                                 <option value="">{{ i18n.trans('aiscan-bulk-actions') }}</option>
                                 <option value="approve">{{ i18n.trans('aiscan-bulk-approve') }}</option>
                                 <option value="discard">{{ i18n.trans('aiscan-bulk-discard') }}</option>
-                                <option value="reanalyze">{{ i18n.trans('aiscan-bulk-reanalyze') }}</option>
+                                <option value="reanalyze-lines">{{ i18n.trans('aiscan-bulk-reanalyze-lines') }}</option>
+                                <option value="reanalyze-total">{{ i18n.trans('aiscan-bulk-reanalyze-total') }}</option>
                             </select>
                             <button class="btn btn-outline-secondary" type="button" id="aiscan-bulk-apply">
                                 {{ i18n.trans('aiscan-apply') }}
@@ -293,8 +294,11 @@
         'aiscan-mark-ready': '{{ i18n.trans('aiscan-mark-ready')|e('js') }}',
         'aiscan-matched-with': '{{ i18n.trans('aiscan-matched-with')|e('js') }}',
         'aiscan-no-file-uploaded': '{{ i18n.trans('aiscan-no-file-uploaded')|e('js') }}',
+        'aiscan-no-product': '{{ i18n.trans('aiscan-no-product')|e('js') }}',
         'aiscan-no-preview': '{{ i18n.trans('aiscan-no-preview')|e('js') }}',
         'aiscan-no-results': '{{ i18n.trans('aiscan-no-results')|e('js') }}',
+        'aiscan-rounding-diff': '{{ i18n.trans('aiscan-rounding-diff')|e('js') }}',
+        'aiscan-fix-rounding': '{{ i18n.trans('aiscan-fix-rounding')|e('js') }}',
         'aiscan-reviewed-count': '{{ i18n.trans('aiscan-reviewed-count')|e('js') }}',
         'aiscan-saved': '{{ i18n.trans('aiscan-saved')|e('js') }}',
         'aiscan-scanned-supplier-invoice': '{{ i18n.trans('aiscan-scanned-supplier-invoice')|e('js') }}',
@@ -315,6 +319,34 @@
         'aiscan-uploading-file': '{{ i18n.trans('aiscan-uploading-file')|e('js') }}',
         'aiscan-validation-warnings': '{{ i18n.trans('aiscan-validation-warnings')|e('js') }}',
         'aiscan-view-invoice': '{{ i18n.trans('aiscan-view-invoice')|e('js') }}',
+        'aiscan-add-line': '{{ i18n.trans('aiscan-add-line')|e('js') }}',
+        'aiscan-delete-line': '{{ i18n.trans('aiscan-delete-line')|e('js') }}',
+        'accept': '{{ i18n.trans('accept')|e('js') }}',
+        'address': '{{ i18n.trans('address')|e('js') }}',
+        'cancel': '{{ i18n.trans('cancel')|e('js') }}',
+        'close': '{{ i18n.trans('close')|e('js') }}',
+        'confidence': '{{ i18n.trans('confidence')|e('js') }}',
+        'date': '{{ i18n.trans('date')|e('js') }}',
+        'description': '{{ i18n.trans('description')|e('js') }}',
+        'discount': '{{ i18n.trans('discount')|e('js') }}',
+        'email': '{{ i18n.trans('email')|e('js') }}',
+        'expiration': '{{ i18n.trans('expiration')|e('js') }}',
+        'irpf': '{{ i18n.trans('irpf')|e('js') }}',
+        'name': '{{ i18n.trans('name')|e('js') }}',
+        'number': '{{ i18n.trans('number')|e('js') }}',
+        'phone': '{{ i18n.trans('phone')|e('js') }}',
+        'price': '{{ i18n.trans('price')|e('js') }}',
+        'quantity': '{{ i18n.trans('quantity')|e('js') }}',
+        'quantity-short': '{{ i18n.trans('quantity-short')|e('js') }}',
+        'reference': '{{ i18n.trans('reference')|e('js') }}',
+        'search': '{{ i18n.trans('search')|e('js') }}',
+        'select-all': '{{ i18n.trans('select-all')|e('js') }}',
+        'subtotal': '{{ i18n.trans('subtotal')|e('js') }}',
+        'summary': '{{ i18n.trans('summary')|e('js') }}',
+        'tax': '{{ i18n.trans('tax')|e('js') }}',
+        'tax-amount': '{{ i18n.trans('tax-amount')|e('js') }}',
+        'tax-id': '{{ i18n.trans('tax-id')|e('js') }}',
+        'total': '{{ i18n.trans('total')|e('js') }}',
     };
 </script>
 {% endblock %}

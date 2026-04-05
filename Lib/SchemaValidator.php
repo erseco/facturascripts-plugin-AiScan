@@ -20,6 +20,8 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
+use FacturaScripts\Core\Tools;
+
 class SchemaValidator
 {
     private const REQUIRED_INVOICE_FIELDS = ['number', 'issue_date', 'total'];
@@ -55,6 +57,10 @@ class SchemaValidator
             if (empty($line['description']) && empty($line['descripcion'])) {
                 $errors[] = 'Missing line description at index ' . $index;
             }
+        }
+
+        if (!empty($data['_truncated'])) {
+            $errors[] = Tools::lang()->trans('aiscan-response-truncated');
         }
 
         if (
@@ -111,7 +117,18 @@ class SchemaValidator
         $data['invoice'] = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
         $data['taxes'] = is_array($data['taxes'] ?? null) ? $data['taxes'] : [];
         $data['lines'] = is_array($data['lines'] ?? null) ? $data['lines'] : [];
-        $data['warnings'] = is_array($data['warnings'] ?? null) ? $data['warnings'] : [];
+        $originalLineCount = count($data['lines']);
+        $data['lines'] = array_values(array_filter($data['lines'], function ($line) {
+            $desc = trim((string) ($line['descripcion'] ?? $line['description'] ?? ''));
+            $price = (float) ($line['pvpunitario'] ?? $line['unit_price'] ?? 0);
+            return $desc !== '' || $price > 0;
+        }));
+        $data['warnings'] = array_values(array_unique(
+            is_array($data['warnings'] ?? null) ? $data['warnings'] : []
+        ));
+        if (count($data['lines']) < $originalLineCount) {
+            $data['_truncated'] = true;
+        }
         $data['confidence'] = is_array($data['confidence'] ?? null) ? $data['confidence'] : [];
         $data['customer'] = is_array($data['customer'] ?? null) ? $data['customer'] : [];
 

@@ -56,14 +56,20 @@ Core rules:
     set document_type accordingly and add a warning.
 11. Distinguish between extracted facts and weak inferences.
 12. Do not create catalog products or suppliers. Only extract and suggest.
-13. If line items are not visible, return an empty array for lines instead of inventing them.
-14. Validate arithmetic consistency:
+13. Warnings must be useful to the end user, not implementation details.
+    - NEVER reference JSON field names (withholding_amount, issue_date, tax_amount, etc.).
+    - NEVER explain internal extraction logic or sign conversions.
+    - NEVER warn about arithmetic that is actually correct (difference = 0).
+    - Use human-readable terms in the app language (retenciones, fecha, impuestos).
+    - Only warn about REAL problems: values that don't add up, ambiguous data, missing info.
+14. If line items are not visible, return an empty array for lines instead of inventing them.
+15. Validate arithmetic consistency:
     - subtotal + taxes should approximately match total
     - if not, keep extracted values but add a warning
-15. Detect the supplier, not the customer:
+16. Detect the supplier, not the customer:
     - supplier/vendor/issuer = the company that issued the invoice
     - buyer/customer = the company receiving the invoice
-16. For purchase invoice workflows, prioritize:
+17. For purchase invoice workflows, prioritize:
     - supplier identity
     - supplier tax id
     - invoice number
@@ -74,14 +80,14 @@ Core rules:
     - taxes
     - total
     - line items
-17. If the document contains several pages, combine evidence across all pages.
-18. If the same field appears multiple times, prefer:
+18. If the document contains several pages, combine evidence across all pages.
+19. If the same field appears multiple times, prefer:
     - explicit invoice labels
     - totals section
     - header metadata
     - then OCR body text
-19. For receipts, line items may be short retail items. For invoices, line items may be services or products.
-20. Confidence must be a number from 0 to 1.
+20. For receipts, line items may be short retail items. For invoices, line items may be services or products.
+21. Confidence must be a number from 0 to 1.
 
 Output schema:
 
@@ -154,27 +160,56 @@ Field-specific rules:
 - issue_date: prefer invoice/emission/date labels over service period dates
 - due_date: only if explicitly present
 - currency: infer from symbol only when clear
-- subtotal: prefer net amount before taxes
-- tax_amount: sum of all taxes if explicit or safely computable
-- total: final payable amount
+- subtotal: EXTRACT from the document totals section (e.g. "Base Imponible", "TOTAL SIN IGIC").
+  Do NOT compute from lines — read the actual value shown in the document.
+- tax_amount: EXTRACT from the document totals section (e.g. "IGIC", "IVA", "Cuota").
+  Do NOT compute from lines — read the actual value shown in the document.
+- total: EXTRACT from the document totals section (e.g. "TOTAL FACTURA", "TOTAL IMP").
+  Do NOT compute from lines — read the actual value shown in the document.
 - summary: concise one-line description of what the invoice is for, based only on document evidence
 - taxes: include each visible tax breakdown
-- lines: only include lines that are actually visible or clearly extracted
+- lines: only include lines that are actually visible or clearly extracted.
+  For hierarchical/grouped invoices (e.g. lines grouped by customer/category with subtotals),
+  extract ONLY the top-level summary lines (one per group with the group total),
+  NOT the individual sub-items. The sub-items are detail — the group total is the line.
+  Example: "Client A: 4.48€" with sub-items below → one line: descripcion="Client A", pvpunitario=4.48
 - lines.cantidad: REQUIRED. Default to 1 if not visible but a line exists.
-- lines.pvpunitario: REQUIRED. Net price per unit BEFORE tax.
-  Common column names: "Base Imponible", "Importe", "Precio", "Price", "Amount", "Base".
-  If the document has a "Base Imponible" column per line, that IS the pvpunitario when cantidad is 1.
+- lines.pvpunitario: REQUIRED. Unit price BEFORE discount and BEFORE tax.
+  Use the "Precio", "Precio Unidad", "Precio Unit.", "Price" column — NOT "Importe" or "Total".
+  "Importe" and "Total" columns show the price AFTER discount — do NOT use them as pvpunitario.
+  If the document only has "Base Imponible" per line and no "Precio" column, use that as pvpunitario.
   If cantidad > 1, divide the base amount by cantidad.
   Never return 0 or null if the line has a visible monetary amount.
+  NEVER confuse "Dto" / "Descuento" / "Discount" columns with the unit price.
+  MANDATORY VERIFICATION for each line:
+  1. Read the line "Total" or "Importe" column value.
+  2. Compute: cantidad * pvpunitario * (1 - dtopor/100).
+  3. If result does NOT match the line total, pvpunitario is WRONG — recalculate it.
+  When table columns are ambiguous, derive pvpunitario FROM the line total:
+  pvpunitario = line_total / cantidad (when dtopor is 0).
+  Example: Qty=75, Total=75 → pvpunitario = 75/75 = 1 (NOT 0.25 or any other number).
+  Also verify: sum of all line totals must approximately equal invoice subtotal.
+- lines.dtopor: discount percentage. Default 0.
+  The "Dto" / "Descuento" column is often a percentage discount.
+  If the document shows a "Dto" column, map it to dtopor (not to pvpunitario).
 - lines.codimpuesto: tax type code from the available tax types list (e.g. IGIC7, IVA21).
   Match the visible tax rate to the closest code from the list.
 - lines.iva: the tax rate percentage matching codimpuesto.
-- lines.irpf: withholding rate percentage. Default 0. If retenciones exist, distribute proportionally.
-- lines.dtopor: discount percentage. Default 0.
+- lines.irpf: withholding rate percentage. Default 0.
+  CRITICAL — NEVER compute irpf by dividing total withholding by total subtotal.
+  Instead, read the RETENCIONES table in the document. It shows which base amounts
+  have retention and at what rate. Match each line to its retention base:
+  - If a line's tax base belongs to "Retención X%", set irpf = X.
+  - If a line's tax base belongs to "Sin retención" or 0%, set irpf = 0.
+  Example: RETENCIONES shows "Sin retención: 180€, Retención 15%: 1.000€"
+  → lines totaling 1.000€ get irpf=15, lines totaling 180€ get irpf=0.
+  The irpf rate MUST match one of the available withholding types in the system.
 - lines.recargo: surcharge/equivalence charge percentage. Default 0.
 - lines.suplido: true only if the line is a reimbursement (suplido). Default false.
-- withholding_amount: must always be a POSITIVE number (absolute value).
-  If the document shows "Retenciones: -180,00 €", store 180.00 not -180.00.
+- withholding_amount: EXTRACT the total retenciones amount directly from the document.
+  Must always be a POSITIVE number (absolute value).
+  If the document shows "Retenciones: -392,00 €", store 392.00 not -392.00.
+  Do NOT compute this from lines — read it from the document's retenciones summary.
   Retenciones/withholding reduces the total: total = subtotal + tax - withholding.
   If retenciones is 0,00 €, set withholding_amount to 0.
 
@@ -182,6 +217,8 @@ Arithmetic rules:
 - If subtotal, tax_amount, and total are present and inconsistent by more
   than a small rounding tolerance, add a warning.
 - Do not modify extracted numbers just to make them fit.
+- FINAL CHECK: if sum of line totals does not match the extracted subtotal,
+  your line extraction has errors. Review and fix pvpunitario values.
 
 Additional regional rules for Spain/EU invoices:
 - Recognize VAT identifiers such as NIF, CIF, DNI, VAT, IVA, CIF/NIF, VAT ID
@@ -193,8 +230,18 @@ Additional regional rules for Spain/EU invoices:
 - "Vencimiento" maps to due_date
 - "Proveedor", issuer header, company header, or footer legal block may identify supplier
 - Do not confuse the buyer tax id with the supplier tax id
-- If IRPF or withholding is present, store it in withholding_amount
+- IRPF / I.R.P.F. / Retenciones: ALWAYS check for withholding sections in the document.
+  Common labels: "I.R.P.F.", "IRPF", "Retenciones", "Retención".
+  The withholding amount REDUCES the total: total = subtotal + tax - withholding.
+  If IRPF is present, store the amount in withholding_amount AND set irpf on each line.
+  The TOTAL shown in the document is ALWAYS the final amount AFTER deducting IRPF.
 - If IGIC appears, include it in taxes exactly as shown
+- If the document shows a single tax rate for the whole invoice (e.g. "TIPO IGIC: 7,00"),
+  apply that rate to ALL lines including ancillary charges like "Canon Digital", "LPI", fees.
+  Set codimpuesto AND iva on every line (e.g. codimpuesto="IGIC7", iva=7).
+  Only set iva=0 on a line if the tax breakdown explicitly shows a 0% base for it.
+- ALWAYS set codimpuesto on every line. Match the tax rate to the available tax types list.
+  For example: IGIC 7% → codimpuesto="IGIC7", IVA 21% → codimpuesto="IVA21".
 PROMPT;
 
     private const DEFAULT_EXECUTION_PROMPT = <<<'PROMPT'
@@ -203,6 +250,7 @@ Analyze this purchase invoice document and extract structured invoice data.
 Context:
 - ERP module: purchase invoices
 - Goal: create or complete a supplier purchase invoice
+- Today's date: {{TODAY}}
 - File name: {{FILE_NAME}}
 - MIME type: {{MIME_TYPE}}
 - Import mode: {{IMPORT_MODE}}
@@ -236,6 +284,8 @@ Examples:
 - A Canary Islands invoice with IGIC 7% and exempt:
   taxes: [{"name":"IGIC","rate":7,"base":800,"amount":56},{"name":"IGIC","rate":0,"base":200,"amount":0}]
 The system will create one invoice line per tax rate from this breakdown.
+IMPORTANT: Always extract withholding_amount from the RETENCIONES section if present.
+The system will compute the IRPF rate per line from the withholding total.
 PROMPT;
 
     public function __construct()
@@ -261,6 +311,7 @@ PROMPT;
         string $historicalContext = ''
     ): string {
         $prompt = self::DEFAULT_EXECUTION_PROMPT;
+        $prompt = str_replace('{{TODAY}}', date('Y-m-d'), $prompt);
         $prompt = str_replace('{{FILE_NAME}}', $fileName ?: 'unknown', $prompt);
         $prompt = str_replace('{{MIME_TYPE}}', $mimeType ?: 'unknown', $prompt);
         $prompt = str_replace('{{IMPORT_MODE}}', $importMode === 'total' ? 'total' : 'lines', $prompt);
@@ -281,6 +332,9 @@ PROMPT;
             . ' MUST be written in ' . $langName . '.'
             . ' Do not use English unless the application language is English.';
 
+        // Add our company info so AI doesn't confuse us with the supplier
+        $prompt .= self::buildCompanyHint();
+
         // Add available tax types and withholding types for matching
         $prompt .= self::buildTaxTypesHint();
 
@@ -291,6 +345,33 @@ PROMPT;
         }
 
         return $prompt;
+    }
+
+    private static function buildCompanyHint(): string
+    {
+        try {
+            $company = new \FacturaScripts\Dinamic\Model\Empresa();
+            $company->loadFromCode(Tools::settings('default', 'idempresa', 1));
+            $names = array_filter([
+                $company->nombre ?? '',
+                $company->nombrecorto ?? '',
+            ]);
+            $cifnif = $company->cifnif ?? '';
+            if (empty($names) && empty($cifnif)) {
+                return '';
+            }
+            $hint = "\n\nOUR COMPANY (the buyer, NOT the supplier):\n";
+            if (!empty($names)) {
+                $hint .= '- Name: ' . implode(' / ', array_unique($names)) . "\n";
+            }
+            if (!empty($cifnif)) {
+                $hint .= '- Tax ID: ' . $cifnif . "\n";
+            }
+            $hint .= "If this name or tax ID appears in the document, it is the CUSTOMER, not the supplier.\n";
+            return $hint;
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     private static function buildTaxTypesHint(): string
@@ -408,6 +489,25 @@ PROMPT;
 
         $data = json_decode($rawJson, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
+            // Remove control characters (keep \n for JSON structure)
+            $cleaned = preg_replace('/[\x00-\x09\x0B-\x1F\x7F]/', '', $rawJson);
+            $data = json_decode($cleaned, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $rawJson = $cleaned;
+            }
+        }
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            // Clean + repair truncated JSON by closing open brackets
+            $cleaned = preg_replace('/[\x00-\x09\x0B-\x1F\x7F]/', '', $rawJson);
+            $repaired = self::repairTruncatedJson($cleaned);
+            $data = json_decode($repaired, true);
+        }
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Tools::log('AiScan')->error(
+                'Invalid JSON from AI provider: ' . json_last_error_msg()
+                . ' | File: ' . $fileName
+                . ' | Response: ' . $rawJson
+            );
             throw new \RuntimeException(
                 'Invalid JSON response from AI provider: ' . json_last_error_msg()
             );
@@ -420,6 +520,53 @@ PROMPT;
         $data['_provider'] = $provider->getName();
 
         return $data;
+    }
+
+    private static function repairTruncatedJson(string $json): string
+    {
+        // Remove trailing incomplete string value
+        $json = preg_replace('/"[^"]*$/', '""', $json);
+        // Remove trailing key without value
+        $json = preg_replace('/,\s*"[^"]*"\s*:\s*$/', '', $json);
+
+        // Count open brackets and close them
+        $opens = substr_count($json, '{') + substr_count($json, '[');
+        $closes = substr_count($json, '}') + substr_count($json, ']');
+        if ($opens <= $closes) {
+            return $json;
+        }
+
+        // Walk through to find which brackets are open
+        $stack = [];
+        $inString = false;
+        $escape = false;
+        for ($i = 0, $len = strlen($json); $i < $len; $i++) {
+            $ch = $json[$i];
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+            if ($ch === '\\' && $inString) {
+                $escape = true;
+                continue;
+            }
+            if ($ch === '"') {
+                $inString = !$inString;
+                continue;
+            }
+            if ($inString) {
+                continue;
+            }
+            if ($ch === '{' || $ch === '[') {
+                $stack[] = $ch === '{' ? '}' : ']';
+            } elseif ($ch === '}' || $ch === ']') {
+                array_pop($stack);
+            }
+        }
+
+        // Remove trailing comma before closing
+        $json = preg_replace('/,\s*$/', '', $json);
+        return $json . implode('', array_reverse($stack));
     }
 
     public static function extractPdfText(string $filePath): string

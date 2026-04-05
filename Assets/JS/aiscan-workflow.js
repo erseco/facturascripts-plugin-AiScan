@@ -93,7 +93,7 @@
             const base = qty * price * (1 - dto / 100);
             calcTotal += base + base * (tax / 100) - base * (irpf / 100);
         }
-        if (Math.abs(calcTotal - invoiceTotal) > 0.05) {
+        if (Math.round(calcTotal * 100) !== Math.round(invoiceTotal * 100)) {
             return trans('aiscan-total-mismatch', {
                 '%calculated%': fmtNumber(calcTotal),
                 '%invoice%': fmtNumber(invoiceTotal),
@@ -271,40 +271,58 @@
         // Save user's provider choice BEFORE upload (buildProviderSelect will rebuild the dropdown)
         const userSelectedProvider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
 
-        const formData = new FormData();
-        state.documents.forEach(doc => formData.append('invoice_files[]', doc.file));
+        // Upload in chunks to avoid PHP max_file_uploads limit
+        const chunkSize = 10;
+        const docs = state.documents;
+        let firstData = null;
 
         try {
-            const response = await fetch('AiScanInvoice?action=upload', {method: 'POST', body: formData});
-            const data = await response.json();
+            for (let start = 0; start < docs.length; start += chunkSize) {
+                const chunk = docs.slice(start, start + chunkSize);
+                const formData = new FormData();
+                chunk.forEach((doc, i) => {
+                    formData.append('invoice_files[]', doc.file);
+                    formData.append('client_indices[]', String(start + i));
+                });
 
-            if (!data.success) {
-                throw new Error(data.error || trans('aiscan-no-file-uploaded'));
-            }
+                const response = await fetch('AiScanInvoice?action=upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await response.json();
 
-            state.availableProviders = data.available_providers || [data.provider];
-            state.extractionPrompt = data.extraction_prompt || '';
-            state.maxParallelRequests = data.max_parallel_requests || 5;
-            // Use the user's selection, not the server default
-            state.defaultProvider = userSelectedProvider;
-
-            const uploadedFiles = data.files || [];
-            uploadedFiles.forEach(uf => {
-                const doc = state.documents[uf.client_index];
-                if (doc) {
-                    doc.tmpFile = uf.tmp_file;
-                    doc.mimeType = uf.mime_type || doc.mimeType;
+                if (!data.success) {
+                    throw new Error(data.error || trans('aiscan-no-file-uploaded'));
                 }
-            });
 
-            if (data.errors && data.errors.length > 0) {
-                data.errors.forEach(err => {
-                    const doc = state.documents[err.client_index];
+                if (!firstData) {
+                    firstData = data;
+                    state.availableProviders = data.available_providers || [data.provider];
+                    state.extractionPrompt = data.extraction_prompt || '';
+                    state.maxParallelRequests = data.max_parallel_requests || 5;
+                    state.defaultProvider = userSelectedProvider;
+                }
+
+                const uploadedFiles = data.files || [];
+                uploadedFiles.forEach(uf => {
+                    const idx = start + uf.client_index;
+                    const doc = docs[idx];
                     if (doc) {
-                        doc.status = STATUS.FAILED;
-                        doc.error = err.error;
+                        doc.tmpFile = uf.tmp_file;
+                        doc.mimeType = uf.mime_type || doc.mimeType;
                     }
                 });
+
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(err => {
+                        const idx = start + err.client_index;
+                        const doc = docs[idx];
+                        if (doc) {
+                            doc.status = STATUS.FAILED;
+                            doc.error = err.error;
+                        }
+                    });
+                }
             }
 
             buildProviderSelect();
@@ -393,6 +411,11 @@
                     doc.extractedData._validation_errors = warnings;
                     doc.extractedData._validation_errors.push(batchDup);
                     needsReview = true;
+                }
+
+                // In total mode, generate synthetic lines for validation
+                if (state.importMode === 'total' && !doc.extractedData.lines?.length) {
+                    doc.extractedData.lines = buildTotalLines(doc.extractedData);
                 }
 
                 // Check if calculated total matches AI total
@@ -562,7 +585,7 @@
             const invoiceNum = invoice.number || doc.originalName;
             const supplierName = supplier.name || '-';
             const dateStr = invoice.issue_date || '-';
-            const totalStr = invoice.total != null ? String(invoice.total) : '-';
+            const totalStr = invoice.total != null ? fmtNumber(parseFloat(invoice.total) || 0) : '-';
 
             return `<div class="list-group-item${isActive ? ' active' : ''}" data-doc-index="${i}">
                 <div class="d-flex align-items-start">
@@ -654,7 +677,8 @@
                         doc.status = STATUS.DISCARDED;
                     }
                     break;
-                case 'reanalyze':
+                case 'reanalyze-lines':
+                case 'reanalyze-total':
                     if (doc.tmpFile && doc.status !== STATUS.ANALYZING) {
                         toReanalyze.push(doc);
                     }
@@ -671,7 +695,8 @@
         renderCurrentDocument();
 
         if (toReanalyze.length > 0) {
-            reanalyzeDocs(toReanalyze);
+            const modeOverride = action === 'reanalyze-total' ? 'total' : 'lines';
+            reanalyzeDocs(toReanalyze, modeOverride);
         }
     }
 
@@ -932,11 +957,10 @@
             ${invoice.payment_terms ? `<input type="hidden" id="invoice_payment_terms" value="${escapeAttr(invoice.payment_terms)}">` : ''}
         `));
 
-        if (state.importMode === 'total') {
-            review.appendChild(buildDefaultProductSection(supplier));
-        }
-
-        if (state.importMode === 'lines') {
+        const docMode = doc._importMode || state.importMode;
+        if (docMode === 'total') {
+            review.appendChild(buildLinesSection(lines.length ? lines : buildTotalLines(data)));
+        } else {
             review.appendChild(buildLinesSection(lines));
         }
 
@@ -981,6 +1005,7 @@
                     </div>
                 </div>
             </div>
+            <div id="aiscan-rounding-alert" class="d-none mt-2"></div>
         `));
 
         review.insertAdjacentHTML('beforeend', `
@@ -993,6 +1018,27 @@
 
         document.getElementById('aiscan-mark-ready-btn')?.addEventListener('click', markCurrentReady);
         bindSupplierSearch();
+
+        // Rounding fix button
+        review.addEventListener('click', e => {
+            const fixBtn = e.target.closest('.aiscan-fix-rounding');
+            if (!fixBtn) { return; }
+            const diff = parseFloat(fixBtn.dataset.diff) || 0;
+            if (diff === 0) { return; }
+            // Find the largest line and adjust its pvpunitario
+            let largestRow = null;
+            let largestPrice = 0;
+            document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(row => {
+                const p = parseFloat(row.querySelector('[data-field="pvpunitario"]')?.value || 0);
+                if (p > largestPrice) { largestPrice = p; largestRow = row; }
+            });
+            if (largestRow) {
+                const input = largestRow.querySelector('[data-field="pvpunitario"]');
+                const current = parseFloat(input.value) || 0;
+                input.value = Math.round((current - diff) * 100) / 100;
+                calcAllLineTotals();
+            }
+        });
     }
 
     let collapseCounter = 0;
@@ -1287,11 +1333,27 @@
                 }
             }
 
-            // Select IRPF in modal — prefer code match
+            // Select IRPF in modal and sync codretencion + hidden irpf
             const modalIrpf = row.querySelector('.aiscan-modal-irpf');
-            if (modalIrpf && irpfCode) {
+            const irpfHidden = row.querySelector('[data-field="irpf"]');
+            const codretHidden = row.querySelector('[data-field="codretencion"]');
+            const irpfVal = parseFloat(irpfHidden?.value) || 0;
+            if (modalIrpf && irpfVal > 0) {
                 const types = window.aiscanWithholdingTypes || [];
-                const match = types.find(t => t.code === irpfCode);
+                let match = irpfCode ? types.find(t => t.code === irpfCode) : null;
+                if (!match) {
+                    match = types.find(t => Math.abs(t.rate - irpfVal) < 0.01);
+                }
+                if (!match) {
+                    // Find closest available rate
+                    let closest = null;
+                    let minDiff = Infinity;
+                    for (const t of types) {
+                        const diff = Math.abs(t.rate - irpfVal);
+                        if (diff < minDiff) { minDiff = diff; closest = t; }
+                    }
+                    if (closest && minDiff < 5) { match = closest; }
+                }
                 if (match) {
                     for (const opt of modalIrpf.options) {
                         if (parseFloat(opt.value) === match.rate) {
@@ -1299,6 +1361,13 @@
                             break;
                         }
                     }
+                    if (irpfHidden) { irpfHidden.value = match.rate; }
+                    if (codretHidden) { codretHidden.value = match.code; }
+                } else {
+                    // No matching type — reset to 0
+                    modalIrpf.selectedIndex = 0;
+                    if (irpfHidden) { irpfHidden.value = 0; }
+                    if (codretHidden) { codretHidden.value = ''; }
                 }
             }
         });
@@ -1306,6 +1375,12 @@
 
     function fmtNumber(n) {
         return n.toLocaleString(document.documentElement.lang || 'es', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function parseLocaleNumber(str) {
+        if (!str || str === '-') { return 0; }
+        // Remove thousands separators (.) and convert decimal comma to dot
+        return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
     }
 
     function calcLineTotal(row) {
@@ -1368,6 +1443,22 @@
         if (irpfEl) { irpfEl.value = fmtNumber(totalIrpf); }
         const totalEl = document.getElementById('invoice_total');
         if (totalEl) { totalEl.value = fmtNumber(totalFinal); }
+
+        // Detect rounding mismatch with original invoice total
+        const roundingAlert = document.getElementById('aiscan-rounding-alert');
+        if (roundingAlert) {
+            const doc = currentDoc();
+            const origTotal = parseFloat(doc?.extractedData?.invoice?.total) || 0;
+            const diff = Math.round((totalFinal - origTotal) * 100) / 100;
+            if (origTotal > 0 && diff !== 0 && Math.abs(diff) <= 0.05) {
+                roundingAlert.className = 'alert alert-warning py-1 px-2 small mt-2 d-flex align-items-center justify-content-between';
+                roundingAlert.innerHTML = `<span><i class="fa-solid fa-info-circle me-1"></i>${escapeHtml(trans('aiscan-rounding-diff', {'%diff%': fmtNumber(diff)}))}</span>`
+                    + `<button type="button" class="btn btn-sm btn-outline-warning aiscan-fix-rounding" data-diff="${diff}"><i class="fa-solid fa-wrench me-1"></i>${escapeHtml(trans('aiscan-fix-rounding'))}</button>`;
+            } else {
+                roundingAlert.className = 'd-none';
+                roundingAlert.innerHTML = '';
+            }
+        }
     }
 
     function taxCodeToRate(code) {
@@ -1420,7 +1511,11 @@
         }
         const irpfModal = modal.querySelector('.aiscan-modal-irpf');
         if (irpfModal) {
-            row.querySelector('[data-field="irpf"]').value = irpfModal.value;
+            const irpfRate = parseFloat(irpfModal.value) || 0;
+            row.querySelector('[data-field="irpf"]').value = irpfRate;
+            const types = window.aiscanWithholdingTypes || [];
+            const irpfMatch = types.find(t => Math.abs(t.rate - irpfRate) < 0.01);
+            row.querySelector('[data-field="codretencion"]').value = irpfMatch ? irpfMatch.code : '';
         }
         const excModal = modal.querySelector('.aiscan-modal-excepcioniva');
         if (excModal) {
@@ -1534,7 +1629,9 @@
             }
             const badge = productSearchTargetRow.querySelector('.aiscan-ref-badge');
             if (badge) {
-                badge.innerHTML = `<span class="badge text-bg-success" title="${escapeAttr(pick.dataset.ref)}"><i class="fa-solid fa-link"></i></span>`;
+                badge.innerHTML = `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(pick.dataset.ref)}"><i class="fa-solid fa-link"></i></span>`;
+                const tt = badge.querySelector('[data-bs-toggle="tooltip"]');
+                if (tt) { new bootstrap.Tooltip(tt); }
             }
             bootstrap.Modal.getInstance(document.getElementById('aiscan-find-product-modal'))?.hide();
             productSearchTargetRow = null;
@@ -1561,8 +1658,8 @@
     function buildLineRow(line, index) {
         const ref = line.referencia || line.sku || '';
         const matchBadge = ref
-            ? `<span class="badge text-bg-success" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
-            : `<span class="badge text-bg-secondary"><i class="fa-solid fa-unlink"></i></span>`;
+            ? `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
+            : `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
         const modalId = 'aiscan-line-modal-' + index;
         const desc = line.descripcion || line.description || '';
         const qty = line.cantidad ?? line.quantity ?? 1;
@@ -1575,7 +1672,7 @@
         const irpfCode = line.codretencion || line.irpf_code || '';
         const recargo = line.recargo ?? 0;
         const excepcion = line.excepcioniva ?? '';
-        const suplido = line.suplido ? '1' : '0';
+        const suplido = line.suplido && line.suplido !== '0' && line.suplido !== 'false' ? '1' : '0';
         return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${taxRate}" data-tax-code="${escapeAttr(taxCode)}" data-irpf-code="${escapeAttr(irpfCode)}">
             <div style="flex:4;position:relative">
                 <div class="input-group input-group-sm">
@@ -1602,6 +1699,7 @@
             <input type="hidden" data-field="iva" class="aiscan-calc" value="${escapeAttr(taxRate)}">
             <input type="hidden" data-field="recargo" value="${escapeAttr(recargo)}">
             <input type="hidden" data-field="irpf" class="aiscan-calc" value="${escapeAttr(irpfRate)}">
+            <input type="hidden" data-field="codretencion" value="${escapeAttr(irpfCode)}">
             <input type="hidden" data-field="excepcioniva" value="${escapeAttr(excepcion)}">
             <input type="hidden" data-field="suplido" value="${escapeAttr(suplido)}">
             <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
@@ -1637,11 +1735,11 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('tax'))}</label>
-                                    ${buildTaxSelect(taxRate, taxCode).replace('data-field="tax_code"', 'class="form-select form-select-sm aiscan-modal-tax"')}
+                                    ${buildTaxSelect(taxRate, taxCode).replace('class="form-select form-select-sm" data-field="tax_code"', 'class="form-select form-select-sm aiscan-modal-tax"')}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">IRPF</label>
-                                    ${buildWithholdingSelect(irpfRate, irpfCode).replace('data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                    ${buildWithholdingSelect(irpfRate, irpfCode).replace('class="form-select form-select-sm" data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>
@@ -1681,12 +1779,48 @@
                         </div>
                         <div class="modal-footer py-1">
                             <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">${escapeHtml(trans('cancel'))}</button>
-                            <button type="button" class="btn btn-sm btn-primary aiscan-modal-accept" data-bs-dismiss="modal">${escapeHtml(trans('accept'))}</button>
+                            <button type="button" class="btn btn-sm btn-primary aiscan-modal-accept">${escapeHtml(trans('accept'))}</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>`;
+    }
+
+    function buildTotalLines(data) {
+        const invoice = data.invoice || {};
+        const taxes = Array.isArray(data.taxes) ? data.taxes : [];
+        const desc = invoice.summary || '';
+        const withholding = parseFloat(invoice.withholding_amount) || 0;
+        const subtotal = parseFloat(invoice.subtotal) || 0;
+        const irpfRate = subtotal > 0 && withholding > 0
+            ? Math.round((withholding / subtotal) * 10000) / 100
+            : 0;
+
+        if (taxes.length > 0) {
+            return taxes.map(t => ({
+                descripcion: desc,
+                cantidad: 1,
+                pvpunitario: parseFloat(t.base) || 0,
+                dtopor: 0,
+                iva: parseFloat(t.rate) || 0,
+                irpf: irpfRate,
+            }));
+        }
+
+        const base = subtotal || parseFloat(invoice.total) || 0;
+        const taxAmount = parseFloat(invoice.tax_amount) || 0;
+        const taxRate = base > 0 && taxAmount > 0
+            ? Math.round((taxAmount / base) * 10000) / 100
+            : 0;
+        return [{
+            descripcion: desc,
+            cantidad: 1,
+            pvpunitario: base,
+            dtopor: 0,
+            iva: taxRate,
+            irpf: irpfRate,
+        }];
     }
 
     function buildLinesSection(lines) {
@@ -1697,7 +1831,7 @@
         const section = buildSection(trans('aiscan-section-products'), `
             <div class="d-flex gap-1 align-items-center py-1 border-bottom mb-1 small text-muted">
                 <div style="flex:4">${escapeHtml(trans('description'))}</div>
-                <div style="width:55px">${escapeHtml(trans('quantity'))}</div>
+                <div style="width:55px">${escapeHtml(trans('quantity-short'))}</div>
                 <div style="width:95px">${escapeHtml(trans('price'))}</div>
                 <div style="width:85px">${escapeHtml(trans('total'))}</div>
                 <div style="width:56px"></div>
@@ -1711,14 +1845,42 @@
         setTimeout(() => {
             initTaxSelects(section);
             calcAllLineTotals();
+            section.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+                new bootstrap.Tooltip(el);
+            });
         }, 0);
 
-        // Calculate modal preview when modal opens
+        // Save modal state on open, restore on cancel/dismiss
+        section.addEventListener('show.bs.modal', e => {
+            const modal = e.target;
+            if (!modal) { return; }
+            const snapshot = {};
+            modal.querySelectorAll('input, select').forEach(el => {
+                snapshot[Array.from(el.classList).join('.') || el.type] = el.value;
+            });
+            modal._snapshot = snapshot;
+            modal._accepted = false;
+        });
         section.addEventListener('shown.bs.modal', e => {
             const modal = e.target;
             if (modal) {
                 calcModalPreview(modal);
             }
+        });
+        section.addEventListener('hide.bs.modal', e => {
+            const modal = e.target;
+            if (!modal || modal._accepted) { return; }
+            const snapshot = modal._snapshot;
+            if (!snapshot) { return; }
+            const keys = Object.keys(snapshot);
+            let i = 0;
+            modal.querySelectorAll('input, select').forEach(el => {
+                const key = Array.from(el.classList).join('.') || el.type;
+                if (keys[i] === key) {
+                    el.value = snapshot[key];
+                    i++;
+                }
+            });
         });
 
         // Recalculate line totals on any value change
@@ -1763,13 +1925,15 @@
                 ));
             }
 
-            // Modal accept — sync values to row
+            // Modal accept — sync values to row, then close
             const acceptBtn = e.target.closest('.aiscan-modal-accept');
             if (acceptBtn) {
                 const modal = acceptBtn.closest('.modal');
                 const row = modal?.closest('.aiscan-line-row');
                 if (modal && row) {
+                    modal._accepted = true;
                     applyModalToRow(modal, row);
+                    bootstrap.Modal.getInstance(modal)?.hide();
                 }
             }
 
@@ -1954,31 +2118,37 @@
 
     function collectFormData(baseData) {
         const data = JSON.parse(JSON.stringify(baseData));
+
+        // Only collect from DOM if the review form is rendered
+        if (!document.getElementById('aiscan-review')?.children.length) {
+            return data;
+        }
+
         data.invoice = data.invoice || {};
         data.supplier = data.supplier || {};
 
-        data.invoice.number = val('invoice_number');
-        data.invoice.issue_date = val('invoice_issue_date');
-        data.invoice.due_date = val('invoice_due_date');
-        data.invoice.currency = val('invoice_currency');
-        data.invoice.subtotal = parseFloat(val('invoice_subtotal') || 0);
-        data.invoice.tax_amount = parseFloat(val('invoice_tax_amount') || 0);
-        data.invoice.total = parseFloat(val('invoice_total') || 0);
+        data.invoice.number = valOr('invoice_number', data.invoice.number);
+        data.invoice.issue_date = valOr('invoice_issue_date', data.invoice.issue_date);
+        data.invoice.due_date = valOr('invoice_due_date', data.invoice.due_date);
+        data.invoice.currency = valOr('invoice_currency', data.invoice.currency);
+        data.invoice.subtotal = parseLocaleNumber(val('invoice_subtotal')) || data.invoice.subtotal || 0;
+        data.invoice.tax_amount = parseLocaleNumber(val('invoice_tax_amount')) || data.invoice.tax_amount || 0;
+        data.invoice.total = parseLocaleNumber(val('invoice_total')) || data.invoice.total || 0;
         const withholdingEl = document.getElementById('invoice_withholding');
         if (withholdingEl) {
-            data.invoice.withholding_amount = parseFloat(withholdingEl.value || 0);
+            data.invoice.withholding_amount = parseLocaleNumber(withholdingEl.value);
         }
-        data.invoice.summary = val('invoice_summary');
+        data.invoice.summary = valOr('invoice_summary', data.invoice.summary);
         const ptEl = document.getElementById('invoice_payment_terms');
         if (ptEl) {
             data.invoice.payment_terms = ptEl.value;
         }
 
-        data.supplier.name = val('supplier_name');
-        data.supplier.tax_id = val('supplier_tax_id');
-        data.supplier.email = val('supplier_email');
-        data.supplier.phone = val('supplier_phone');
-        data.supplier.address = val('supplier_address');
+        data.supplier.name = valOr('supplier_name', data.supplier.name);
+        data.supplier.tax_id = valOr('supplier_tax_id', data.supplier.tax_id);
+        data.supplier.email = valOr('supplier_email', data.supplier.email);
+        data.supplier.phone = valOr('supplier_phone', data.supplier.phone);
+        data.supplier.address = valOr('supplier_address', data.supplier.address);
 
         const selectedSupplier = document.getElementById('supplier_match_select');
         if (selectedSupplier) {
@@ -1986,8 +2156,9 @@
             delete data.supplier.create_if_missing;
         }
 
-        if (state.importMode === 'lines') {
-            data.lines = Array.from(document.querySelectorAll('#aiscan-lines-body .aiscan-line-row')).map(row => {
+        const lineRows = document.querySelectorAll('#aiscan-lines-body .aiscan-line-row');
+        if (lineRows.length > 0) {
+            data.lines = Array.from(lineRows).map(row => {
                 const line = {};
                 row.querySelectorAll('[data-field]').forEach(input => {
                     line[input.dataset.field] = input.type === 'number' ? parseFloat(input.value || 0) : input.value;
@@ -2001,6 +2172,11 @@
 
     function val(id) {
         return document.getElementById(id)?.value || '';
+    }
+
+    function valOr(id, fallback) {
+        const el = document.getElementById(id);
+        return el ? el.value : (fallback || '');
     }
 
     function markCurrentReady() {
@@ -2055,13 +2231,15 @@
         }
     }
 
-    async function reanalyzeDocs(docs) {
+    async function reanalyzeDocs(docs, modeOverride) {
         const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+        const importMode = modeOverride || state.importMode;
 
         for (const doc of docs) {
             doc.status = STATUS.ANALYZING;
             doc.error = null;
             doc.reviewDecision = null;
+            doc._importMode = importMode;
             renderSidebar();
             if (doc.index === state.currentIndex) {
                 renderPreview(doc);
@@ -2073,7 +2251,7 @@
                     action: 'analyze',
                     tmp_file: doc.tmpFile,
                     mime_type: doc.mimeType,
-                    import_mode: state.importMode,
+                    import_mode: importMode,
                     use_history: state.useHistory ? '1' : '0',
                     supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
                     provider: provider,
@@ -2168,8 +2346,11 @@
                     <td>${escapeHtml(supplier.name || '-')}</td>
                     <td>${escapeHtml(invoice.number || '-')}</td>
                     <td>${escapeHtml(invoice.issue_date || '-')}</td>
-                    <td>${escapeHtml(invoice.total ?? '-')}</td>
-                    <td><span class="badge ${info.cls}"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span></td>
+                    <td>${escapeHtml(invoice.total != null ? fmtNumber(parseFloat(invoice.total) || 0) : '-')}</td>
+                    <td>${doc.status === STATUS.FAILED && doc.error
+                        ? `<span class="badge ${info.cls}" role="button" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(doc.error)}" data-error="${escapeAttr(doc.error)}" style="cursor:pointer"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span>`
+                        : `<span class="badge ${info.cls}"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span>`
+                    }</td>
                     <td>${doc.status !== STATUS.DISCARDED && doc.status !== STATUS.FAILED && doc.status !== STATUS.IMPORTED ? `<button class="btn btn-sm btn-outline-danger aiscan-toggle-discard" data-index="${i}"><i class="fa-solid fa-ban"></i></button>` : ''}${doc.status === STATUS.IMPORTED && doc.invoiceId ? `<a href="EditFacturaProveedor?code=${encodeURIComponent(doc.invoiceId)}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-eye"></i></a>` : ''}</td>
                 </tr>
             `;
@@ -2186,11 +2367,42 @@
             });
         });
 
+        tbody.querySelectorAll('[data-error]').forEach(el => {
+            new bootstrap.Tooltip(el);
+            el.addEventListener('click', () => {
+                showErrorModal(el.dataset.error);
+            });
+        });
+
         const countEl = document.getElementById('aiscan-import-count');
         if (countEl) {
             const importable = state.documents.filter(d => d.status === STATUS.READY || d.status === STATUS.ANALYZED).length;
             countEl.textContent = trans('aiscan-import-count', {'%count%': String(importable), '%total%': String(state.documents.length)});
         }
+    }
+
+    function showErrorModal(errorText) {
+        let modal = document.getElementById('aiscan-error-modal');
+        if (!modal) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="aiscan-error-modal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header py-2">
+                                <h6 class="modal-title"><i class="fa-solid fa-circle-exclamation text-danger me-1"></i>Error</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" id="aiscan-error-modal-body"></div>
+                            <div class="modal-footer py-1">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">${escapeHtml(trans('close'))}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+            modal = document.getElementById('aiscan-error-modal');
+        }
+        document.getElementById('aiscan-error-modal-body').textContent = errorText;
+        new bootstrap.Modal(modal).show();
     }
 
     async function executeImport() {
@@ -2204,6 +2416,7 @@
             tmp_file: doc.tmpFile,
             mime_type: doc.mimeType,
             original_name: doc.originalName,
+            import_mode: doc._importMode || state.importMode,
         }));
 
         try {

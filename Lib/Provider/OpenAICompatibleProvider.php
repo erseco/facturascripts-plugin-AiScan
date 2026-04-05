@@ -81,7 +81,7 @@ class OpenAICompatibleProvider implements ProviderInterface
             'messages' => $messages,
             'response_format' => ['type' => 'json_object'],
             'temperature' => 0,
-            'max_tokens' => 4096,
+            'max_tokens' => 32768,
         ]);
 
         $ch = curl_init(rtrim($this->baseUrl, '/') . '/chat/completions');

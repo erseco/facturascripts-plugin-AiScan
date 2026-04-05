@@ -89,10 +89,6 @@ class InvoiceMapper
                 }
             }
 
-            if (!empty($invoiceData['withholding_amount'])) {
-                $invoice->totalirpf = (float) $invoiceData['withholding_amount'];
-            }
-
             $invoice->observaciones = $this->buildNotes($invoiceData);
 
             if (empty($invoice->codalmacen)) {
@@ -106,7 +102,9 @@ class InvoiceMapper
             }
 
             if (!$invoice->save()) {
-                $result['errors'][] = Tools::lang()->trans('record-save-error');
+                $miniLog = Tools::log()::read('', ['critical', 'error', 'warning']);
+                $detail = implode('; ', array_map(fn ($m) => $m['message'], $miniLog));
+                $result['errors'][] = $detail ?: Tools::lang()->trans('record-save-error');
                 return $result;
             }
 
@@ -117,7 +115,7 @@ class InvoiceMapper
             }
 
             $taxes = $extractedData['taxes'] ?? [];
-            $invoiceLines = $importMode === 'total'
+            $invoiceLines = $importMode === 'total' && empty($lines)
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData);
 
@@ -158,13 +156,41 @@ class InvoiceMapper
         foreach ($preparedLines as $lineData) {
             $reference = $this->productMatcher->findReference($lineData);
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
-            $line->descripcion = trim((string) ($lineData['description'] ?? $line->descripcion));
-            $line->cantidad = max(1, (float) ($lineData['quantity'] ?? 1));
-            $line->pvpunitario = (float) ($lineData['unit_price'] ?? $line->pvpunitario);
-            $line->dtopor = (float) ($lineData['discount'] ?? 0);
+            $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
+            $line->descripcion = trim((string) $desc);
+            $line->cantidad = max(1, (float) ($lineData['quantity'] ?? $lineData['cantidad'] ?? 1));
+            $line->pvpunitario = (float) ($lineData['unit_price'] ?? $lineData['pvpunitario'] ?? $line->pvpunitario);
+            $line->dtopor = (float) ($lineData['discount'] ?? $lineData['dtopor'] ?? 0);
 
-            if (!empty($lineData['tax_rate'])) {
-                $line->iva = (float) $lineData['tax_rate'];
+            if (!empty($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? '')) {
+                $line->codimpuesto = $lineData['codimpuesto'] ?? $lineData['tax_code'];
+            }
+
+            $taxRate = $lineData['tax_rate'] ?? $lineData['iva'] ?? null;
+            if ($taxRate !== null && $taxRate !== '') {
+                $line->iva = (float) $taxRate;
+            }
+
+            $irpf = $lineData['irpf'] ?? null;
+            if ($irpf !== null && $irpf !== '') {
+                $line->irpf = (float) $irpf;
+            }
+
+            $codret = $lineData['codretencion'] ?? $lineData['irpf_code'] ?? '';
+            if (!empty($codret)) {
+                $line->codretencion = $codret;
+            }
+
+            if (!empty($lineData['recargo'] ?? 0)) {
+                $line->recargo = (float) $lineData['recargo'];
+            }
+
+            if (!empty($lineData['excepcioniva'] ?? '')) {
+                $line->excepcioniva = $lineData['excepcioniva'];
+            }
+
+            if (!empty($lineData['suplido'] ?? false)) {
+                $line->suplido = true;
             }
 
             $invoiceLines[] = $line;
