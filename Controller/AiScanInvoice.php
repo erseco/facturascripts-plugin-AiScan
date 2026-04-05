@@ -282,7 +282,8 @@ class AiScanInvoice extends Controller
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mimeType = (string) $finfo->file($tmpName);
 
-        if ($mimeType === '' || $mimeType === 'application/octet-stream') {
+        $genericTypes = ['', 'application/octet-stream', 'text/plain'];
+        if (in_array($mimeType, $genericTypes, true)) {
             return self::EXTENSION_MIME_TYPES[$extension] ?? $mimeType;
         }
 
