@@ -832,9 +832,19 @@
 
         if (validationErrors.length > 0) {
             review.insertAdjacentHTML('beforeend', `
-                <div class="alert alert-warning py-2">
-                    <strong class="small">${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
+                <div class="alert alert-danger py-2">
+                    <strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
                     <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
+                </div>
+            `);
+        }
+
+        const aiWarnings = Array.isArray(data.warnings) ? data.warnings.filter(w => w) : [];
+        if (aiWarnings.length > 0) {
+            review.insertAdjacentHTML('beforeend', `
+                <div class="alert alert-info py-2">
+                    <strong class="small"><i class="fa-solid fa-circle-info me-1"></i>${escapeHtml(trans('aiscan-ai-notes'))}</strong>
+                    <ul class="mb-0 small">${aiWarnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
                 </div>
             `);
         }
