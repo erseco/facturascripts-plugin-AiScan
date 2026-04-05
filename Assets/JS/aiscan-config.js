@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
-    var textarea = document.querySelector('textarea[name="extraction_prompt"]');
+    var textarea = document.querySelector('textarea[name="additional_prompt"]');
     if (!textarea) {
         return;
     }

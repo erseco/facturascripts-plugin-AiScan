@@ -50,13 +50,6 @@ class Init extends InitClass
             }
         }
 
-        // Clear old full prompts stored from previous versions
-        $stored = $settings->getProperty('extraction_prompt') ?? '';
-        $default = \FacturaScripts\Plugins\AiScan\Lib\ExtractionService::getDefaultSystemPrompt();
-        if (trim($stored) === trim($default)) {
-            $settings->extraction_prompt = '';
-        }
-
         $settings->save();
     }
 

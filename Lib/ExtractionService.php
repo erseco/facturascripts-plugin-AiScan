@@ -296,7 +296,7 @@ PROMPT;
     public static function getSystemPrompt(): string
     {
         $prompt = self::DEFAULT_SYSTEM_PROMPT;
-        $custom = trim(Tools::settings('AiScan', 'extraction_prompt', ''));
+        $custom = trim(Tools::settings('AiScan', 'additional_prompt', ''));
         if (!empty($custom)) {
             $prompt .= "\n\n## Additional instructions\n\n" . $custom;
         }
