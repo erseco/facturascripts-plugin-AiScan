@@ -22,6 +22,8 @@ namespace FacturaScripts\Plugins\AiScan\Controller;
 
 use FacturaScripts\Core\Lib\ExtendedController\PanelController;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Dinamic\Lib\AssetManager;
+use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 
 class AiScanConfig extends PanelController
 {
@@ -44,6 +46,9 @@ class AiScanConfig extends PanelController
         $this->addEditView($viewName, 'Settings', 'aiscan-settings', 'fa-solid fa-gear');
         $this->views[$viewName]->disableColumn('name', false, false);
 
+        $route = Tools::config('route');
+        AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan-config.js');
+
         $defaultProvider = $this->views[$viewName]->columnForName('default-provider');
         if ($defaultProvider) {
             $defaultProvider->widget->setValuesFromArray([
@@ -54,6 +59,24 @@ class AiScanConfig extends PanelController
                 ['value' => 'browser-prompt', 'title' => Tools::lang()->trans('aiscan-provider-browser-prompt')],
             ], false, false);
         }
+    }
+
+    protected function execPreviousAction($action)
+    {
+        if ($action === 'get-base-prompt') {
+            $this->setTemplate(false);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'prompt' => ExtractionService::getDefaultSystemPrompt(),
+                'i18n' => [
+                    'title' => Tools::lang()->trans('aiscan-base-prompt-title'),
+                    'close' => Tools::lang()->trans('close'),
+                    'view' => Tools::lang()->trans('aiscan-view-base-prompt'),
+                ],
+            ]);
+            return false;
+        }
+        return parent::execPreviousAction($action);
     }
 
     protected function loadData($viewName, $view)

@@ -295,8 +295,12 @@ PROMPT;
 
     public static function getSystemPrompt(): string
     {
-        $custom = Tools::settings('AiScan', 'extraction_prompt', '');
-        return !empty(trim($custom)) ? $custom : self::DEFAULT_SYSTEM_PROMPT;
+        $prompt = self::DEFAULT_SYSTEM_PROMPT;
+        $custom = trim(Tools::settings('AiScan', 'extraction_prompt', ''));
+        if (!empty($custom)) {
+            $prompt .= "\n\n## Additional instructions\n\n" . $custom;
+        }
+        return $prompt;
     }
 
     public static function getDefaultSystemPrompt(): string
