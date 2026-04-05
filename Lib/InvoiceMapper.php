@@ -22,8 +22,8 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Tools;
-use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Core\Where;
+use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\EstadoDocumento;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
@@ -296,5 +296,4 @@ class InvoiceMapper
             return;
         }
     }
-
 }
