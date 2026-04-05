@@ -137,8 +137,19 @@ class AiScanInvoice extends Controller
     private function loadPageAssets(): void
     {
         $route = Tools::config('route');
-        AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css');
-        AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan-workflow.js');
+        $v = '?v=' . $this->getPluginVersion();
+        AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css' . $v);
+        AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan-workflow.js' . $v);
+    }
+
+    private function getPluginVersion(): string
+    {
+        $iniPath = FS_FOLDER . '/Plugins/AiScan/facturascripts.ini';
+        if (file_exists($iniPath)) {
+            $ini = parse_ini_file($iniPath);
+            return $ini['version'] ?? '0';
+        }
+        return '0';
     }
 
     private function handleUpload(): void
