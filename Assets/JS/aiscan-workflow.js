@@ -93,11 +93,15 @@
             const base = qty * price * (1 - dto / 100);
             calcTotal += base + base * (tax / 100) - base * (irpf / 100);
         }
-        if (Math.round(calcTotal * 100) !== Math.round(invoiceTotal * 100)) {
-            return trans('aiscan-total-mismatch', {
-                '%calculated%': fmtNumber(calcTotal),
-                '%invoice%': fmtNumber(invoiceTotal),
-            });
+        const diffCents = Math.round(calcTotal * 100) - Math.round(invoiceTotal * 100);
+        if (diffCents !== 0) {
+            return {
+                message: trans('aiscan-total-mismatch', {
+                    '%calculated%': fmtNumber(calcTotal),
+                    '%invoice%': fmtNumber(invoiceTotal),
+                }),
+                isRounding: Math.abs(diffCents) <= 5,
+            };
         }
         return null;
     }
@@ -424,8 +428,10 @@
                     if (!doc.extractedData._validation_errors) {
                         doc.extractedData._validation_errors = [];
                     }
-                    doc.extractedData._validation_errors.push(totalMismatch);
-                    needsReview = true;
+                    doc.extractedData._validation_errors.push(totalMismatch.message);
+                    if (!totalMismatch.isRounding) {
+                        needsReview = true;
+                    }
                 }
 
                 doc.status = needsReview ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
@@ -1019,26 +1025,6 @@
         document.getElementById('aiscan-mark-ready-btn')?.addEventListener('click', markCurrentReady);
         bindSupplierSearch();
 
-        // Rounding fix button
-        review.addEventListener('click', e => {
-            const fixBtn = e.target.closest('.aiscan-fix-rounding');
-            if (!fixBtn) { return; }
-            const diff = parseFloat(fixBtn.dataset.diff) || 0;
-            if (diff === 0) { return; }
-            // Find the largest line and adjust its pvpunitario
-            let largestRow = null;
-            let largestPrice = 0;
-            document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(row => {
-                const p = parseFloat(row.querySelector('[data-field="pvpunitario"]')?.value || 0);
-                if (p > largestPrice) { largestPrice = p; largestRow = row; }
-            });
-            if (largestRow) {
-                const input = largestRow.querySelector('[data-field="pvpunitario"]');
-                const current = parseFloat(input.value) || 0;
-                input.value = Math.round((current - diff) * 100) / 100;
-                calcAllLineTotals();
-            }
-        });
     }
 
     let collapseCounter = 0;
@@ -1449,11 +1435,11 @@
         if (roundingAlert) {
             const doc = currentDoc();
             const origTotal = parseFloat(doc?.extractedData?.invoice?.total) || 0;
-            const diff = Math.round((totalFinal - origTotal) * 100) / 100;
-            if (origTotal > 0 && diff !== 0 && Math.abs(diff) <= 0.05) {
-                roundingAlert.className = 'alert alert-warning py-1 px-2 small mt-2 d-flex align-items-center justify-content-between';
-                roundingAlert.innerHTML = `<span><i class="fa-solid fa-info-circle me-1"></i>${escapeHtml(trans('aiscan-rounding-diff', {'%diff%': fmtNumber(diff)}))}</span>`
-                    + `<button type="button" class="btn btn-sm btn-outline-warning aiscan-fix-rounding" data-diff="${diff}"><i class="fa-solid fa-wrench me-1"></i>${escapeHtml(trans('aiscan-fix-rounding'))}</button>`;
+            const diffCents = Math.round(totalFinal * 100) - Math.round(origTotal * 100);
+            if (origTotal > 0 && diffCents !== 0 && Math.abs(diffCents) <= 5) {
+                const diff = diffCents / 100;
+                roundingAlert.className = 'alert alert-info py-1 px-2 small mt-2';
+                roundingAlert.innerHTML = `<i class="fa-solid fa-info-circle me-1"></i>${escapeHtml(trans('aiscan-rounding-diff', {'%diff%': fmtNumber(diff)}))}`;
             } else {
                 roundingAlert.className = 'd-none';
                 roundingAlert.innerHTML = '';
