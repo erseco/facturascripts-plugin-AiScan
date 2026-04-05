@@ -17,11 +17,15 @@ jobs:
       - name: Checkout plugin
         uses: actions/checkout@v6
 
-      - name: Remove plugin mount from docker-compose.yml
+      - name: Remove plugin mount and plugin-dependent env vars from docker-compose.yml
         run: |
           # In CI we don't mount the plugin directory to avoid permission issues
           # Instead we copy the files after the container is running
           sed -i '/\.\/:/d' docker-compose.yml
+          # Remove env vars that reference plugin files (they don't exist yet)
+          sed -i '/FS_SEED_FILE/d' docker-compose.yml
+          sed -i '/POST_CONFIGURE_COMMANDS/d' docker-compose.yml
+          sed -i '/php84.*setup-aiscan\.php/d' docker-compose.yml
 
       - name: Wait for services to be ready
         run: |
@@ -31,14 +35,22 @@ jobs:
           timeout=120
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
-            if docker compose ps | grep -q "healthy"; then
-              echo "✅ Services are healthy"
+            STATUS=$(docker compose ps facturascripts --format '{{.Status}}' 2>/dev/null || true)
+            if echo "$STATUS" | grep -qi "up"; then
+              echo "✅ facturascripts container is up: $STATUS"
               break
             fi
-            echo "⏳ Waiting for services... ($elapsed/$timeout seconds)"
+            echo "⏳ Waiting for facturascripts... status=$STATUS ($elapsed/$timeout seconds)"
             sleep 5
             elapsed=$((elapsed + 5))
           done
+
+          if [ $elapsed -ge $timeout ]; then
+            echo "❌ Timeout waiting for facturascripts container"
+            docker compose ps
+            docker compose logs facturascripts | tail -50
+            exit 1
+          fi
 
           echo "Waiting for FacturaScripts to initialize..."
           sleep 15

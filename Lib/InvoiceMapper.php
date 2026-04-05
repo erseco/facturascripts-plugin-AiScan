@@ -22,8 +22,10 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Dinamic\Model\Divisa;
+use FacturaScripts\Dinamic\Model\EstadoDocumento;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
@@ -126,6 +128,8 @@ class InvoiceMapper
 
             $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
 
+            $this->setReceivedStatus($invoice);
+
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
         } catch (\Exception $e) {
@@ -154,7 +158,9 @@ class InvoiceMapper
         $invoiceLines = [];
 
         foreach ($preparedLines as $lineData) {
-            $reference = $this->productMatcher->findReference($lineData);
+            $reference = !empty($lineData['referencia'])
+                ? $lineData['referencia']
+                : $this->productMatcher->findReference($lineData);
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
             $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
             $line->descripcion = trim((string) $desc);
@@ -275,5 +281,19 @@ class InvoiceMapper
     {
         $subtotal = (float) ($invoiceData['subtotal'] ?? $invoiceData['total'] ?? 0);
         return $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0);
+    }
+
+    private function setReceivedStatus(FacturaProveedor $invoice): void
+    {
+        $status = new EstadoDocumento();
+        $where = [
+            Where::column('tipodoc', 'FacturaProveedor'),
+            Where::column('nombre', 'Recibida'),
+        ];
+        foreach ($status->all($where, [], 0, 1) as $received) {
+            $invoice->idestado = $received->idestado;
+            $invoice->save();
+            return;
+        }
     }
 }
