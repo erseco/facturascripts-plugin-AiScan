@@ -20,6 +20,8 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
+use FacturaScripts\Core\Tools;
+
 class SchemaValidator
 {
     private const REQUIRED_INVOICE_FIELDS = ['number', 'issue_date', 'total'];
@@ -52,9 +54,13 @@ class SchemaValidator
 
         $lines = is_array($data['lines'] ?? null) ? $data['lines'] : [];
         foreach ($lines as $index => $line) {
-            if (empty($line['description'])) {
+            if (empty($line['description']) && empty($line['descripcion'])) {
                 $errors[] = 'Missing line description at index ' . $index;
             }
+        }
+
+        if (!empty($data['_truncated'])) {
+            $errors[] = Tools::lang()->trans('aiscan-response-truncated');
         }
 
         if (
@@ -98,14 +104,9 @@ class SchemaValidator
             }
         }
 
-        // Include AI-generated warnings
-        if (!empty($data['warnings']) && is_array($data['warnings'])) {
-            foreach ($data['warnings'] as $warning) {
-                if (is_string($warning) && !empty($warning)) {
-                    $errors[] = $warning;
-                }
-            }
-        }
+        // AI-generated warnings are informational only, not validation errors.
+        // They are preserved in data['warnings'] for display but do not
+        // block the review workflow.
 
         return $errors;
     }
@@ -116,7 +117,18 @@ class SchemaValidator
         $data['invoice'] = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
         $data['taxes'] = is_array($data['taxes'] ?? null) ? $data['taxes'] : [];
         $data['lines'] = is_array($data['lines'] ?? null) ? $data['lines'] : [];
-        $data['warnings'] = is_array($data['warnings'] ?? null) ? $data['warnings'] : [];
+        $originalLineCount = count($data['lines']);
+        $data['lines'] = array_values(array_filter($data['lines'], function ($line) {
+            $desc = trim((string) ($line['descripcion'] ?? $line['description'] ?? ''));
+            $price = (float) ($line['pvpunitario'] ?? $line['unit_price'] ?? 0);
+            return $desc !== '' || $price > 0;
+        }));
+        $data['warnings'] = array_values(array_unique(
+            is_array($data['warnings'] ?? null) ? $data['warnings'] : []
+        ));
+        if (count($data['lines']) < $originalLineCount) {
+            $data['_truncated'] = true;
+        }
         $data['confidence'] = is_array($data['confidence'] ?? null) ? $data['confidence'] : [];
         $data['customer'] = is_array($data['customer'] ?? null) ? $data['customer'] : [];
 
@@ -133,6 +145,11 @@ class SchemaValidator
             }
         }
 
+        // Ensure withholding is always positive (absolute value)
+        if (isset($data['invoice']['withholding_amount']) && $data['invoice']['withholding_amount'] < 0) {
+            $data['invoice']['withholding_amount'] = abs($data['invoice']['withholding_amount']);
+        }
+
         if (!empty($data['invoice']['currency'])) {
             $raw = strtoupper(trim((string) $data['invoice']['currency']));
             $data['invoice']['currency'] = $this->normalizeCurrencySymbol($raw);
@@ -140,9 +157,76 @@ class SchemaValidator
 
         if (isset($data['lines']) && is_array($data['lines'])) {
             foreach ($data['lines'] as &$line) {
-                foreach (['quantity', 'unit_price', 'discount', 'tax_rate', 'line_total'] as $field) {
+                // Map old field names to FS field names
+                $aliases = [
+                    'description' => 'descripcion',
+                    'quantity' => 'cantidad',
+                    'unit_price' => 'pvpunitario',
+                    'discount' => 'dtopor',
+                    'tax_rate' => 'iva',
+                    'tax_code' => 'codimpuesto',
+                    'irpf_code' => 'codretencion',
+                    'line_total' => 'pvptotal',
+                    'sku' => 'referencia',
+                ];
+                foreach ($aliases as $old => $new) {
+                    if (isset($line[$old]) && !isset($line[$new])) {
+                        $line[$new] = $line[$old];
+                    }
+                }
+
+                // Normalize decimal fields
+                $decimalFields = ['cantidad', 'pvpunitario', 'dtopor', 'dtopor2',
+                    'iva', 'recargo', 'irpf', 'pvptotal'];
+                foreach ($decimalFields as $field) {
                     if (isset($line[$field])) {
                         $line[$field] = $this->normalizeDecimal($line[$field]);
+                    }
+                }
+
+                // Default cantidad to 1 if missing
+                if (empty($line['cantidad'])) {
+                    $line['cantidad'] = 1.0;
+                }
+
+                // Default numeric fields
+                $line['dtopor'] = (float) ($line['dtopor'] ?? 0);
+                $line['dtopor2'] = (float) ($line['dtopor2'] ?? 0);
+                $line['iva'] = (float) ($line['iva'] ?? 0);
+                $line['recargo'] = (float) ($line['recargo'] ?? 0);
+                $line['irpf'] = (float) ($line['irpf'] ?? 0);
+                $line['suplido'] = !empty($line['suplido']);
+
+                // Try to compute pvpunitario from pvptotal if missing
+                if (empty($line['pvpunitario']) && !empty($line['pvptotal'])) {
+                    $qty = (float) ($line['cantidad'] ?: 1);
+                    $line['pvpunitario'] = $qty > 0
+                        ? $line['pvptotal'] / $qty
+                        : $line['pvptotal'];
+                }
+            }
+            unset($line);
+
+            // Distribute withholding to lines if invoice has it but lines don't
+            $withholding = (float) ($data['invoice']['withholding_amount'] ?? 0);
+            if ($withholding > 0 && !empty($data['lines'])) {
+                $allZero = true;
+                foreach ($data['lines'] as $line) {
+                    if ((float) ($line['irpf'] ?? 0) > 0) {
+                        $allZero = false;
+                        break;
+                    }
+                }
+                if ($allZero) {
+                    $subtotal = (float) ($data['invoice']['subtotal'] ?? 0);
+                    $irpfRate = $subtotal > 0
+                        ? round(($withholding / $subtotal) * 100, 0)
+                        : 0;
+                    if ($irpfRate > 0) {
+                        foreach ($data['lines'] as &$line) {
+                            $line['irpf'] = (float) $irpfRate;
+                        }
+                        unset($line);
                     }
                 }
             }

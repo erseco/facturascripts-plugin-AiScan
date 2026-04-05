@@ -27,17 +27,17 @@ class AiScanLog extends ModelClass
 {
     use ModelTrait;
 
-    public int $id;
+    public ?int $id;
     public ?int $idfactura;
-    public string $filename;
-    public string $mime_type;
-    public string $provider;
+    public ?string $filename;
+    public ?string $mime_type;
+    public ?string $provider;
     public ?string $model;
-    public string $status;
+    public ?string $status;
     public ?string $raw_payload;
     public ?string $error_message;
-    public float $confidence;
-    public string $created_at;
+    public ?float $confidence;
+    public ?string $created_at;
 
     public function clear(): void
     {

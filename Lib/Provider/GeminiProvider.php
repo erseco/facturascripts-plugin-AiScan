@@ -31,7 +31,7 @@ class GeminiProvider implements ProviderInterface
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'gemini_api_key', '');
-        $this->model = Tools::settings('AiScan', 'gemini_model', 'gemini-2.5-flash');
+        $this->model = Tools::settings('AiScan', 'gemini_model', 'gemini-2.5-flash-lite');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
 
@@ -72,8 +72,9 @@ class GeminiProvider implements ProviderInterface
             ],
             'generationConfig' => [
                 'temperature' => 0,
-                'maxOutputTokens' => 4096,
+                'maxOutputTokens' => 32768,
                 'responseMimeType' => 'application/json',
+                'thinkingConfig' => ['thinkingBudget' => 0],
             ],
         ];
 

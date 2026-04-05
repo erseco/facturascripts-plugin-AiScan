@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<view>
+    <columns>
+        <group name="general" title="general" numcolumns="12">
+            <column name="id" numcolumns="2" order="10">
+                <widget type="text" fieldname="id" readonly="true"/>
+            </column>
+            <column name="date" numcolumns="3" order="20">
+                <widget type="datetime" fieldname="created_at" readonly="true"/>
+            </column>
+            <column name="user" numcolumns="3" order="30">
+                <widget type="text" fieldname="nick" readonly="true"/>
+            </column>
+            <column name="aiscan-import-mode" numcolumns="2" order="40">
+                <widget type="text" fieldname="importmode" readonly="true"/>
+            </column>
+            <column name="aiscan-provider" numcolumns="2" order="50">
+                <widget type="text" fieldname="provider" readonly="true"/>
+            </column>
+            <column name="aiscan-total-documents" numcolumns="2" order="60">
+                <widget type="number" fieldname="totaldocuments" decimal="0" readonly="true"/>
+            </column>
+            <column name="aiscan-imported" numcolumns="2" order="70">
+                <widget type="number" fieldname="importedcount" decimal="0" readonly="true"/>
+            </column>
+            <column name="aiscan-hist-discarded" numcolumns="2" order="80">
+                <widget type="number" fieldname="discardedcount" decimal="0" readonly="true"/>
+            </column>
+            <column name="aiscan-hist-failed" numcolumns="2" order="90">
+                <widget type="number" fieldname="failedcount" decimal="0" readonly="true"/>
+            </column>
+        </group>
+    </columns>
+</view>

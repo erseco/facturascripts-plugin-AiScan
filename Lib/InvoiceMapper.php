@@ -22,9 +22,11 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\Proveedor;
+use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
 
 class InvoiceMapper
 {
@@ -35,8 +37,11 @@ class InvoiceMapper
     ) {
     }
 
-    public function mapToInvoice(array $extractedData, ?int $invoiceId = null): array
-    {
+    public function mapToInvoice(
+        array $extractedData,
+        ?int $invoiceId = null,
+        string $importMode = 'lines'
+    ): array {
         $result = ['success' => false, 'invoice_id' => null, 'errors' => []];
 
         try {
@@ -84,14 +89,22 @@ class InvoiceMapper
                 }
             }
 
-            if (!empty($invoiceData['withholding_amount'])) {
-                $invoice->totalirpf = (float) $invoiceData['withholding_amount'];
-            }
-
             $invoice->observaciones = $this->buildNotes($invoiceData);
 
+            if (empty($invoice->codalmacen)) {
+                $invoice->codalmacen = Tools::settings('default', 'codalmacen', '');
+                if (empty($invoice->codalmacen)) {
+                    $warehouse = new Almacen();
+                    foreach ($warehouse->all([], [], 0, 1) as $first) {
+                        $invoice->codalmacen = $first->codalmacen;
+                    }
+                }
+            }
+
             if (!$invoice->save()) {
-                $result['errors'][] = Tools::lang()->trans('record-save-error');
+                $miniLog = Tools::log()::read('', ['critical', 'error', 'warning']);
+                $detail = implode('; ', array_map(fn ($m) => $m['message'], $miniLog));
+                $result['errors'][] = $detail ?: Tools::lang()->trans('record-save-error');
                 return $result;
             }
 
@@ -101,21 +114,10 @@ class InvoiceMapper
                 }
             }
 
-            $invoiceLines = [];
-            foreach ($this->prepareLines($lines, $invoiceData) as $lineData) {
-                $reference = $this->productMatcher->findReference($lineData);
-                $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
-                $line->descripcion = trim((string) ($lineData['description'] ?? $line->descripcion));
-                $line->cantidad = max(1, (float) ($lineData['quantity'] ?? 1));
-                $line->pvpunitario = (float) ($lineData['unit_price'] ?? $line->pvpunitario);
-                $line->dtopor = (float) ($lineData['discount'] ?? 0);
-
-                if (!empty($lineData['tax_rate'])) {
-                    $line->iva = (float) $lineData['tax_rate'];
-                }
-
-                $invoiceLines[] = $line;
-            }
+            $taxes = $extractedData['taxes'] ?? [];
+            $invoiceLines = $importMode === 'total' && empty($lines)
+                ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
+                : $this->buildLinesMode($invoice, $lines, $invoiceData);
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
                 $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
@@ -146,24 +148,132 @@ class InvoiceMapper
         return implode("\n\n", array_unique($parts));
     }
 
+    private function buildLinesMode(FacturaProveedor $invoice, array $lines, array $invoiceData): array
+    {
+        $preparedLines = $this->prepareLines($lines, $invoiceData);
+        $invoiceLines = [];
+
+        foreach ($preparedLines as $lineData) {
+            $reference = $this->productMatcher->findReference($lineData);
+            $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+            $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
+            $line->descripcion = trim((string) $desc);
+            $line->cantidad = max(1, (float) ($lineData['quantity'] ?? $lineData['cantidad'] ?? 1));
+            $line->pvpunitario = (float) ($lineData['unit_price'] ?? $lineData['pvpunitario'] ?? $line->pvpunitario);
+            $line->dtopor = (float) ($lineData['discount'] ?? $lineData['dtopor'] ?? 0);
+
+            if (!empty($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? '')) {
+                $line->codimpuesto = $lineData['codimpuesto'] ?? $lineData['tax_code'];
+            }
+
+            $taxRate = $lineData['tax_rate'] ?? $lineData['iva'] ?? null;
+            if ($taxRate !== null && $taxRate !== '') {
+                $line->iva = (float) $taxRate;
+            }
+
+            $irpf = $lineData['irpf'] ?? null;
+            if ($irpf !== null && $irpf !== '') {
+                $line->irpf = (float) $irpf;
+            }
+
+            $codret = $lineData['codretencion'] ?? $lineData['irpf_code'] ?? '';
+            if (!empty($codret)) {
+                $line->codretencion = $codret;
+            }
+
+            if (!empty($lineData['recargo'] ?? 0)) {
+                $line->recargo = (float) $lineData['recargo'];
+            }
+
+            if (!empty($lineData['excepcioniva'] ?? '')) {
+                $line->excepcioniva = $lineData['excepcioniva'];
+            }
+
+            if (!empty($lineData['suplido'] ?? false)) {
+                $line->suplido = true;
+            }
+
+            $invoiceLines[] = $line;
+        }
+
+        return $invoiceLines;
+    }
+
+    private function buildTotalModeLines(
+        FacturaProveedor $invoice,
+        array $invoiceData,
+        array $taxes,
+        ?Proveedor $supplier
+    ): array {
+        $reference = null;
+        if ($supplier) {
+            $defaultProduct = AiScanSupplierProduct::getForSupplier($supplier->codproveedor);
+            if ($defaultProduct) {
+                $reference = $defaultProduct->referencia;
+            }
+        }
+
+        $description = $this->fallbackDescription($invoiceData);
+
+        if (!empty($taxes) && count($taxes) > 1) {
+            $invoiceLines = [];
+            foreach ($taxes as $tax) {
+                $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+                $line->descripcion = $description;
+                $line->cantidad = 1;
+                $line->pvpunitario = (float) ($tax['base'] ?? 0);
+                $line->dtopor = 0;
+                $line->iva = (float) ($tax['rate'] ?? 0);
+                $invoiceLines[] = $line;
+            }
+            return $invoiceLines;
+        }
+
+        $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+        $line->descripcion = $description;
+        $line->cantidad = 1;
+        $line->pvpunitario = $this->fallbackSubtotal($invoiceData);
+        $line->dtopor = 0;
+        $line->iva = !empty($taxes) ? (float) ($taxes[0]['rate'] ?? 0) : $this->computeTaxRate($invoiceData);
+
+        return [$line];
+    }
+
     private function prepareLines(array $lines, array $invoiceData): array
     {
         if (!empty($lines)) {
             return $lines;
         }
 
+        return [[
+            'description' => $this->fallbackDescription($invoiceData),
+            'quantity' => 1,
+            'unit_price' => $this->fallbackSubtotal($invoiceData),
+            'discount' => 0,
+            'tax_rate' => $this->computeTaxRate($invoiceData),
+        ]];
+    }
+
+    private function computeTaxRate(array $invoiceData): float
+    {
         $subtotal = (float) ($invoiceData['subtotal'] ?? $invoiceData['total'] ?? 0);
         $taxAmount = (float) ($invoiceData['tax_amount'] ?? 0);
-        $taxRate = $subtotal > 0 && $taxAmount > 0 ? round(($taxAmount / $subtotal) * 100, 2) : 0.0;
+        return $subtotal > 0 && $taxAmount > 0
+            ? round(($taxAmount / $subtotal) * 100, 2)
+            : 0.0;
+    }
 
-        return [[
-            'description' => trim((string) (
-                $invoiceData['summary'] ?? Tools::lang()->trans('aiscan-scanned-supplier-invoice')
-            )),
-            'quantity' => 1,
-            'unit_price' => $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0),
-            'discount' => 0,
-            'tax_rate' => $taxRate,
-        ]];
+    private function fallbackDescription(array $invoiceData): string
+    {
+        return trim((string) (
+            $invoiceData['summary']
+            ?? Tools::lang()->trans('aiscan-scanned-supplier-invoice')
+        ));
+    }
+
+    private function fallbackSubtotal(array $invoiceData): float
+    {
+        $subtotal = (float) ($invoiceData['subtotal'] ?? $invoiceData['total'] ?? 0);
+        return $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0);
     }
 }

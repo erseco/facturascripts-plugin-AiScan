@@ -32,7 +32,7 @@ class OpenAIProvider implements ProviderInterface
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'openai_api_key', '');
-        $this->model = Tools::settings('AiScan', 'openai_model', 'gpt-5-mini');
+        $this->model = Tools::settings('AiScan', 'openai_model', 'gpt-5-nano');
         $this->baseUrl = Tools::settings('AiScan', 'openai_base_url', 'https://api.openai.com/v1');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
@@ -96,7 +96,7 @@ class OpenAIProvider implements ProviderInterface
             'model' => $this->model,
             'messages' => $messages,
             'response_format' => ['type' => 'json_object'],
-            'max_completion_tokens' => 4096,
+            'max_completion_tokens' => 32768,
         ]);
 
         $ch = curl_init($this->baseUrl . '/chat/completions');

@@ -8,23 +8,73 @@
  * License, or (at your option) any later version.
  */
 
-.aiscan-modal .modal-dialog {
-    max-width: 1200px;
+/* Review layout: sidebar + split */
+.aiscan-review-layout {
+    display: flex;
+    height: 75vh;
+    min-height: 400px;
+    gap: 0;
 }
 
-.aiscan-modal .modal-body {
-    padding: 0;
+/* Collapsible sidebar */
+.aiscan-review-sidebar {
+    flex: 0 0 300px;
+    min-width: 200px;
+    max-width: 50%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.aiscan-review-sidebar > .card {
+    border-radius: 0;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.aiscan-review-sidebar > .card > .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Sidebar list */
+.aiscan-sidebar-list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.aiscan-sidebar-list .list-group-item {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    border-left: 3px solid transparent;
+    border-radius: 0;
+}
+
+.aiscan-sidebar-list .list-group-item:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.aiscan-sidebar-list .list-group-item.active {
+    border-left-color: var(--bs-primary);
+    background: rgba(13, 110, 253, 0.06);
+    color: inherit;
 }
 
 /* Split pane layout */
 .aiscan-split {
     display: flex;
-    height: 75vh;
-    min-height: 400px;
+    flex: 1;
+    min-width: 0;
 }
 
 .aiscan-split-left {
-    flex: 0 0 55%;
+    flex: 0 0 40%;
     min-width: 0;
     overflow: hidden;
     display: flex;
@@ -96,8 +146,7 @@
     border: 2px dashed var(--bs-border-color);
     border-radius: 0.5rem;
     cursor: pointer;
-    height: 100%;
-    min-height: 300px;
+    min-height: 200px;
     transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
@@ -128,6 +177,18 @@
     overflow-y: auto;
 }
 
-.aiscan-modal #aiscan-wizard-progress {
-    min-width: 84px;
+/* Status badges in progress bar */
+#aiscan-doc-status-badges {
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+#aiscan-doc-status-badges .badge {
+    font-size: 0.7rem;
+    min-width: 28px;
+    transition: all 0.15s;
+}
+
+#aiscan-doc-status-badges .badge:hover {
+    opacity: 0.8;
 }

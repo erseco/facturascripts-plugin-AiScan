@@ -1,0 +1,56 @@
+{
+    "document_type": "invoice",
+    "supplier": {
+        "name": "Panadería Artesana El Horno",
+        "tax_id": "B38901234",
+        "email": null,
+        "phone": null,
+        "website": null,
+        "address": null
+    },
+    "customer": {
+        "name": "Pepita Gómez",
+        "tax_id": "125478938W",
+        "address": null
+    },
+    "invoice": {
+        "number": "F-2024/011",
+        "issue_date": "2026-01-28",
+        "due_date": null,
+        "currency": "EUR",
+        "subtotal": 350.00,
+        "tax_amount": 24.50,
+        "withholding_amount": 0,
+        "total": 374.50,
+        "summary": "Gestión redes sociales marzo",
+        "payment_terms": null
+    },
+    "taxes": [
+        {
+            "name": "IGIC",
+            "rate": 7,
+            "base": 350.00,
+            "amount": 24.50
+        }
+    ],
+    "lines": [
+        {
+            "description": "Gestión redes sociales marzo",
+            "quantity": 1,
+            "unit_price": 350.00,
+            "discount": 0,
+            "tax_rate": 7,
+            "line_total": 350.00,
+            "sku": null
+        }
+    ],
+    "confidence": {
+        "supplier_name": 0.95,
+        "supplier_tax_id": 0.98,
+        "invoice_number": 0.99,
+        "issue_date": 0.97,
+        "total": 0.99,
+        "lines": 0.95
+    },
+    "warnings": []
+}

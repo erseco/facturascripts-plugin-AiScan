@@ -8,7 +8,7 @@
   "debug": {
     "enabled": true
   },
-  "landingPage": "/AdminPlugins",
+  "landingPage": "/AiScanInvoice",
   "siteOptions": {
     "title": "AiScan Playground Demo",
     "locale": "es_ES",
@@ -20,5 +20,233 @@
   },
   "plugins": [
     "https://github.com/erseco/facturascripts-plugin-AiScan/archive/refs/heads/main.zip"
-  ]
+  ],
+  "install": {
+    "codpais": "ESP",
+    "empresa": "Pepita Gómez - Autónoma",
+    "cifnif": "125478938W",
+    "tipoidfiscal": "NIF",
+    "regimeniva": "General",
+    "defaultplan": true
+  },
+  "seed": {
+    "suppliers": [
+      {
+        "nombre": "Clínica Dental Sonrisa",
+        "razonsocial": "Clínica Dental Sonrisa S.L.",
+        "cifnif": "B38456789",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Panadería Artesana El Horno",
+        "razonsocial": "Panadería Artesana El Horno S.L.",
+        "cifnif": "B38901234",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Gimnasio Fit & Strong",
+        "razonsocial": "Gimnasio Fit & Strong S.L.",
+        "cifnif": "B38012345",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Bodega Volcanes del Sur",
+        "razonsocial": "Bodega Volcanes del Sur S.L.",
+        "cifnif": "B38033344",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Peluquería Estilo Libre",
+        "razonsocial": "Peluquería Estilo Libre S.L.",
+        "cifnif": "B38778899",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Soluciones Digitales Canarias",
+        "razonsocial": "Soluciones Digitales Canarias S.L.",
+        "cifnif": "B38111222",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Restaurante El Mirador",
+        "razonsocial": "Restaurante El Mirador C.B.",
+        "cifnif": "E76234567",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Transportes Tenerife",
+        "razonsocial": "Transportes Tenerife S.A.",
+        "cifnif": "A38345678",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Comercial Atlántica",
+        "razonsocial": "Comercial Atlántica S.L.",
+        "cifnif": "B38556677",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Inmobiliaria Canarias",
+        "razonsocial": "Inmobiliaria Canarias S.A.",
+        "cifnif": "A38789012",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Constructora Isla Verde",
+        "razonsocial": "Constructora Isla Verde S.L.",
+        "cifnif": "B38112233",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Cabildo de Tenerife",
+        "razonsocial": "Cabildo Insular de Tenerife",
+        "cifnif": "P3800000B",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Óptica Visión Clara",
+        "razonsocial": "Óptica Visión Clara S.L.",
+        "cifnif": "B38334455",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Gobierno de Canarias",
+        "razonsocial": "Gobierno de Canarias",
+        "cifnif": "S3511001I",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Surf School Tenerife",
+        "razonsocial": "Surf School Tenerife S.L.",
+        "cifnif": "B38889900",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Joyería Atlantis",
+        "razonsocial": "Joyería Atlantis S.L.",
+        "cifnif": "B76567890",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      },
+      {
+        "nombre": "Ingeniería TechIsland",
+        "razonsocial": "Ingeniería TechIsland S.A.",
+        "cifnif": "A38333444",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "_unique": "cifnif"
+      }
+    ],
+    "products": [
+      {
+        "referencia": "SERV-DEV",
+        "descripcion": "Desarrollo de software",
+        "precio": 75.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-DISENO",
+        "descripcion": "Diseño gráfico y web",
+        "precio": 60.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-RRSS",
+        "descripcion": "Gestión de redes sociales",
+        "precio": 350.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-PUBLI",
+        "descripcion": "Publicidad digital",
+        "precio": 500.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-CONSUL",
+        "descripcion": "Consultoría y formación",
+        "precio": 80.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-HOSTING",
+        "descripcion": "Hosting, dominios y SSL",
+        "precio": 9.99,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-TESTING",
+        "descripcion": "Testing y auditoría",
+        "precio": 65.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-MANTEN",
+        "descripcion": "Mantenimiento web",
+        "precio": 200.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-FOTO",
+        "descripcion": "Fotografía y vídeo profesional",
+        "precio": 120.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-RENDER",
+        "descripcion": "Renders 3D y tours virtuales",
+        "precio": 450.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-PLANOS",
+        "descripcion": "Planos y documentación técnica",
+        "precio": 180.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "SERV-MIGRA",
+        "descripcion": "Migración de datos y servidores",
+        "precio": 90.00,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "GASTOS-GEN",
+        "descripcion": "Gastos generales",
+        "precio": 0.00,
+        "_unique": "referencia"
+      }
+    ]
+  }
 }

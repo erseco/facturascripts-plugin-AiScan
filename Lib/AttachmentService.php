@@ -47,6 +47,16 @@ class AttachmentService
             return;
         }
 
+        $originalName = basename((string) ($uploadData['original_name'] ?? ''));
+        if (!empty($originalName)) {
+            $safeName = preg_replace('/[^a-zA-Z0-9_\-.]/', '-', $originalName);
+            $destPath = $tmpDir . DIRECTORY_SEPARATOR . $safeName;
+            if (!file_exists($destPath)) {
+                rename($tmpPath, $destPath);
+                $tmpFile = $safeName;
+            }
+        }
+
         $attachedFile = new AttachedFile();
         $attachedFile->path = 'aiscan_tmp/' . $tmpFile;
         if (false === $attachedFile->save()) {

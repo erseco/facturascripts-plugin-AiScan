@@ -43,7 +43,7 @@ class SupplierMatcher
 
         if (!empty($supplierData['tax_id'])) {
             $supplier = new Proveedor();
-            $where = [new Where('cifnif', '=', $supplierData['tax_id'])];
+            $where = [Where::eq('cifnif', $supplierData['tax_id'])];
             $candidates = $supplier->all($where, [], 0, 5);
             if (count($candidates) === 1) {
                 $result['match_status'] = 'matched';
@@ -59,7 +59,7 @@ class SupplierMatcher
         if (!empty($supplierData['name'])) {
             $supplier = new Proveedor();
             $normalizedName = $this->normalizeName($supplierData['name']);
-            $where = [new Where('nombre', 'LIKE', '%' . $normalizedName . '%')];
+            $where = [Where::like('nombre', '%' . $normalizedName . '%')];
             $candidates = $supplier->all($where, [], 0, 5);
             if (count($candidates) === 1) {
                 $result['match_status'] = 'matched';

@@ -29,8 +29,6 @@ class Init extends InitClass
 {
     public function init(): void
     {
-        $this->loadExtension(new Extension\Controller\EditFacturaProveedor());
-        $this->loadExtension(new Extension\Controller\ListFacturaProveedor());
     }
 
     public function update(): void
