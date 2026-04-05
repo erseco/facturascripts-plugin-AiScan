@@ -23,6 +23,7 @@
         maxParallelRequests: 5,
         selectedIndices: new Set(),
         selectionAnchorIndex: null,
+        selectionShiftPressed: false,
         sortField: 'upload_order',
     };
 
@@ -651,8 +652,12 @@
 
         listEl.querySelectorAll('.aiscan-row-check').forEach(cb => {
             cb.addEventListener('click', (e) => {
+                state.selectionShiftPressed = e.shiftKey;
+            });
+
+            cb.addEventListener('change', () => {
                 const idx = parseInt(cb.dataset.index, 10);
-                const usedRangeSelection = e.shiftKey
+                const usedRangeSelection = state.selectionShiftPressed
                     && state.selectionAnchorIndex !== null
                     && applySelectionRange(
                         state.selectedIndices,
@@ -670,9 +675,11 @@
                     }
                 }
 
+                state.selectionShiftPressed = false;
                 state.selectionAnchorIndex = idx;
 
                 if (usedRangeSelection) {
+                    updateSelectAll();
                     renderSidebar();
                     return;
                 }
