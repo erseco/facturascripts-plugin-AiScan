@@ -156,7 +156,7 @@
             }
         }
 
-        return end > start;
+        return true;
     }
 
     // ── Initialization ─────────────────────────────────────────────────
@@ -677,14 +677,12 @@
 
                 state.selectionShiftPressed = false;
                 state.selectionAnchorIndex = idx;
+                updateSelectAll();
 
                 if (usedRangeSelection) {
-                    updateSelectAll();
                     renderSidebar();
                     return;
                 }
-
-                updateSelectAll();
             });
         });
 
