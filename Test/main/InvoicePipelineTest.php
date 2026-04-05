@@ -22,7 +22,6 @@ namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\SchemaValidator;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -78,7 +77,8 @@ final class InvoicePipelineTest extends TestCase
 
     // ── Normalization tests ────────────────────────────────────────────
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testNormalizePreservesRequiredSections(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -92,7 +92,8 @@ final class InvoicePipelineTest extends TestCase
         $this->assertIsArray($normalized['warnings']);
     }
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testNormalizeDateFormat(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -105,7 +106,8 @@ final class InvoicePipelineTest extends TestCase
         );
     }
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testNormalizeDecimalFields(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -127,7 +129,8 @@ final class InvoicePipelineTest extends TestCase
 
     // ── Validation tests ───────────────────────────────────────────────
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testValidateAcceptsWellFormedFixture(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -182,7 +185,8 @@ final class InvoicePipelineTest extends TestCase
 
     // ── Arithmetic consistency tests ───────────────────────────────────
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testArithmeticConsistency(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -202,7 +206,8 @@ final class InvoicePipelineTest extends TestCase
         );
     }
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testLinesTotalsMatchSubtotal(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -230,7 +235,8 @@ final class InvoicePipelineTest extends TestCase
 
     // ── Tax breakdown tests ────────────────────────────────────────────
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testTaxBreakdownMatchesTotalTax(string $fixture): void
     {
         $raw = self::loadFixture($fixture);
@@ -358,7 +364,8 @@ final class InvoicePipelineTest extends TestCase
 
     // ── Supplier data extraction tests ─────────────────────────────────
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testSupplierDataPresent(string $fixture): void
     {
         $data = self::loadFixture($fixture);
@@ -383,7 +390,8 @@ final class InvoicePipelineTest extends TestCase
 
     // ── Confidence scores tests ────────────────────────────────────────
 
-    #[DataProvider('invoiceFixtureProvider')]
+    /** @dataProvider invoiceFixtureProvider */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invoiceFixtureProvider')]
     public function testConfidenceScoresInRange(string $fixture): void
     {
         $data = self::loadFixture($fixture);

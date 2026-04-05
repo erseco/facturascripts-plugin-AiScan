@@ -1474,6 +1474,42 @@
         if (tot) { tot.textContent = fmtNumber(total); }
     }
 
+    function syncRowToModal(row, modal) {
+        const fields = {
+            descripcion: '.aiscan-modal-description',
+            cantidad: '.aiscan-modal-quantity',
+            pvpunitario: '.aiscan-modal-price',
+            dtopor: '.aiscan-modal-discount',
+        };
+        for (const [field, sel] of Object.entries(fields)) {
+            const rowInput = row.querySelector(`[data-field="${field}"]`);
+            const modalInput = modal.querySelector(sel);
+            if (rowInput && modalInput) {
+                modalInput.value = rowInput.value;
+            }
+        }
+        const taxRow = row.querySelector('[data-field="codimpuesto"]');
+        const taxModal = modal.querySelector('.aiscan-modal-tax');
+        if (taxRow && taxModal) {
+            taxModal.value = taxRow.value;
+        }
+        const irpfRow = row.querySelector('[data-field="irpf"]');
+        const irpfModal = modal.querySelector('.aiscan-modal-irpf');
+        if (irpfRow && irpfModal) {
+            irpfModal.value = irpfRow.value;
+        }
+        const excRow = row.querySelector('[data-field="excepcioniva"]');
+        const excModal = modal.querySelector('.aiscan-modal-excepcioniva');
+        if (excRow && excModal) {
+            excModal.value = excRow.value;
+        }
+        const supRow = row.querySelector('[data-field="suplido"]');
+        const supModal = modal.querySelector('.aiscan-modal-suplido');
+        if (supRow && supModal) {
+            supModal.value = supRow.value;
+        }
+    }
+
     function applyModalToRow(modal, row) {
         const fields = {
             descripcion: '.aiscan-modal-description',
@@ -1840,6 +1876,11 @@
         section.addEventListener('show.bs.modal', e => {
             const modal = e.target;
             if (!modal) { return; }
+            // Sync current row values into modal before opening
+            const row = modal.closest('.aiscan-line-row');
+            if (row) {
+                syncRowToModal(row, modal);
+            }
             const snapshot = {};
             modal.querySelectorAll('input, select').forEach(el => {
                 snapshot[Array.from(el.classList).join('.') || el.type] = el.value;

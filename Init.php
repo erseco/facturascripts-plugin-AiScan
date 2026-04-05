@@ -23,7 +23,6 @@ namespace FacturaScripts\Plugins\AiScan;
 use FacturaScripts\Core\Template\InitClass;
 use FacturaScripts\Dinamic\Model\Settings;
 use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
-use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 
 class Init extends InitClass
 {
@@ -41,7 +40,6 @@ class Init extends InitClass
             foreach (AiScanSettings::getDefaults() as $key => $value) {
                 $settings->$key = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
             }
-            $settings->extraction_prompt = ExtractionService::getDefaultSystemPrompt();
             $settings->save();
             return;
         }
@@ -50,10 +48,6 @@ class Init extends InitClass
             if (null === $settings->getProperty($key)) {
                 $settings->$key = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
             }
-        }
-
-        if (empty($settings->getProperty('extraction_prompt'))) {
-            $settings->extraction_prompt = ExtractionService::getDefaultSystemPrompt();
         }
 
         $settings->save();

@@ -66,8 +66,8 @@
             </column>
         </group>
         <group name="prompt" title="extraction-prompt" icon="fa-solid fa-comment-dots" numcolumns="12">
-            <column name="extraction-prompt" numcolumns="12" order="100">
-                <widget type="textarea" fieldname="extraction_prompt" rows="10"/>
+            <column name="extraction-prompt-additions" numcolumns="12" order="100">
+                <widget type="textarea" fieldname="additional_prompt" rows="6"/>
             </column>
         </group>
     </columns>
