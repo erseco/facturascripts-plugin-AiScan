@@ -59,7 +59,7 @@ function loadTestHooks() {
                 return {
                     innerHTML: '',
                     set textContent(value) {
-                        this.innerHTML = value == null ? '' : String(value);
+                        this.innerHTML = value === null || value === undefined ? '' : String(value);
                     },
                 };
             },
