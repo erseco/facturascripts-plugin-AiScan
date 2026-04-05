@@ -32,6 +32,7 @@
     "aiscan-supplier-create-error": "Error al crear proveedor.",
     "aiscan-supplier-created-success": "Proveedor creado correctamente.",
     "aiscan-supplier-name-required": "El nombre del proveedor es obligatorio.",
+    "aiscan-total-mismatch": "El total calculado (%calculated%) no coincide con el total de la factura (%invoice%). Revisa las líneas.",
     "aiscan-create-new-supplier-confirm": "No se ha encontrado el proveedor. ¿Quieres que AiScan cree uno nuevo con los datos extraídos?",
     "aiscan-create-or-update-invoice": "Crear / actualizar factura",
     "aiscan-default-product": "Producto predeterminado para este proveedor",

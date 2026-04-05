@@ -78,6 +78,30 @@
         return escapeHtml(value).replace(/"/g, '&quot;');
     }
 
+    function checkTotalMismatch(data) {
+        if (!data?.invoice?.total || !data?.lines?.length) {
+            return null;
+        }
+        const invoiceTotal = parseFloat(data.invoice.total) || 0;
+        let calcTotal = 0;
+        for (const line of data.lines) {
+            const qty = parseFloat(line.cantidad ?? line.quantity ?? 1);
+            const price = parseFloat(line.pvpunitario ?? line.unit_price ?? 0);
+            const dto = parseFloat(line.dtopor ?? line.discount ?? 0);
+            const tax = parseFloat(line.iva ?? line.tax_rate ?? 0);
+            const irpf = parseFloat(line.irpf ?? 0);
+            const base = qty * price * (1 - dto / 100);
+            calcTotal += base + base * (tax / 100) - base * (irpf / 100);
+        }
+        if (Math.abs(calcTotal - invoiceTotal) > 0.05) {
+            return trans('aiscan-total-mismatch', {
+                '%calculated%': fmtNumber(calcTotal),
+                '%invoice%': fmtNumber(invoiceTotal),
+            });
+        }
+        return null;
+    }
+
     function checkInBatchDuplicate(doc) {
         const inv = doc.extractedData?.invoice;
         if (!inv?.number) {
@@ -368,6 +392,16 @@
                 if (batchDup) {
                     doc.extractedData._validation_errors = warnings;
                     doc.extractedData._validation_errors.push(batchDup);
+                    needsReview = true;
+                }
+
+                // Check if calculated total matches AI total
+                const totalMismatch = checkTotalMismatch(doc.extractedData);
+                if (totalMismatch) {
+                    if (!doc.extractedData._validation_errors) {
+                        doc.extractedData._validation_errors = [];
+                    }
+                    doc.extractedData._validation_errors.push(totalMismatch);
                     needsReview = true;
                 }
 
@@ -1678,6 +1712,14 @@
             initTaxSelects(section);
             calcAllLineTotals();
         }, 0);
+
+        // Calculate modal preview when modal opens
+        section.addEventListener('shown.bs.modal', e => {
+            const modal = e.target;
+            if (modal) {
+                calcModalPreview(modal);
+            }
+        });
 
         // Recalculate line totals on any value change
         section.addEventListener('input', e => {

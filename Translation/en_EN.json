@@ -32,6 +32,7 @@
     "aiscan-supplier-create-error": "Error creating supplier.",
     "aiscan-supplier-created-success": "Supplier created successfully.",
     "aiscan-supplier-name-required": "Supplier name is required.",
+    "aiscan-total-mismatch": "Calculated total (%calculated%) does not match invoice total (%invoice%). Review the line items.",
     "aiscan-create-new-supplier-confirm": "Supplier not found. Do you want AiScan to create a new supplier with the extracted data?",
     "aiscan-create-or-update-invoice": "Create / update invoice",
     "aiscan-default-product": "Default product for this supplier",
