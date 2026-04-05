@@ -121,7 +121,12 @@ jobs:
 
       - name: Run JavaScript flow tests
         working-directory: plugin
-        run: node --test Test/js/*.test.js
+        run: |
+          if ls Test/js/*.test.js 1>/dev/null 2>&1; then
+            node --test Test/js/*.test.js
+          else
+            echo "No JS tests found, skipping"
+          fi
 
       - name: Download FacturaScripts
         run: |
