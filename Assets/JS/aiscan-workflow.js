@@ -404,6 +404,13 @@
                     throw new Error(data.error);
                 }
 
+                // Multi-invoice: the AI found several invoices in one document
+                if (data._multi_invoice && Array.isArray(data.invoices) && data.invoices.length > 1) {
+                    handleMultiInvoiceResponse(doc, data.invoices);
+                    refreshUI();
+                    return;
+                }
+
                 doc.extractedData = data.data;
 
                 if (state.useHistory && doc.extractedData?.supplier?.matched_supplier_id && !doc._historyAnalyzed) {
@@ -424,40 +431,7 @@
                     }
                 }
 
-                const warnings = doc.extractedData?._validation_errors || [];
-                let needsReview = warnings.length > 0;
-
-                // Server-side duplicate: invoice already exists in FS
-                if (doc.extractedData?._duplicate) {
-                    needsReview = true;
-                }
-
-                // In-batch duplicate: same invoice already analyzed in this batch
-                const batchDup = checkInBatchDuplicate(doc);
-                if (batchDup) {
-                    doc.extractedData._validation_errors = warnings;
-                    doc.extractedData._validation_errors.push(batchDup);
-                    needsReview = true;
-                }
-
-                // In total mode, generate synthetic lines for validation
-                if (state.importMode === 'total' && !doc.extractedData.lines?.length) {
-                    doc.extractedData.lines = buildTotalLines(doc.extractedData);
-                }
-
-                // Check if calculated total matches AI total
-                const totalMismatch = checkTotalMismatch(doc.extractedData);
-                if (totalMismatch) {
-                    if (!doc.extractedData._validation_errors) {
-                        doc.extractedData._validation_errors = [];
-                    }
-                    doc.extractedData._validation_errors.push(totalMismatch.message);
-                    if (!totalMismatch.isRounding) {
-                        needsReview = true;
-                    }
-                }
-
-                doc.status = needsReview ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
+                finalizeAnalyzedDoc(doc);
             } catch (error) {
                 doc.status = STATUS.FAILED;
                 doc.error = error.message;
@@ -485,6 +459,104 @@
                 }
             }
             scheduleNext();
+        });
+    }
+
+    /**
+     * Apply post-analysis checks to a single analyzed document.
+     */
+    function finalizeAnalyzedDoc(doc) {
+        const warnings = doc.extractedData?._validation_errors || [];
+        let needsReview = warnings.length > 0;
+
+        // Server-side duplicate: invoice already exists in FS
+        if (doc.extractedData?._duplicate) {
+            needsReview = true;
+        }
+
+        // In-batch duplicate: same invoice already analyzed in this batch
+        const batchDup = checkInBatchDuplicate(doc);
+        if (batchDup) {
+            doc.extractedData._validation_errors = warnings;
+            doc.extractedData._validation_errors.push(batchDup);
+            needsReview = true;
+        }
+
+        // In total mode, generate synthetic lines for validation
+        if (state.importMode === 'total' && !doc.extractedData.lines?.length) {
+            doc.extractedData.lines = buildTotalLines(doc.extractedData);
+        }
+
+        // Check if calculated total matches AI total
+        const totalMismatch = checkTotalMismatch(doc.extractedData);
+        if (totalMismatch) {
+            if (!doc.extractedData._validation_errors) {
+                doc.extractedData._validation_errors = [];
+            }
+            doc.extractedData._validation_errors.push(totalMismatch.message);
+            if (!totalMismatch.isRounding) {
+                needsReview = true;
+            }
+        }
+
+        doc.status = needsReview ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
+    }
+
+    /**
+     * Handle a multi-invoice response from one uploaded document.
+     *
+     * The original document entry is updated with the first invoice, and
+     * additional entries are inserted into state.documents for each
+     * subsequent invoice found.
+     */
+    function handleMultiInvoiceResponse(originalDoc, invoices) {
+        const docIndex = state.documents.indexOf(originalDoc);
+
+        // Build entries for each detected invoice
+        const newDocs = invoices.map((invoiceData, i) => {
+            const pageRange = invoiceData.page_range || null;
+            const invoiceNum = invoiceData.invoice?.number || '';
+            const suffix = invoices.length > 1
+                ? ` [${i + 1}/${invoices.length}${pageRange ? ' p.' + pageRange : ''}]`
+                : '';
+
+            if (i === 0) {
+                // Reuse the original document entry for the first invoice
+                originalDoc.extractedData = invoiceData;
+                originalDoc.originalName = originalDoc.originalName + suffix;
+                originalDoc._multiInvoiceSource = true;
+                finalizeAnalyzedDoc(originalDoc);
+                return null; // sentinel, already updated in-place
+            }
+
+            // Create new document entries for additional invoices
+            return {
+                index: state.documents.length + i - 1,
+                file: originalDoc.file,
+                originalName: originalDoc.originalName.replace(/ \[1\/.*$/, '') + suffix,
+                mimeType: originalDoc.mimeType,
+                size: originalDoc.size,
+                objectUrl: originalDoc.objectUrl,
+                tmpFile: originalDoc.tmpFile,
+                status: STATUS.PENDING,
+                extractedData: invoiceData,
+                error: null,
+                reviewDecision: null,
+                _multiInvoiceSource: true,
+            };
+        });
+
+        // Insert additional documents right after the original
+        const toInsert = newDocs.filter(d => d !== null);
+        if (toInsert.length > 0) {
+            state.documents.splice(docIndex + 1, 0, ...toInsert);
+            // Re-index all documents
+            state.documents.forEach((d, i) => { d.index = i; });
+        }
+
+        // Finalize status for the newly inserted documents
+        toInsert.forEach(doc => {
+            finalizeAnalyzedDoc(doc);
         });
     }
 
@@ -2744,6 +2816,8 @@
     if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
         globalThis.__aiscanWorkflowTestHooks = {
             applySelectionRange,
+            finalizeAnalyzedDoc,
+            handleMultiInvoiceResponse,
             renderSidebar,
             state,
         };

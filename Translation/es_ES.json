@@ -49,6 +49,7 @@
     "aiscan-drop-or-click": "o haz clic para seleccionar archivos",
     "aiscan-duplicate-in-batch": "Esta factura ya fue analizada en esta importación (igual que %name%).",
     "aiscan-duplicate-invoice-exists": "Ya existe una factura de compra con este número: %code%. Revisa antes de importar.",
+    "aiscan-multi-invoice-detected": "Se han detectado %count% facturas en este documento. Cada una se ha añadido a la lista de revisión.",
     "aiscan-failed-to-calculate-invoice-lines": "No se pudieron calcular las líneas de la factura.",
     "aiscan-failed-to-store-uploaded-file": "No se pudo guardar el archivo subido.",
     "aiscan-file-progress": "Archivo %current% de %total%",

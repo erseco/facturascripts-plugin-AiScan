@@ -562,4 +562,157 @@ final class SchemaValidatorTest extends TestCase
             0.01
         );
     }
+
+    // ── isMultiInvoice() ────────────────────────────────────
+
+    public function testIsMultiInvoiceReturnsTrueForMultipleInvoices(): void
+    {
+        $data = [
+            'invoices' => [
+                ['invoice' => ['number' => 'A1']],
+                ['invoice' => ['number' => 'A2']],
+            ],
+        ];
+        $this->assertTrue($this->validator->isMultiInvoice($data));
+    }
+
+    public function testIsMultiInvoiceReturnsFalseForSingleInvoice(): void
+    {
+        $data = [
+            'invoice' => ['number' => 'A1', 'issue_date' => '2025-01-01', 'total' => 100],
+        ];
+        $this->assertFalse($this->validator->isMultiInvoice($data));
+    }
+
+    public function testIsMultiInvoiceReturnsFalseForSingleElementArray(): void
+    {
+        $data = [
+            'invoices' => [
+                ['invoice' => ['number' => 'A1']],
+            ],
+        ];
+        $this->assertFalse($this->validator->isMultiInvoice($data));
+    }
+
+    public function testIsMultiInvoiceReturnsFalseForNonArray(): void
+    {
+        $data = ['invoices' => 'not-an-array'];
+        $this->assertFalse($this->validator->isMultiInvoice($data));
+    }
+
+    public function testIsMultiInvoiceReturnsFalseForEmptyData(): void
+    {
+        $this->assertFalse($this->validator->isMultiInvoice([]));
+    }
+
+    // ── splitMultiInvoice() ─────────────────────────────────
+
+    public function testSplitMultiInvoiceReturnsSeparatePayloads(): void
+    {
+        $data = [
+            'invoices' => [
+                [
+                    'supplier' => ['name' => 'Supplier A'],
+                    'invoice' => ['number' => 'INV-1', 'issue_date' => '2025-01-01', 'total' => 100],
+                    'lines' => [],
+                    'taxes' => [],
+                    'confidence' => [],
+                    'warnings' => [],
+                ],
+                [
+                    'supplier' => ['name' => 'Supplier B'],
+                    'invoice' => ['number' => 'INV-2', 'issue_date' => '2025-02-01', 'total' => 200],
+                    'lines' => [],
+                    'taxes' => [],
+                    'confidence' => [],
+                    'warnings' => [],
+                ],
+            ],
+        ];
+
+        $results = $this->validator->splitMultiInvoice($data);
+
+        $this->assertCount(2, $results);
+        $this->assertSame('INV-1', $results[0]['invoice']['number']);
+        $this->assertSame('Supplier A', $results[0]['supplier']['name']);
+        $this->assertSame(0, $results[0]['_multi_invoice_index']);
+        $this->assertSame(2, $results[0]['_multi_invoice_total']);
+        $this->assertSame('INV-2', $results[1]['invoice']['number']);
+        $this->assertSame(1, $results[1]['_multi_invoice_index']);
+    }
+
+    public function testSplitMultiInvoiceInheritsFallbackSupplier(): void
+    {
+        $data = [
+            'supplier' => ['name' => 'Shared Supplier', 'tax_id' => 'B00000000'],
+            'invoices' => [
+                [
+                    'invoice' => ['number' => 'A', 'issue_date' => '2025-01-01', 'total' => 50],
+                ],
+                [
+                    'invoice' => ['number' => 'B', 'issue_date' => '2025-01-02', 'total' => 75],
+                    'supplier' => ['name' => 'Other Supplier'],
+                ],
+            ],
+        ];
+
+        $results = $this->validator->splitMultiInvoice($data);
+
+        // First invoice inherits the top-level supplier
+        $this->assertSame('Shared Supplier', $results[0]['supplier']['name']);
+        // Second invoice keeps its own supplier
+        $this->assertSame('Other Supplier', $results[1]['supplier']['name']);
+    }
+
+    public function testSplitSingleInvoiceReturnsWrappedArray(): void
+    {
+        $data = [
+            'invoice' => ['number' => 'X', 'issue_date' => '2025-01-01', 'total' => 10],
+        ];
+
+        $results = $this->validator->splitMultiInvoice($data);
+
+        $this->assertCount(1, $results);
+        $this->assertSame('X', $results[0]['invoice']['number']);
+    }
+
+    public function testSplitMultiInvoiceEachCanBeNormalized(): void
+    {
+        $data = [
+            'invoices' => [
+                [
+                    'invoice' => [
+                        'number' => 'F-1',
+                        'issue_date' => '01/03/2025',
+                        'total' => '1.234,56',
+                    ],
+                    'lines' => [
+                        ['description' => 'Item A', 'unit_price' => '50,00'],
+                    ],
+                ],
+                [
+                    'invoice' => [
+                        'number' => 'F-2',
+                        'issue_date' => '2025-04-01',
+                        'total' => 200,
+                    ],
+                ],
+            ],
+        ];
+
+        $results = $this->validator->splitMultiInvoice($data);
+
+        // Normalize and validate each independently
+        foreach ($results as $single) {
+            $normalized = $this->validator->normalize($single);
+            $errors = $this->validator->validate($normalized);
+            $this->assertIsArray($errors);
+            $this->assertIsArray($normalized['invoice']);
+        }
+
+        // First invoice date should be normalizable
+        $first = $this->validator->normalize($results[0]);
+        $this->assertSame('2025-03-01', $first['invoice']['issue_date']);
+        $this->assertEqualsWithDelta(1234.56, $first['invoice']['total'], 0.01);
+    }
 }
