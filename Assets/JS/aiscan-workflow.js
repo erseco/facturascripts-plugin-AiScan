@@ -531,7 +531,7 @@
 
             // Create new document entries for additional invoices
             return {
-                index: state.documents.length + i - 1,
+                index: docIndex + i,
                 file: originalDoc.file,
                 originalName: originalDoc.originalName.replace(/ \[1\/.*$/, '') + suffix,
                 mimeType: originalDoc.mimeType,

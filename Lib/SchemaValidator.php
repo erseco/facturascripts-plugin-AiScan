@@ -63,7 +63,7 @@ class SchemaValidator
             // Ensure standard sections exist
             foreach (['invoice', 'taxes', 'lines', 'confidence', 'warnings'] as $key) {
                 if (!isset($single[$key])) {
-                    $single[$key] = $key === 'invoice' ? [] : [];
+                    $single[$key] = [];
                 }
             }
 
