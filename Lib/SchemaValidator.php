@@ -29,6 +29,54 @@ class SchemaValidator
     // Regex to detect European number format (e.g. 1.234,56)
     private const EUROPEAN_NUMBER_PATTERN = '/^\d{1,3}(\.\d{3})+(,\d+)?$/';
 
+    /**
+     * Check whether the AI response contains multiple invoices.
+     */
+    public function isMultiInvoice(array $data): bool
+    {
+        return isset($data['invoices']) && is_array($data['invoices']) && count($data['invoices']) > 1;
+    }
+
+    /**
+     * Split a multi-invoice response into an array of individual invoice payloads.
+     *
+     * Each element is a standalone extraction result that can be validated
+     * and normalized independently.
+     *
+     * @return array<int, array>
+     */
+    public function splitMultiInvoice(array $data): array
+    {
+        if (!$this->isMultiInvoice($data)) {
+            return [$data];
+        }
+
+        $results = [];
+        foreach ($data['invoices'] as $index => $invoice) {
+            $single = $invoice;
+
+            // Ensure top-level sections exist so normalize() works
+            $single['supplier'] = $single['supplier'] ?? $data['supplier'] ?? [];
+            $single['customer'] = $single['customer'] ?? $data['customer'] ?? [];
+            $single['document_type'] = $single['document_type'] ?? $data['document_type'] ?? null;
+
+            // Ensure standard sections exist
+            foreach (['invoice', 'taxes', 'lines', 'confidence', 'warnings'] as $key) {
+                if (!isset($single[$key])) {
+                    $single[$key] = [];
+                }
+            }
+
+            // Tag the invoice position within the original document
+            $single['_multi_invoice_index'] = $index;
+            $single['_multi_invoice_total'] = count($data['invoices']);
+
+            $results[] = $single;
+        }
+
+        return $results;
+    }
+
     public function validate(array $data): array
     {
         $errors = [];

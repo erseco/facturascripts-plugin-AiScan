@@ -136,3 +136,138 @@ test('renderSidebar marks the full Shift-selected range as checked', () => {
     assert.match(elements['aiscan-sidebar-list'].innerHTML, /data-index="2" checked/);
     assert.match(elements['aiscan-sidebar-list'].innerHTML, /data-index="3" checked/);
 });
+
+test('handleMultiInvoiceResponse splits one document into multiple entries', () => {
+    const {hooks} = loadTestHooks();
+
+    hooks.state.documents = [
+        {
+            index: 0,
+            file: null,
+            originalName: 'batch.pdf',
+            mimeType: 'application/pdf',
+            size: 1000,
+            objectUrl: 'blob:test',
+            tmpFile: 'aiscan_batch_abc123.pdf',
+            status: 'analyzing',
+            extractedData: null,
+            error: null,
+            reviewDecision: null,
+        },
+    ];
+    hooks.state.importMode = 'lines';
+
+    const invoices = [
+        {
+            invoice: {number: 'INV-1', issue_date: '2025-01-01', total: 100},
+            supplier: {name: 'Supplier A'},
+            lines: [{descripcion: 'Item 1', cantidad: 1, pvpunitario: 100}],
+            taxes: [],
+            confidence: {},
+            warnings: [],
+            page_range: '1-2',
+        },
+        {
+            invoice: {number: 'INV-2', issue_date: '2025-02-01', total: 200},
+            supplier: {name: 'Supplier B'},
+            lines: [{descripcion: 'Item 2', cantidad: 2, pvpunitario: 100}],
+            taxes: [],
+            confidence: {},
+            warnings: [],
+            page_range: '3',
+        },
+        {
+            invoice: {number: 'INV-3', issue_date: '2025-03-01', total: 50},
+            supplier: {name: 'Supplier A'},
+            lines: [],
+            taxes: [],
+            confidence: {},
+            warnings: [],
+            page_range: '4',
+        },
+    ];
+
+    hooks.handleMultiInvoiceResponse(hooks.state.documents[0], invoices);
+
+    assert.equal(hooks.state.documents.length, 3);
+    assert.equal(hooks.state.documents[0].extractedData.invoice.number, 'INV-1');
+    assert.equal(hooks.state.documents[1].extractedData.invoice.number, 'INV-2');
+    assert.equal(hooks.state.documents[2].extractedData.invoice.number, 'INV-3');
+
+    // All share the same tmpFile (same source document)
+    assert.equal(hooks.state.documents[1].tmpFile, 'aiscan_batch_abc123.pdf');
+    assert.equal(hooks.state.documents[2].tmpFile, 'aiscan_batch_abc123.pdf');
+
+    // Original doc is updated in-place (first invoice)
+    assert.ok(hooks.state.documents[0]._multiInvoiceSource);
+    assert.ok(hooks.state.documents[1]._multiInvoiceSource);
+
+    // Each document should have a valid status (not analyzing)
+    for (const doc of hooks.state.documents) {
+        assert.notEqual(doc.status, 'analyzing');
+    }
+});
+
+test('handleMultiInvoiceResponse re-indexes documents correctly', () => {
+    const {hooks} = loadTestHooks();
+
+    hooks.state.documents = [
+        {
+            index: 0,
+            file: null,
+            originalName: 'first.pdf',
+            mimeType: 'application/pdf',
+            size: 500,
+            objectUrl: 'blob:test1',
+            tmpFile: 'aiscan_first_001.pdf',
+            status: 'analyzed',
+            extractedData: {invoice: {number: 'EXISTING'}},
+            error: null,
+            reviewDecision: null,
+        },
+        {
+            index: 1,
+            file: null,
+            originalName: 'multi.pdf',
+            mimeType: 'application/pdf',
+            size: 1000,
+            objectUrl: 'blob:test2',
+            tmpFile: 'aiscan_multi_002.pdf',
+            status: 'analyzing',
+            extractedData: null,
+            error: null,
+            reviewDecision: null,
+        },
+    ];
+    hooks.state.importMode = 'lines';
+
+    const invoices = [
+        {
+            invoice: {number: 'M-1', issue_date: '2025-01-01', total: 50},
+            supplier: {},
+            lines: [],
+            taxes: [],
+            confidence: {},
+            warnings: [],
+        },
+        {
+            invoice: {number: 'M-2', issue_date: '2025-01-02', total: 75},
+            supplier: {},
+            lines: [],
+            taxes: [],
+            confidence: {},
+            warnings: [],
+        },
+    ];
+
+    hooks.handleMultiInvoiceResponse(hooks.state.documents[1], invoices);
+
+    // Should now have 3 documents: first.pdf, multi.pdf [1/2], multi.pdf [2/2]
+    assert.equal(hooks.state.documents.length, 3);
+    assert.equal(hooks.state.documents[0].index, 0);
+    assert.equal(hooks.state.documents[1].index, 1);
+    assert.equal(hooks.state.documents[2].index, 2);
+
+    // Original first document is untouched
+    assert.equal(hooks.state.documents[0].extractedData.invoice.number, 'EXISTING');
+});

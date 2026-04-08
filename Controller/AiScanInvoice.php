@@ -368,6 +368,30 @@ class AiScanInvoice extends Controller
             $historicalContext
         );
 
+        // Multi-invoice: the AI returned several invoices from one document
+        if (!empty($extracted['_multi_invoice'])) {
+            $invoices = [];
+            foreach ($extracted['invoices'] as $single) {
+                $invoices[] = $this->enrichExtractedData($single);
+            }
+            echo json_encode([
+                'success' => true,
+                '_multi_invoice' => true,
+                'invoices' => $invoices,
+            ]);
+            return;
+        }
+
+        $extracted = $this->enrichExtractedData($extracted);
+
+        echo json_encode(['success' => true, 'data' => $extracted]);
+    }
+
+    /**
+     * Enrich a single extracted invoice with supplier matching and duplicate checks.
+     */
+    private function enrichExtractedData(array $extracted): array
+    {
         if (!empty($extracted['supplier'])) {
             $matcher = new SupplierMatcher();
             $matchResult = $matcher->findMatch($extracted['supplier']);
@@ -391,7 +415,7 @@ class AiScanInvoice extends Controller
             $extracted['_validation_errors'][] = $duplicateWarning['message'];
         }
 
-        echo json_encode(['success' => true, 'data' => $extracted]);
+        return $extracted;
     }
 
     private function handleMatchSupplier(): void

@@ -100,4 +100,12 @@ final class ExtractionServiceTest extends TestCase
         $this->expectExceptionMessage('File not found');
         $service->extractFromFile('/nonexistent/file.pdf', 'application/pdf');
     }
+
+    public function testDefaultSystemPromptContainsMultiInvoiceInstructions(): void
+    {
+        $prompt = ExtractionService::getDefaultSystemPrompt();
+        $this->assertStringContainsString('MULTIPLE INVOICES', $prompt);
+        $this->assertStringContainsString('invoices', $prompt);
+        $this->assertStringContainsString('page_range', $prompt);
+    }
 }

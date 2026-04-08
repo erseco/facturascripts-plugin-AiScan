@@ -34,13 +34,29 @@ class ExtractionService
     private const DEFAULT_SYSTEM_PROMPT = <<<'PROMPT'
 You are an expert invoice and receipt extraction engine for purchase invoices in an ERP.
 
-Your job is to analyze one supplier invoice, receipt, or purchase document from:
+Your job is to analyze supplier invoices, receipts, or purchase documents from:
 - OCR text
 - extracted PDF text
 - one or more page images
 - optional user hints
 
-You must extract structured data for a PURCHASE invoice only.
+You must extract structured data for PURCHASE invoices only.
+
+MULTIPLE INVOICES: A single document (PDF or image) may contain more than one
+invoice. For example, several invoices merged into one PDF, a batch scan, or
+a supplier sending multiple invoices in a single file.
+- If the document contains EXACTLY ONE invoice, return a single JSON object
+  following the output schema below.
+- If the document contains MORE THAN ONE invoice, return:
+  {"invoices": [ {invoice1}, {invoice2}, ... ]}
+  where each element follows the same output schema as a single invoice.
+- Detect invoice boundaries by looking for changes in: invoice number,
+  invoice date, supplier header/footer, new total/tax blocks, or repeated
+  document structure.
+- Each invoice in the array must be self-contained with its own supplier,
+  invoice, taxes, lines, confidence, and warnings sections.
+- Add a "page_range" string to each invoice (e.g. "1-2", "3", "4-5") when
+  page boundaries are identifiable. Use null if not determinable.
 
 Core rules:
 1. Return ONLY valid JSON.
@@ -80,7 +96,9 @@ Core rules:
     - taxes
     - total
     - line items
-18. If the document contains several pages, combine evidence across all pages.
+18. If the document contains several pages belonging to the SAME invoice,
+    combine evidence across all pages. If different pages belong to
+    DIFFERENT invoices, return separate invoice objects in the "invoices" array.
 19. If the same field appears multiple times, prefer:
     - explicit invoice labels
     - totals section
@@ -89,10 +107,11 @@ Core rules:
 20. For receipts, line items may be short retail items. For invoices, line items may be services or products.
 21. Confidence must be a number from 0 to 1.
 
-Output schema:
+Output schema (single invoice):
 
 {
   "document_type": "invoice | receipt | proforma | credit_note | unknown",
+  "page_range": "string|null (e.g. '1-2', '3', null if unknown)",
   "supplier": {
     "name": "string|null",
     "tax_id": "string|null",
@@ -515,6 +534,21 @@ PROMPT;
             throw new \RuntimeException(
                 'Invalid JSON response from AI provider: ' . json_last_error_msg()
             );
+        }
+
+        // Multi-invoice: if the AI returned an "invoices" array, split and
+        // normalize/validate each one independently.
+        if ($this->validator->isMultiInvoice($data)) {
+            $invoices = $this->validator->splitMultiInvoice($data);
+            $results = [];
+            foreach ($invoices as $single) {
+                $single = $this->validator->normalize($single);
+                $errors = $this->validator->validate($single);
+                $single['_validation_errors'] = $errors;
+                $single['_provider'] = $provider->getName();
+                $results[] = $single;
+            }
+            return ['_multi_invoice' => true, 'invoices' => $results];
         }
 
         $data = $this->validator->normalize($data);
