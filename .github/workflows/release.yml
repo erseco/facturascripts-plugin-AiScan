@@ -38,7 +38,7 @@ jobs:
           git archive --format=zip --prefix=AiScan/ HEAD -o AiScan-${{ steps.version.outputs.VERSION }}.zip
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: AiScan-${{ steps.version.outputs.VERSION }}.zip
           generate_release_notes: true
