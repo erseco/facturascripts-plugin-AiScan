@@ -48,6 +48,8 @@
         failed: {cls: 'text-bg-danger', icon: 'fa-times-circle'},
     };
 
+    const MIN_AUTOCOMPLETE_QUERY_LENGTH = 2;
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     function trans(key, replacements) {
@@ -2041,7 +2043,7 @@
             }
 
             resultsDiv.innerHTML = items.map((item, index) =>
-                `<button type="button" class="list-group-item list-group-item-action small py-1" role="option" aria-selected="${index === 0 ? 'true' : 'false'}" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
+                `<button type="button" class="list-group-item list-group-item-action small py-1" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
                     <strong>${escapeHtml(item.referencia)}</strong> <span class="text-muted">${escapeHtml(item.description)}</span>
                 </button>`
             ).join('');
@@ -2053,7 +2055,7 @@
 
         const doSearch = () => {
             const query = input.value.trim();
-            if (query.length < 2) {
+            if (query.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) {
                 closeResults();
                 return;
             }
@@ -2095,7 +2097,7 @@
         });
 
         input.addEventListener('focus', () => {
-            if (input.value.trim().length >= 2) {
+            if (input.value.trim().length >= MIN_AUTOCOMPLETE_QUERY_LENGTH) {
                 clearTimeout(timer);
                 timer = setTimeout(doSearch, 0);
             }
