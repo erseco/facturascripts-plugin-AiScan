@@ -49,6 +49,7 @@
     };
 
     const MIN_AUTOCOMPLETE_QUERY_LENGTH = 2;
+    const AUTOCOMPLETE_OPTION_SELECTOR = '[data-autocomplete-option]';
 
     // ── Helpers ────────────────────────────────────────────────────────
 
@@ -2000,15 +2001,22 @@
     }
 
     function updateLineAutocompleteHighlight(resultsDiv, activeIndex) {
-        const options = Array.from(resultsDiv?.querySelectorAll('[data-autocomplete-option]') || []);
+        const options = Array.from(resultsDiv?.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR) || []);
+        const input = resultsDiv?.closest('.aiscan-product-cell')?.querySelector('.aiscan-product-autocomplete-input');
         options.forEach((option, index) => {
             const isActive = index === activeIndex;
             option.classList.toggle('active', isActive);
             option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            if (isActive && input) {
+                input.setAttribute('aria-activedescendant', option.id);
+            }
             if (isActive && typeof option.scrollIntoView === 'function') {
                 option.scrollIntoView({block: 'nearest'});
             }
         });
+        if (input && (activeIndex < 0 || !options[activeIndex])) {
+            input.removeAttribute('aria-activedescendant');
+        }
         return options;
     }
 
@@ -2028,11 +2036,13 @@
         let timer = null;
         let activeIndex = -1;
         let requestId = 0;
+        const resultsId = resultsDiv.id;
 
         const closeResults = () => {
             resultsDiv.innerHTML = '';
             resultsDiv.classList.add('d-none');
             input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
             activeIndex = -1;
         };
 
@@ -2043,7 +2053,7 @@
             }
 
             resultsDiv.innerHTML = items.map((item, index) =>
-                `<button type="button" class="list-group-item list-group-item-action small py-1" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
+                `<button type="button" class="list-group-item list-group-item-action small py-1" id="${resultsId}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
                     <strong>${escapeHtml(item.referencia)}</strong> <span class="text-muted">${escapeHtml(item.description)}</span>
                 </button>`
             ).join('');
@@ -2104,7 +2114,7 @@
         });
 
         input.addEventListener('keydown', e => {
-            const options = Array.from(resultsDiv.querySelectorAll('[data-autocomplete-option]'));
+            const options = Array.from(resultsDiv.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR));
             const action = resolveAutocompleteKeyAction(
                 e.key,
                 !resultsDiv.classList.contains('d-none'),
@@ -2136,13 +2146,13 @@
         });
 
         resultsDiv.addEventListener('mousedown', e => {
-            if (e.target.closest('[data-autocomplete-option]')) {
+            if (e.target.closest(AUTOCOMPLETE_OPTION_SELECTOR)) {
                 e.preventDefault();
             }
         });
 
         resultsDiv.addEventListener('click', e => {
-            const option = e.target.closest('[data-autocomplete-option]');
+            const option = e.target.closest(AUTOCOMPLETE_OPTION_SELECTOR);
             if (!option) {
                 return;
             }
