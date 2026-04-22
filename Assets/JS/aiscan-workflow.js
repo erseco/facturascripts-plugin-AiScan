@@ -48,6 +48,9 @@
         failed: {cls: 'text-bg-danger', icon: 'fa-times-circle'},
     };
 
+    const MIN_AUTOCOMPLETE_QUERY_LENGTH = 2;
+    const AUTOCOMPLETE_OPTION_SELECTOR = '[data-autocomplete-option]';
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     function trans(key, replacements) {
@@ -156,6 +159,43 @@
         }
 
         return true;
+    }
+
+    function resolveAutocompleteKeyAction(key, isOpen, activeIndex, itemCount) {
+        if (!isOpen || itemCount < 1) {
+            return null;
+        }
+
+        if (key === 'ArrowDown') {
+            return {
+                type: 'highlight',
+                index: Math.min(itemCount - 1, activeIndex < 0 ? 0 : activeIndex + 1),
+                preventDefault: true,
+            };
+        }
+
+        if (key === 'ArrowUp') {
+            return {
+                type: 'highlight',
+                index: Math.max(0, activeIndex < 0 ? itemCount - 1 : activeIndex - 1),
+                preventDefault: true,
+            };
+        }
+
+        if (key === 'Enter' || key === 'Tab') {
+            return {
+                type: 'select',
+                index: activeIndex < 0 ? 0 : Math.min(activeIndex, itemCount - 1),
+                moveFocus: key === 'Tab',
+                preventDefault: true,
+            };
+        }
+
+        if (key === 'Escape') {
+            return {type: 'close', preventDefault: true};
+        }
+
+        return null;
     }
 
     // ── Initialization ─────────────────────────────────────────────────
@@ -1768,16 +1808,7 @@
             if (!pick || !productSearchTargetRow) {
                 return;
             }
-            const refInput = productSearchTargetRow.querySelector('[data-field="referencia"]');
-            if (refInput) {
-                refInput.value = pick.dataset.ref;
-            }
-            const badge = productSearchTargetRow.querySelector('.aiscan-ref-badge');
-            if (badge) {
-                badge.innerHTML = `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(pick.dataset.ref)}"><i class="fa-solid fa-link"></i></span>`;
-                const tt = badge.querySelector('[data-bs-toggle="tooltip"]');
-                if (tt) { new bootstrap.Tooltip(tt); }
-            }
+            setLineProductMatch(productSearchTargetRow, pick.dataset.ref || '');
             bootstrap.Modal.getInstance(document.getElementById('aiscan-find-product-modal'))?.hide();
             productSearchTargetRow = null;
         });
@@ -1788,7 +1819,7 @@
         productSearchTargetRow = row;
         const input = document.getElementById('aiscan-product-modal-input');
         const resultsDiv = document.getElementById('aiscan-product-modal-results');
-        const desc = row.querySelector('[data-field="description"]')?.value || '';
+        const desc = row.querySelector('[data-field="descripcion"]')?.value || '';
         input.value = desc;
         resultsDiv.innerHTML = '';
         const modal = new bootstrap.Modal(document.getElementById('aiscan-find-product-modal'));
@@ -1802,10 +1833,9 @@
 
     function buildLineRow(line, index) {
         const ref = line.referencia || line.sku || '';
-        const matchBadge = ref
-            ? `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(ref)}"><i class="fa-solid fa-link"></i></span>`
-            : `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
+        const matchBadge = buildProductMatchBadge(ref);
         const modalId = 'aiscan-line-modal-' + index;
+        const resultsId = 'aiscan-line-product-results-' + index;
         const desc = line.descripcion || line.description || '';
         const qty = line.cantidad ?? line.quantity ?? 1;
         const price = line.pvpunitario ?? line.unit_price ?? 0;
@@ -1819,13 +1849,14 @@
         const excepcion = line.excepcioniva ?? '';
         const suplido = line.suplido && line.suplido !== '0' && line.suplido !== 'false' ? '1' : '0';
         return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${taxRate}" data-tax-code="${escapeAttr(taxCode)}" data-irpf-code="${escapeAttr(irpfCode)}">
-            <div style="flex:4;position:relative">
+            <div class="aiscan-product-cell" style="flex:4;position:relative">
                 <div class="input-group input-group-sm">
-                    <input class="form-control form-control-sm" data-field="descripcion" value="${escapeAttr(desc)}">
+                    <input class="form-control form-control-sm aiscan-product-autocomplete-input" data-field="descripcion" value="${escapeAttr(desc)}" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-haspopup="listbox" aria-controls="${resultsId}">
                     <input type="hidden" data-field="referencia" value="${escapeAttr(ref)}">
                     <button class="btn btn-info btn-sm aiscan-product-match-btn" type="button" title="${escapeAttr(trans('aiscan-search-product'))}"><i class="fa-solid fa-book fa-fw"></i></button>
                     <span class="input-group-text p-0 px-1 aiscan-ref-badge">${matchBadge}</span>
                 </div>
+                <div id="${resultsId}" class="list-group position-absolute w-100 shadow-sm d-none aiscan-product-autocomplete-results" role="listbox" style="top:100%;left:0;z-index:1080;max-height:200px;overflow-y:auto"></div>
             </div>
             <input class="form-control form-control-sm aiscan-calc" data-field="cantidad" type="number" step="any" value="${escapeAttr(qty)}" style="width:55px">
             <div class="input-group input-group-sm" style="width:95px">
@@ -1932,6 +1963,216 @@
         </div>`;
     }
 
+    function buildProductMatchBadge(reference) {
+        return reference
+            ? `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(reference)}"><i class="fa-solid fa-link"></i></span>`
+            : `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
+    }
+
+    function setLineProductMatch(row, reference) {
+        const refInput = row?.querySelector('[data-field="referencia"]');
+        if (refInput) {
+            refInput.value = reference || '';
+        }
+
+        const badge = row?.querySelector('.aiscan-ref-badge');
+        if (badge) {
+            badge.innerHTML = buildProductMatchBadge(reference || '');
+            const tooltip = badge.querySelector('[data-bs-toggle="tooltip"]');
+            if (tooltip) {
+                new bootstrap.Tooltip(tooltip);
+            }
+        }
+    }
+
+    function focusNextLineField(row, currentField) {
+        const fields = [
+            row?.querySelector('[data-field="descripcion"]'),
+            row?.querySelector('[data-field="cantidad"]'),
+            row?.querySelector('[data-field="pvpunitario"]'),
+            row?.querySelector('.aiscan-line-detail-btn'),
+            row?.querySelector('.aiscan-delete-line'),
+        ].filter(Boolean);
+        const currentIndex = fields.indexOf(currentField);
+        const nextField = fields[currentIndex + 1] || null;
+        if (nextField && typeof nextField.focus === 'function') {
+            nextField.focus();
+        }
+    }
+
+    function updateLineAutocompleteHighlight(resultsDiv, activeIndex) {
+        const options = Array.from(resultsDiv?.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR) || []);
+        const input = resultsDiv?.closest('.aiscan-product-cell')?.querySelector('.aiscan-product-autocomplete-input');
+        options.forEach((option, index) => {
+            const isActive = index === activeIndex;
+            option.classList.toggle('active', isActive);
+            option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            if (isActive && input) {
+                input.setAttribute('aria-activedescendant', option.id);
+            }
+            if (isActive && typeof option.scrollIntoView === 'function') {
+                option.scrollIntoView({block: 'nearest'});
+            }
+        });
+        if (input && (activeIndex < 0 || !options[activeIndex])) {
+            input.removeAttribute('aria-activedescendant');
+        }
+        return options;
+    }
+
+    function bindLineProductAutocomplete(row) {
+        if (!row || row.dataset.productAutocompleteBound === '1') {
+            return;
+        }
+
+        row.dataset.productAutocompleteBound = '1';
+
+        const input = row.querySelector('.aiscan-product-autocomplete-input');
+        const resultsDiv = row.querySelector('.aiscan-product-autocomplete-results');
+        if (!input || !resultsDiv) {
+            return;
+        }
+
+        let timer = null;
+        let activeIndex = -1;
+        let requestId = 0;
+        const resultsId = resultsDiv.id;
+
+        const closeResults = () => {
+            resultsDiv.innerHTML = '';
+            resultsDiv.classList.add('d-none');
+            input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
+            activeIndex = -1;
+        };
+
+        const renderResults = (items) => {
+            if (items.length < 1) {
+                closeResults();
+                return;
+            }
+
+            resultsDiv.innerHTML = items.map((item, index) =>
+                `<button type="button" class="list-group-item list-group-item-action small py-1" id="${resultsId}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
+                    <strong>${escapeHtml(item.referencia)}</strong> <span class="text-muted">${escapeHtml(item.description)}</span>
+                </button>`
+            ).join('');
+            resultsDiv.classList.remove('d-none');
+            input.setAttribute('aria-expanded', 'true');
+            activeIndex = 0;
+            updateLineAutocompleteHighlight(resultsDiv, activeIndex);
+        };
+
+        const doSearch = () => {
+            const query = input.value.trim();
+            if (query.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) {
+                closeResults();
+                return;
+            }
+
+            const currentRequestId = ++requestId;
+            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+                .then(r => r.json())
+                .then(data => {
+                    if (currentRequestId !== requestId) {
+                        return;
+                    }
+
+                    renderResults(Array.isArray(data.results) ? data.results : []);
+                })
+                .catch(() => {
+                    if (currentRequestId === requestId) {
+                        closeResults();
+                    }
+                });
+        };
+
+        const selectOption = (option, moveFocus = false) => {
+            if (!option) {
+                return;
+            }
+
+            setLineProductMatch(row, option.dataset.ref || '');
+            closeResults();
+
+            if (moveFocus) {
+                focusNextLineField(row, input);
+            }
+        };
+
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            setLineProductMatch(row, '');
+            timer = setTimeout(doSearch, 250);
+        });
+
+        input.addEventListener('focus', () => {
+            if (input.value.trim().length >= MIN_AUTOCOMPLETE_QUERY_LENGTH) {
+                clearTimeout(timer);
+                timer = setTimeout(doSearch, 0);
+            }
+        });
+
+        input.addEventListener('keydown', e => {
+            const options = Array.from(resultsDiv.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR));
+            const action = resolveAutocompleteKeyAction(
+                e.key,
+                !resultsDiv.classList.contains('d-none'),
+                activeIndex,
+                options.length
+            );
+            if (!action) {
+                return;
+            }
+
+            if (action.preventDefault) {
+                e.preventDefault();
+            }
+
+            if (action.type === 'highlight') {
+                activeIndex = action.index;
+                updateLineAutocompleteHighlight(resultsDiv, activeIndex);
+                return;
+            }
+
+            if (action.type === 'select') {
+                selectOption(options[action.index], action.moveFocus);
+                return;
+            }
+
+            if (action.type === 'close') {
+                closeResults();
+            }
+        });
+
+        resultsDiv.addEventListener('mousedown', e => {
+            if (e.target.closest(AUTOCOMPLETE_OPTION_SELECTOR)) {
+                e.preventDefault();
+            }
+        });
+
+        resultsDiv.addEventListener('click', e => {
+            const option = e.target.closest(AUTOCOMPLETE_OPTION_SELECTOR);
+            if (!option) {
+                return;
+            }
+
+            selectOption(option);
+        });
+
+        row.addEventListener('focusout', e => {
+            if (row.contains(e.relatedTarget)) {
+                return;
+            }
+
+            setTimeout(() => {
+                if (!row.contains(document.activeElement)) {
+                    closeResults();
+                }
+            }, 0);
+        });
+    }
+
     function buildTotalLines(data) {
         const invoice = data.invoice || {};
         const taxes = Array.isArray(data.taxes) ? data.taxes : [];
@@ -1990,6 +2231,7 @@
         setTimeout(() => {
             initTaxSelects(section);
             calcAllLineTotals();
+            section.querySelectorAll('.aiscan-line-row').forEach(bindLineProductAutocomplete);
             section.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
                 new bootstrap.Tooltip(el);
             });
@@ -2109,6 +2351,7 @@
                 container.insertAdjacentHTML('beforeend', buildLineRow(
                     {descripcion: '', cantidad: 1, pvpunitario: 0, dtopor: 0, iva: 0, irpf: 0}, newIndex
                 ));
+                bindLineProductAutocomplete(container.lastElementChild);
             }
 
             // Modal accept — sync values to row, then close
@@ -2818,6 +3061,7 @@
             applySelectionRange,
             finalizeAnalyzedDoc,
             handleMultiInvoiceResponse,
+            resolveAutocompleteKeyAction,
             renderSidebar,
             state,
         };
