@@ -49,6 +49,7 @@ class AttachmentService
 
         $tmpFile = $this->moveTemporaryFileToMyFilesRoot($tmpPath, $tmpFile);
         if (empty($tmpFile)) {
+            Tools::log()->warning('AiScan could not move temporary attachment into MyFiles root.');
             return;
         }
 
@@ -105,7 +106,16 @@ class AttachmentService
             ++$counter;
         }
 
-        return rename($tmpPath, $destDir . '/' . $destFile) ? $destFile : '';
+        $destPath = $destDir . '/' . $destFile;
+        if (rename($tmpPath, $destPath)) {
+            return $destFile;
+        }
+
+        Tools::log()->warning('AiScan could not stage attachment file.', [
+            '%source%' => $tmpPath,
+            '%destination%' => $destPath,
+        ]);
+        return '';
     }
 
     private function sanitizeStoredFileName(string $originalName): string
