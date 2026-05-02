@@ -82,6 +82,22 @@ También intenta reutilizar productos existentes a partir del SKU o de la descri
 - FacturaScripts 2025 o superior
 - PHP 8.1 o superior
 
+## Solución de problemas
+
+### Enlaces privados `myft` para JPG/JPEG
+
+AiScan ahora adjunta imágenes siguiendo el mismo flujo base que usa FacturaScripts al subir archivos desde la
+biblioteca: el archivo se coloca temporalmente en `MyFiles/` y después `AttachedFile` lo mueve a la carpeta
+fechada definitiva. Esto evita diferencias de ruta entre las imágenes importadas por AiScan y los adjuntos
+creados manualmente.
+
+Si en Hostinger/LiteSpeed un JPG/JPEG sigue fallando con `El token de acceso ... no es válido o ha caducado`,
+el problema ya no está en AiScan sino en la capa de hosting. En ese caso:
+
+- mantén `MyFiles` privado;
+- excluye `/MyFiles/` de la caché/optimización de imágenes de LiteSpeed;
+- asegúrate de que el servidor preserva el parámetro de consulta `myft` en las peticiones de imágenes.
+
 ## Desarrollo
 
 - `make upd` — arranca los contenedores Docker
