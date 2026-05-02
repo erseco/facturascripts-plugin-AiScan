@@ -79,6 +79,10 @@ class AttachmentService
 
     private function applyOriginalFileName(AttachedFile $attachedFile, string $originalName): void
     {
+        if ('' === trim($originalName)) {
+            return;
+        }
+
         $safeName = $this->sanitizeStoredFileName($originalName);
         if (empty($safeName) || $attachedFile->filename === $safeName) {
             return;
@@ -97,11 +101,7 @@ class AttachmentService
         $counter = 1;
 
         while (file_exists($destDir . '/' . $destFile)) {
-            $destFile = $baseName . '_' . $counter;
-            if (!empty($extension)) {
-                $destFile .= '.' . $extension;
-            }
-
+            $destFile = $baseName . '_' . $counter . (!empty($extension) ? '.' . $extension : '');
             ++$counter;
         }
 
