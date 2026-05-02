@@ -10,3 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Agent skills architecture in `.agents/` with 8 specialized skills (ADR-0001)
 - ADR framework in `docs/adr/` for tracking architectural decisions
 - This changelog
+
+### Fixed
+
+- Align AiScan image attachments with the core FacturaScripts upload flow so private `myft` URLs for JPG/JPEG
+  use the same staging path as manual uploads
