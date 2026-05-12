@@ -563,6 +563,216 @@ final class SchemaValidatorTest extends TestCase
         );
     }
 
+    // ── tax-inclusive line price normalization ─────────────
+
+    public function testNormalizeConvertsIgicIncludedLinePricesToTaxExclusive(): void
+    {
+        // Cafetería Maracaná (IGIC INCLUIDO) — see issue #30.
+        // Lines come with tax-inclusive unit prices (5.70 and 3.95) so the
+        // sum of (qty × price) equals the total (19.30), not the subtotal
+        // (18.04). After normalization unit prices must become tax-exclusive.
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'T-058755/26',
+                'issue_date' => '2026-05-07',
+                'subtotal' => 18.04,
+                'tax_amount' => 1.26,
+                'total' => 19.30,
+            ],
+            'lines' => [
+                [
+                    'description' => 'REINA PEPIDA',
+                    'quantity' => 2,
+                    'unit_price' => 5.70,
+                    'tax_rate' => 7,
+                    'line_total' => 11.40,
+                ],
+                [
+                    'description' => 'VITAMINADO SUPER',
+                    'quantity' => 2,
+                    'unit_price' => 3.95,
+                    'tax_rate' => 7,
+                    'line_total' => 7.90,
+                ],
+            ],
+        ]);
+
+        $this->assertTrue(
+            $data['_tax_inclusive_lines_converted'] ?? false,
+            'Tax-inclusive prices should have been detected and flagged'
+        );
+
+        $expected = [5.70 / 1.07, 3.95 / 1.07];
+        foreach ($data['lines'] as $index => $line) {
+            $this->assertEqualsWithDelta(
+                $expected[$index],
+                $line['pvpunitario'],
+                0.0001,
+                "Line {$index} pvpunitario should be tax-exclusive"
+            );
+        }
+
+        $lineSum = 0.0;
+        foreach ($data['lines'] as $line) {
+            $lineSum += $line['cantidad'] * $line['pvpunitario'];
+        }
+        $this->assertEqualsWithDelta(18.04, $lineSum, 0.02);
+    }
+
+    public function testNormalizeLeavesTaxExclusiveLinePricesUntouched(): void
+    {
+        // Line sum (350) matches subtotal (350), not total (374.50).
+        // Prices are correctly tax-exclusive; no conversion must happen.
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2026-01-01',
+                'subtotal' => 350.0,
+                'tax_amount' => 24.50,
+                'total' => 374.50,
+            ],
+            'lines' => [
+                [
+                    'description' => 'Gestión redes sociales',
+                    'quantity' => 1,
+                    'unit_price' => 350.0,
+                    'tax_rate' => 7,
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($data['_tax_inclusive_lines_converted'] ?? false);
+        $this->assertEqualsWithDelta(350.0, $data['lines'][0]['pvpunitario'], 0.01);
+    }
+
+    public function testNormalizeSkipsConversionWhenInvoiceHasNoTax(): void
+    {
+        // subtotal == total, no tax breakdown → never convert.
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2026-01-01',
+                'subtotal' => 100.0,
+                'tax_amount' => 0,
+                'total' => 100.0,
+            ],
+            'lines' => [
+                [
+                    'description' => 'Servicio exento',
+                    'quantity' => 1,
+                    'unit_price' => 100.0,
+                    'tax_rate' => 0,
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($data['_tax_inclusive_lines_converted'] ?? false);
+        $this->assertEqualsWithDelta(100.0, $data['lines'][0]['pvpunitario'], 0.01);
+    }
+
+    public function testNormalizeConvertsMixedTaxRatesWhenInclusive(): void
+    {
+        // Two lines: 10 € at 21% and 5 € at 10% (both tax-inclusive).
+        // Subtotal = 10/1.21 + 5/1.10 = 8.2645 + 4.5455 = 12.8100
+        // Tax     = 10 - 8.2645 + 5 - 4.5455 = 2.190
+        // Total   = 15.00 (= sum of inclusive line prices)
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2026-01-01',
+                'subtotal' => 12.81,
+                'tax_amount' => 2.19,
+                'total' => 15.00,
+            ],
+            'lines' => [
+                [
+                    'description' => 'Producto A',
+                    'quantity' => 1,
+                    'unit_price' => 10.0,
+                    'tax_rate' => 21,
+                ],
+                [
+                    'description' => 'Producto B',
+                    'quantity' => 1,
+                    'unit_price' => 5.0,
+                    'tax_rate' => 10,
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($data['_tax_inclusive_lines_converted'] ?? false);
+        $this->assertEqualsWithDelta(10.0 / 1.21, $data['lines'][0]['pvpunitario'], 0.0001);
+        $this->assertEqualsWithDelta(5.0 / 1.10, $data['lines'][1]['pvpunitario'], 0.0001);
+    }
+
+    public function testNormalizeAdjustsLineTotalWhenConverting(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2026-01-01',
+                'subtotal' => 18.04,
+                'tax_amount' => 1.26,
+                'total' => 19.30,
+            ],
+            'lines' => [
+                [
+                    'description' => 'REINA PEPIDA',
+                    'quantity' => 2,
+                    'unit_price' => 5.70,
+                    'tax_rate' => 7,
+                    'line_total' => 11.40,
+                ],
+                [
+                    'description' => 'VITAMINADO SUPER',
+                    'quantity' => 2,
+                    'unit_price' => 3.95,
+                    'tax_rate' => 7,
+                    'line_total' => 7.90,
+                ],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(
+            round(2 * (5.70 / 1.07), 2),
+            $data['lines'][0]['pvptotal'],
+            0.01
+        );
+        $this->assertEqualsWithDelta(
+            round(2 * (3.95 / 1.07), 2),
+            $data['lines'][1]['pvptotal'],
+            0.01
+        );
+    }
+
+    public function testNormalizeRespectsDiscountWhenDetectingInclusive(): void
+    {
+        // Line: qty 1, price 21.40 with 50% discount and 7% IGIC included.
+        // Net post-discount inclusive: 10.70 → should match total 10.70.
+        // Tax-exclusive expected: 21.40 / 1.07 = 20.0
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2026-01-01',
+                'subtotal' => 10.0,
+                'tax_amount' => 0.70,
+                'total' => 10.70,
+            ],
+            'lines' => [
+                [
+                    'description' => 'Discounted item',
+                    'quantity' => 1,
+                    'unit_price' => 21.40,
+                    'discount' => 50,
+                    'tax_rate' => 7,
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($data['_tax_inclusive_lines_converted'] ?? false);
+        $this->assertEqualsWithDelta(20.0, $data['lines'][0]['pvpunitario'], 0.001);
+    }
+
     // ── isMultiInvoice() ────────────────────────────────────
 
     public function testIsMultiInvoiceReturnsTrueForMultipleInvoices(): void

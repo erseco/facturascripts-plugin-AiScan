@@ -1,0 +1,65 @@
+{
+    "document_type": "receipt",
+    "supplier": {
+        "name": "Cafetería Maracaná",
+        "tax_id": "B38764833",
+        "email": null,
+        "phone": "922663078",
+        "website": null,
+        "address": "Avda. Los Menceyes 337, La Cuesta, 38320 San Cristóbal de La Laguna"
+    },
+    "customer": {
+        "name": null,
+        "tax_id": null,
+        "address": null
+    },
+    "invoice": {
+        "number": "T-058755/26",
+        "issue_date": "2026-05-07",
+        "due_date": null,
+        "currency": "EUR",
+        "subtotal": 18.04,
+        "tax_amount": 1.26,
+        "withholding_amount": 0,
+        "total": 19.30,
+        "summary": "Reina Pepida y Vitaminado Super (IGIC incluido)",
+        "payment_terms": null
+    },
+    "taxes": [
+        {
+            "name": "IGIC",
+            "rate": 7,
+            "base": 18.04,
+            "amount": 1.26
+        }
+    ],
+    "lines": [
+        {
+            "description": "REINA PEPIDA",
+            "quantity": 2,
+            "unit_price": 5.70,
+            "discount": 0,
+            "tax_rate": 7,
+            "line_total": 11.40,
+            "sku": "80"
+        },
+        {
+            "description": "VITAMINADO SUPER",
+            "quantity": 2,
+            "unit_price": 3.95,
+            "discount": 0,
+            "tax_rate": 7,
+            "line_total": 7.90,
+            "sku": "581"
+        }
+    ],
+    "confidence": {
+        "supplier_name": 0.92,
+        "supplier_tax_id": 0.97,
+        "invoice_number": 0.60,
+        "issue_date": 0.95,
+        "total": 0.98,
+        "lines": 0.90
+    },
+    "warnings": []
+}

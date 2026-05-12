@@ -200,6 +200,17 @@ Field-specific rules:
   If cantidad > 1, divide the base amount by cantidad.
   Never return 0 or null if the line has a visible monetary amount.
   NEVER confuse "Dto" / "Descuento" / "Discount" columns with the unit price.
+  TAX-INCLUSIVE PRICES (simplified receipts / tickets):
+    Spanish "FACTURA SIMPLIFICADA", "TICKET", "RECIBO SIMPLIFICADO", or any
+    document showing "IGIC INCLUIDO", "IVA INCLUIDO", "Impuestos incluidos",
+    "TAX INCLUDED" prints unit prices that ALREADY INCLUDE tax.
+    In that case pvpunitario MUST be the tax-EXCLUSIVE value:
+        pvpunitario = displayed_price / (1 + tax_rate/100)
+    Example: ticket shows "Precio 5,70" with IGIC 7% included →
+    pvpunitario = 5.70 / 1.07 = 5.327103.
+    Additional signal: when the "Importe" column values multiplied by quantity
+    sum to the TOTAL (not to the "Base imponible"), the displayed prices are
+    tax-inclusive and you MUST convert them.
   MANDATORY VERIFICATION for each line:
   1. Read the line "Total" or "Importe" column value.
   2. Compute: cantidad * pvpunitario * (1 - dtopor/100).
