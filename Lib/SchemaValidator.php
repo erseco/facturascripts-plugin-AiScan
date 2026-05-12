@@ -255,6 +255,12 @@ class SchemaValidator
             }
             unset($line);
 
+            // Detect tax-inclusive line prices typical of "factura simplificada"
+            // / tickets marked "IGIC INCLUIDO" or "IVA INCLUIDO" and convert
+            // each unit price to tax-exclusive so downstream calculation does
+            // not double-count the tax.
+            $this->fixTaxInclusiveLinePrices($data);
+
             // Distribute withholding to lines if invoice has it but lines don't
             $withholding = (float) ($data['invoice']['withholding_amount'] ?? 0);
             if ($withholding > 0 && !empty($data['lines'])) {
@@ -291,6 +297,81 @@ class SchemaValidator
         }
 
         return $data;
+    }
+
+    /**
+     * Convert tax-inclusive line unit prices to tax-exclusive when the
+     * extracted lines clearly carry post-tax amounts (typical for Spanish
+     * "factura simplificada" / tickets with "IGIC INCLUIDO" or
+     * "IVA INCLUIDO" footers).
+     *
+     * Detection: if the sum of (cantidad × pvpunitario × (1 − dtopor/100))
+     * across all lines matches the invoice total — and clearly differs from
+     * the subtotal — the unit prices already include tax. We then divide
+     * each pvpunitario by (1 + iva/100). Lines without a positive iva are
+     * left untouched.
+     */
+    private function fixTaxInclusiveLinePrices(array &$data): void
+    {
+        if (empty($data['lines']) || !is_array($data['lines'])) {
+            return;
+        }
+
+        $invoice = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
+        $subtotal = (float) ($invoice['subtotal'] ?? 0);
+        $total = (float) ($invoice['total'] ?? 0);
+        $taxAmount = (float) ($invoice['tax_amount'] ?? 0);
+
+        if ($subtotal <= 0 || $total <= 0 || $taxAmount <= 0) {
+            return;
+        }
+
+        // No tax: subtotal == total, nothing to convert.
+        if (abs($total - $subtotal) < 0.01) {
+            return;
+        }
+
+        $lineSum = 0.0;
+        $anyTaxedLine = false;
+        foreach ($data['lines'] as $line) {
+            $qty = (float) ($line['cantidad'] ?? 1);
+            $price = (float) ($line['pvpunitario'] ?? 0);
+            $discount = (float) ($line['dtopor'] ?? 0);
+            $lineSum += $qty * $price * (1 - $discount / 100);
+            if ((float) ($line['iva'] ?? 0) > 0) {
+                $anyTaxedLine = true;
+            }
+        }
+
+        if ($lineSum <= 0 || !$anyTaxedLine) {
+            return;
+        }
+
+        $tolerance = max(0.02, $total * 0.005);
+        $diffToSubtotal = abs($lineSum - $subtotal);
+        $diffToTotal = abs($lineSum - $total);
+
+        // Only treat as tax-inclusive when the line sum is meaningfully closer
+        // to the total than to the subtotal.
+        if ($diffToTotal >= $tolerance || $diffToTotal >= $diffToSubtotal) {
+            return;
+        }
+
+        foreach ($data['lines'] as &$line) {
+            $iva = (float) ($line['iva'] ?? 0);
+            if ($iva <= 0) {
+                continue;
+            }
+            $line['pvpunitario'] = round((float) ($line['pvpunitario'] ?? 0) / (1 + $iva / 100), 6);
+            if (isset($line['pvptotal'])) {
+                $qty = (float) ($line['cantidad'] ?? 1);
+                $discount = (float) ($line['dtopor'] ?? 0);
+                $line['pvptotal'] = round($line['pvpunitario'] * $qty * (1 - $discount / 100), 2);
+            }
+        }
+        unset($line);
+
+        $data['_tax_inclusive_lines_converted'] = true;
     }
 
     private function normalizeDate(string $date): string

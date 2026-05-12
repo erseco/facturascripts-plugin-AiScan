@@ -72,6 +72,7 @@ final class InvoicePipelineTest extends TestCase
             'two-lines-same-tax' => ['F-2024-012'],
             'two-lines-mixed-tax-with-retention' => ['F-2024-014'],
             'simple-1-line-low-amount' => ['F-2024-021'],
+            'simplified-receipt-igic-included' => ['F-2026-026-igic-included'],
         ];
     }
 
@@ -459,5 +460,66 @@ final class InvoicePipelineTest extends TestCase
         $normalized = $this->validator->normalize($raw);
 
         $this->assertSame('EUR', $normalized['invoice']['currency']);
+    }
+
+    // ── IGIC-included simplified receipt (issue #30) ────────────────────
+
+    public function testSimplifiedReceiptIgicIncludedConvertsLinesToTaxExclusive(): void
+    {
+        $raw = self::loadFixture('F-2026-026-igic-included');
+
+        // Raw fixture matches what the AI returns for the Cafetería Maracaná
+        // ticket: sum of (qty × unit_price) equals the TOTAL (19.30), not the
+        // SUBTOTAL (18.04), because the displayed prices include IGIC.
+        $rawLineSum = 0.0;
+        foreach ($raw['lines'] as $line) {
+            $rawLineSum += $line['quantity'] * $line['unit_price'];
+        }
+        $this->assertEqualsWithDelta(
+            $raw['invoice']['total'],
+            $rawLineSum,
+            0.02,
+            'Pre-normalization line sum should match the invoice total'
+        );
+
+        $normalized = $this->validator->normalize($raw);
+
+        $this->assertTrue(
+            $normalized['_tax_inclusive_lines_converted'] ?? false,
+            'Normalization should detect tax-inclusive prices on this receipt'
+        );
+
+        $normalizedLineSum = 0.0;
+        foreach ($normalized['lines'] as $line) {
+            $normalizedLineSum += $line['cantidad'] * $line['pvpunitario'];
+        }
+        $this->assertEqualsWithDelta(
+            $normalized['invoice']['subtotal'],
+            $normalizedLineSum,
+            0.02,
+            'After conversion line sum should match the invoice subtotal'
+        );
+    }
+
+    public function testSimplifiedReceiptArithmeticAfterConversion(): void
+    {
+        $raw = self::loadFixture('F-2026-026-igic-included');
+        $normalized = $this->validator->normalize($raw);
+
+        $linesSubtotal = 0.0;
+        $linesTax = 0.0;
+        foreach ($normalized['lines'] as $line) {
+            $base = $line['cantidad'] * $line['pvpunitario']
+                * (1 - ($line['dtopor'] ?? 0) / 100);
+            $linesSubtotal += $base;
+            $linesTax += $base * ($line['iva'] / 100);
+        }
+
+        $this->assertEqualsWithDelta(
+            $normalized['invoice']['total'],
+            $linesSubtotal + $linesTax,
+            0.02,
+            'Recomputing total from converted lines must match the receipt total'
+        );
     }
 }
