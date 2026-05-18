@@ -313,6 +313,17 @@ final class SchemaValidatorTest extends TestCase
         );
     }
 
+    public function testTranslateInvoiceFieldUsesLocalizedLabelsAndFallback(): void
+    {
+        $method = new \ReflectionMethod($this->validator, 'translateInvoiceField');
+        $method->setAccessible(true);
+
+        $this->assertSame(Tools::lang()->trans('number'), $method->invoke($this->validator, 'number'));
+        $this->assertSame(Tools::lang()->trans('date'), $method->invoke($this->validator, 'issue_date'));
+        $this->assertSame(Tools::lang()->trans('expiration'), $method->invoke($this->validator, 'due_date'));
+        $this->assertSame('custom_field', $method->invoke($this->validator, 'custom_field'));
+    }
+
     // ── normalize() ─────────────────────────────────────────
 
     public function testNormalizeDateFormats(): void

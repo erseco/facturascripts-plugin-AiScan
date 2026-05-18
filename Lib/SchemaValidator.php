@@ -171,7 +171,7 @@ class SchemaValidator
             'total' => 'total',
         ];
 
-        if (false === isset($translationKeys[$field])) {
+        if (!isset($translationKeys[$field])) {
             return $field;
         }
 
