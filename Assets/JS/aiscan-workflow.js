@@ -163,11 +163,9 @@
         const selectedMode = normalizeImportMode(mode);
         state.importMode = selectedMode;
 
-        if (typeof document.querySelectorAll === 'function') {
-            document.querySelectorAll('input[name="import_mode"]').forEach(radio => {
-                radio.checked = radio.value === selectedMode;
-            });
-        }
+        document.querySelectorAll('input[name="import_mode"]').forEach(radio => {
+            radio.checked = radio.value === selectedMode;
+        });
 
         document.getElementById('aiscan-import-mode-error')?.classList.add('d-none');
     }
