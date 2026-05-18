@@ -8,6 +8,11 @@ function loadTestHooks() {
     const scriptPath = path.join(__dirname, '..', '..', 'Assets', 'JS', 'aiscan-workflow.js');
     const script = fs.readFileSync(scriptPath, 'utf8');
     const elements = {};
+    const storage = new Map();
+    const importModeRadios = [
+        {id: 'mode-lines', value: 'lines', checked: false, addEventListener() {}},
+        {id: 'mode-total', value: 'total', checked: false, addEventListener() {}},
+    ];
 
     function getElement(id) {
         if (!elements[id]) {
@@ -55,6 +60,12 @@ function loadTestHooks() {
             getElementById(id) {
                 return getElement(id);
             },
+            querySelectorAll(selector) {
+                if (selector === 'input[name="import_mode"]') {
+                    return importModeRadios;
+                }
+                return [];
+            },
             createElement() {
                 return {
                     innerHTML: '',
@@ -65,6 +76,14 @@ function loadTestHooks() {
             },
             body: {
                 style: {},
+            },
+        },
+        localStorage: {
+            getItem(key) {
+                return storage.has(key) ? storage.get(key) : null;
+            },
+            setItem(key, value) {
+                storage.set(key, String(value));
             },
         },
     };
@@ -79,8 +98,40 @@ function loadTestHooks() {
     return {
         elements,
         hooks: context.__aiscanWorkflowTestHooks,
+        localStorage: context.localStorage,
+        importModeRadios,
     };
 }
+
+test('initializeImportMode defaults to lines when there is no saved preference', () => {
+    const {hooks, importModeRadios} = loadTestHooks();
+
+    hooks.state.importMode = null;
+    hooks.initializeImportMode();
+
+    assert.equal(hooks.state.importMode, 'lines');
+    assert.equal(importModeRadios[0].checked, true);
+    assert.equal(importModeRadios[1].checked, false);
+});
+
+test('initializeImportMode restores the last saved import mode', () => {
+    const {hooks, localStorage, importModeRadios} = loadTestHooks();
+
+    localStorage.setItem('aiscan.importMode', 'total');
+    hooks.initializeImportMode();
+
+    assert.equal(hooks.state.importMode, 'total');
+    assert.equal(importModeRadios[0].checked, false);
+    assert.equal(importModeRadios[1].checked, true);
+});
+
+test('persistImportMode stores the normalized import mode', () => {
+    const {hooks, localStorage} = loadTestHooks();
+
+    hooks.persistImportMode('unexpected');
+
+    assert.equal(localStorage.getItem('aiscan.importMode'), 'lines');
+});
 
 test('applySelectionRange selects the visible range between anchor and target', () => {
     const {hooks} = loadTestHooks();

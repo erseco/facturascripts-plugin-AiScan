@@ -12,10 +12,13 @@
 
 (() => {
     // ── State ──────────────────────────────────────────────────────────
+    const DEFAULT_IMPORT_MODE = 'lines';
+    const IMPORT_MODE_STORAGE_KEY = 'aiscan.importMode';
+
     const state = {
         documents: [],
         currentIndex: 0,
-        importMode: null,
+        importMode: DEFAULT_IMPORT_MODE,
         useHistory: false,
         availableProviders: [],
         defaultProvider: null,
@@ -136,6 +139,43 @@
         return state.documents[state.currentIndex] || null;
     }
 
+    function normalizeImportMode(mode) {
+        return mode === 'total' ? 'total' : DEFAULT_IMPORT_MODE;
+    }
+
+    function getStoredImportMode() {
+        try {
+            return normalizeImportMode(globalThis.localStorage?.getItem(IMPORT_MODE_STORAGE_KEY));
+        } catch (error) {
+            return DEFAULT_IMPORT_MODE;
+        }
+    }
+
+    function persistImportMode(mode) {
+        try {
+            globalThis.localStorage?.setItem(IMPORT_MODE_STORAGE_KEY, normalizeImportMode(mode));
+        } catch (error) {
+            // Ignore storage errors to keep the workflow usable in restricted browsers.
+        }
+    }
+
+    function setImportMode(mode) {
+        const selectedMode = normalizeImportMode(mode);
+        state.importMode = selectedMode;
+
+        if (typeof document.querySelectorAll === 'function') {
+            document.querySelectorAll('input[name="import_mode"]').forEach(radio => {
+                radio.checked = radio.value === selectedMode;
+            });
+        }
+
+        document.getElementById('aiscan-import-mode-error')?.classList.add('d-none');
+    }
+
+    function initializeImportMode() {
+        setImportMode(getStoredImportMode());
+    }
+
     function applySelectionRange(selectedIndices, sortedIndices, anchorIndex, targetIndex, checked) {
         const anchorPos = sortedIndices.indexOf(anchorIndex);
         const targetPos = sortedIndices.indexOf(targetIndex);
@@ -174,6 +214,7 @@
         bindReviewStep();
         bindImportStep();
         bindSplitHandle();
+        initializeImportMode();
     }
 
     // ── Step 1: Upload ─────────────────────────────────────────────────
@@ -215,8 +256,8 @@
 
         document.querySelectorAll('input[name="import_mode"]').forEach(radio => {
             radio.addEventListener('change', () => {
-                state.importMode = radio.value;
-                document.getElementById('aiscan-import-mode-error')?.classList.add('d-none');
+                setImportMode(radio.value);
+                persistImportMode(radio.value);
             });
         });
 
@@ -2817,8 +2858,12 @@
         globalThis.__aiscanWorkflowTestHooks = {
             applySelectionRange,
             finalizeAnalyzedDoc,
+            getStoredImportMode,
             handleMultiInvoiceResponse,
+            initializeImportMode,
+            persistImportMode,
             renderSidebar,
+            setImportMode,
             state,
         };
     }
