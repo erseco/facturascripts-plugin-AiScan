@@ -82,28 +82,32 @@ class SchemaValidator
         $errors = [];
 
         if (!isset($data['invoice']) || false === is_array($data['invoice'])) {
-            $errors[] = 'Missing invoice section';
+            $errors[] = Tools::lang()->trans('aiscan-missing-invoice-section');
             return $errors;
         }
 
         foreach (self::REQUIRED_INVOICE_FIELDS as $field) {
             if (empty($data['invoice'][$field])) {
-                $errors[] = 'Missing required invoice field: ' . $field;
+                $errors[] = Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                    '%field%' => $this->translateInvoiceField($field),
+                ]);
             }
         }
 
         if (isset($data['taxes']) && false === is_array($data['taxes'])) {
-            $errors[] = 'Taxes must be an array';
+            $errors[] = Tools::lang()->trans('aiscan-taxes-must-be-array');
         }
 
         if (isset($data['lines']) && false === is_array($data['lines'])) {
-            $errors[] = 'Lines must be an array';
+            $errors[] = Tools::lang()->trans('aiscan-lines-must-be-array');
         }
 
         $lines = is_array($data['lines'] ?? null) ? $data['lines'] : [];
         foreach ($lines as $index => $line) {
             if (empty($line['description']) && empty($line['descripcion'])) {
-                $errors[] = 'Missing line description at index ' . $index;
+                $errors[] = Tools::lang()->trans('aiscan-missing-line-description-at-index', [
+                    '%index%' => (string) $index,
+                ]);
             }
         }
 
@@ -115,21 +119,21 @@ class SchemaValidator
             !empty($data['invoice']['issue_date'])
             && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['issue_date'])
         ) {
-            $errors[] = 'Issue date must use YYYY-MM-DD format';
+            $errors[] = Tools::lang()->trans('aiscan-issue-date-must-use-yyyy-mm-dd-format');
         }
 
         if (
             !empty($data['invoice']['due_date'])
             && 1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['invoice']['due_date'])
         ) {
-            $errors[] = 'Due date must use YYYY-MM-DD format';
+            $errors[] = Tools::lang()->trans('aiscan-due-date-must-use-yyyy-mm-dd-format');
         }
 
         if (
             !empty($data['invoice']['currency'])
             && false === $this->isValidCurrencyCode($data['invoice']['currency'])
         ) {
-            $errors[] = 'Currency must be a 3-letter ISO code';
+            $errors[] = Tools::lang()->trans('aiscan-currency-must-be-a-3-letter-iso-code');
         }
 
         if (
@@ -141,14 +145,13 @@ class SchemaValidator
             $computed = (float) $data['invoice']['subtotal'] + (float) $data['invoice']['tax_amount'] - $withholding;
             $declared = (float) $data['invoice']['total'];
             if (abs($computed - $declared) > 0.02) {
-                $errors[] = sprintf(
-                    'Tax mismatch: subtotal(%.2f) + tax(%.2f) - withholding(%.2f) = %.2f but total is %.2f',
-                    $data['invoice']['subtotal'],
-                    $data['invoice']['tax_amount'],
-                    $withholding,
-                    $computed,
-                    $declared
-                );
+                $errors[] = Tools::lang()->trans('aiscan-tax-mismatch', [
+                    '%subtotal%' => sprintf('%.2f', (float) $data['invoice']['subtotal']),
+                    '%tax%' => sprintf('%.2f', (float) $data['invoice']['tax_amount']),
+                    '%withholding%' => sprintf('%.2f', $withholding),
+                    '%computed%' => sprintf('%.2f', $computed),
+                    '%declared%' => sprintf('%.2f', $declared),
+                ]);
             }
         }
 
@@ -157,6 +160,22 @@ class SchemaValidator
         // block the review workflow.
 
         return $errors;
+    }
+
+    private function translateInvoiceField(string $field): string
+    {
+        $translationKeys = [
+            'due_date' => 'expiration',
+            'issue_date' => 'date',
+            'number' => 'number',
+            'total' => 'total',
+        ];
+
+        if (false === isset($translationKeys[$field])) {
+            return $field;
+        }
+
+        return Tools::lang()->trans($translationKeys[$field]);
     }
 
     public function normalize(array $data): array
