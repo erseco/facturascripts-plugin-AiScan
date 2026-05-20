@@ -21,6 +21,7 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
+use FacturaScripts\Core\Plugins;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
@@ -42,6 +43,13 @@ final class InvoiceMapperStockUpdateTest extends TestCase
 
     /** @var Proveedor[] */
     private array $suppliersToDelete = [];
+
+    public static function setUpBeforeClass(): void
+    {
+        if (!class_exists(Proveedor::class)) {
+            Plugins::deploy(true, true);
+        }
+    }
 
     protected function setUp(): void
     {
