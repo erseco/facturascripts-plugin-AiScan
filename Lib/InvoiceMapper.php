@@ -35,8 +35,7 @@ class InvoiceMapper
     public function __construct(
         private readonly AttachmentService $attachmentService = new AttachmentService(),
         private readonly ProductMatcher $productMatcher = new ProductMatcher(),
-        private readonly PurchaseLineInventoryUpdater
-        $purchaseLineInventoryUpdater = new PurchaseLineInventoryUpdater(),
+        private readonly PurchaseLineInventoryUpdater $inventoryUpdater = new PurchaseLineInventoryUpdater(),
         private readonly SupplierService $supplierService = new SupplierService()
     ) {
     }
@@ -134,7 +133,7 @@ class InvoiceMapper
             $this->setReceivedStatus($invoice);
 
             if ($updateStockPurchaseData) {
-                $updateResult = $this->purchaseLineInventoryUpdater->update($invoice, $lines);
+                $updateResult = $this->inventoryUpdater->update($invoice, $lines);
                 $result['warnings'] = $updateResult['warnings'];
             }
 
