@@ -35,8 +35,8 @@ class InvoiceMapper
     public function __construct(
         private readonly AttachmentService $attachmentService = new AttachmentService(),
         private readonly ProductMatcher $productMatcher = new ProductMatcher(),
-        private readonly PurchaseLineInventoryUpdater $purchaseLineInventoryUpdater =
-            new PurchaseLineInventoryUpdater(),
+        private readonly PurchaseLineInventoryUpdater
+        $purchaseLineInventoryUpdater = new PurchaseLineInventoryUpdater(),
         private readonly SupplierService $supplierService = new SupplierService()
     ) {
     }
