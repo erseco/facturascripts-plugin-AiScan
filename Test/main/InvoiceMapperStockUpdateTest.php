@@ -345,7 +345,10 @@ final class InvoiceMapperStockUpdateTest extends TestCase
                 $queries[] = $item['message'];
             }
 
-            $filePath = Tools::folder('MyFiles', 'test_error_' . date('Y-m-d_H-i-s_') . rand(0, 1000) . '.log');
+            $filePath = Tools::folder(
+                'MyFiles',
+                'test_error_' . date('Y-m-d_H-i-s_') . random_int(0, 1000000) . '.log'
+            );
             file_put_contents($filePath, implode(PHP_EOL, $queries) . PHP_EOL, FILE_APPEND);
             error_log('Database queries in ' . $filePath . PHP_EOL);
 
