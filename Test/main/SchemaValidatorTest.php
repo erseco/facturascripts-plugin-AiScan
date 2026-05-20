@@ -89,7 +89,16 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('mismatch', $errors[0]);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-tax-mismatch', [
+                '%subtotal%' => '100.00',
+                '%tax%' => '21.00',
+                '%withholding%' => '0.00',
+                '%computed%' => '121.00',
+                '%declared%' => '200.00',
+            ]),
+            $errors
+        );
     }
 
     public function testValidatePassesWhenArithmeticIsCorrect(): void
@@ -136,7 +145,16 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('mismatch', $errors[0]);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-tax-mismatch', [
+                '%subtotal%' => '100.00',
+                '%tax%' => '21.00',
+                '%withholding%' => '15.00',
+                '%computed%' => '106.00',
+                '%declared%' => '121.00',
+            ]),
+            $errors
+        );
     }
 
     public function testValidateToleratesSmallRounding(): void
