@@ -930,7 +930,7 @@ class AiScanInvoice extends Controller
         return null;
     }
 
-    private function toBool($value): bool
+    private function toBool(mixed $value): bool
     {
         if (is_bool($value)) {
             return $value;

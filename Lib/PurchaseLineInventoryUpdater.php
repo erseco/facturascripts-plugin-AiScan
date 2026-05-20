@@ -23,6 +23,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\LineaFacturaProveedor;
 use FacturaScripts\Dinamic\Model\ProductoProveedor;
 use FacturaScripts\Dinamic\Model\Variante;
 
@@ -104,7 +105,7 @@ class PurchaseLineInventoryUpdater
         return $result;
     }
 
-    private function enableStockUpdate($line): bool
+    private function enableStockUpdate(LineaFacturaProveedor $line): bool
     {
         if ((int) $line->actualizastock === 1) {
             return true;
@@ -119,7 +120,7 @@ class PurchaseLineInventoryUpdater
      */
     private function updateSupplierProduct(
         FacturaProveedor $invoice,
-        $line,
+        LineaFacturaProveedor $line,
         float $unitPrice,
         array $sourceLine
     ): bool {
