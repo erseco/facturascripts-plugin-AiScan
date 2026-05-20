@@ -46,15 +46,21 @@ final class SchemaValidatorTest extends TestCase
         $errors = $this->validator->validate(['invoice' => []]);
         $this->assertNotEmpty($errors);
         $this->assertContains(
-            Tools::lang()->trans('aiscan-missing-required-invoice-field', ['%field%' => Tools::lang()->trans('number')]),
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('number'),
+            ]),
             $errors
         );
         $this->assertContains(
-            Tools::lang()->trans('aiscan-missing-required-invoice-field', ['%field%' => Tools::lang()->trans('date')]),
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('date'),
+            ]),
             $errors
         );
         $this->assertContains(
-            Tools::lang()->trans('aiscan-missing-required-invoice-field', ['%field%' => Tools::lang()->trans('total')]),
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('total'),
+            ]),
             $errors
         );
     }
