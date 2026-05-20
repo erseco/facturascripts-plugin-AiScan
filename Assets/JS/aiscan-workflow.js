@@ -107,6 +107,39 @@
         return null;
     }
 
+    function getValidationWarnings(data) {
+        const validationErrors = Array.isArray(data?._validation_errors) ? data._validation_errors : [];
+        const dynamicWarnings = [data?._total_mismatch_warning].filter(Boolean);
+        const warnings = validationErrors.filter(message => !dynamicWarnings.includes(message));
+        const totalMismatch = checkTotalMismatch(data);
+        if (totalMismatch) {
+            warnings.push(totalMismatch.message);
+        }
+        return warnings;
+    }
+
+    function updateValidationWarnings() {
+        const container = document.getElementById('aiscan-validation-warnings');
+        const doc = currentDoc();
+        if (!container || !doc?.extractedData) {
+            return;
+        }
+
+        const data = collectFormData(doc.extractedData);
+        const validationErrors = getValidationWarnings(data);
+        if (validationErrors.length === 0) {
+            container.className = 'd-none';
+            container.innerHTML = '';
+            return;
+        }
+
+        container.className = 'alert alert-danger py-2';
+        container.innerHTML = `
+            <strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
+            <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
+        `;
+    }
+
     function checkInBatchDuplicate(doc) {
         const inv = doc.extractedData?.invoice;
         if (!inv?.number) {
@@ -466,7 +499,7 @@
      * Apply post-analysis checks to a single analyzed document.
      */
     function finalizeAnalyzedDoc(doc) {
-        const warnings = doc.extractedData?._validation_errors || [];
+        const warnings = Array.isArray(doc.extractedData?._validation_errors) ? [...doc.extractedData._validation_errors] : [];
         let needsReview = warnings.length > 0;
 
         // Server-side duplicate: invoice already exists in FS
@@ -476,9 +509,8 @@
 
         // In-batch duplicate: same invoice already analyzed in this batch
         const batchDup = checkInBatchDuplicate(doc);
-        if (batchDup) {
-            doc.extractedData._validation_errors = warnings;
-            doc.extractedData._validation_errors.push(batchDup);
+        if (batchDup && !warnings.includes(batchDup)) {
+            warnings.push(batchDup);
             needsReview = true;
         }
 
@@ -490,15 +522,15 @@
         // Check if calculated total matches AI total
         const totalMismatch = checkTotalMismatch(doc.extractedData);
         if (totalMismatch) {
-            if (!doc.extractedData._validation_errors) {
-                doc.extractedData._validation_errors = [];
-            }
-            doc.extractedData._validation_errors.push(totalMismatch.message);
+            doc.extractedData._total_mismatch_warning = totalMismatch.message;
             if (!totalMismatch.isRounding) {
                 needsReview = true;
             }
+        } else {
+            delete doc.extractedData._total_mismatch_warning;
         }
 
+        doc.extractedData._validation_errors = warnings;
         doc.status = needsReview ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
     }
 
@@ -1013,19 +1045,19 @@
         const invoice = data.invoice || {};
         const supplier = data.supplier || {};
         const lines = Array.isArray(data.lines) ? data.lines : [];
-        const validationErrors = Array.isArray(data._validation_errors) ? data._validation_errors : [];
+        const validationErrors = getValidationWarnings(data);
         const confidence = data.confidence || {};
 
         review.innerHTML = '';
 
-        if (validationErrors.length > 0) {
-            review.insertAdjacentHTML('beforeend', `
-                <div class="alert alert-danger py-2">
-                    <strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
-                    <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
-                </div>
-            `);
-        }
+        review.insertAdjacentHTML('beforeend', `
+            <div id="aiscan-validation-warnings" class="${validationErrors.length > 0 ? 'alert alert-danger py-2' : 'd-none'}">
+                ${validationErrors.length > 0
+                    ? `<strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
+                    <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+                    : ''}
+            </div>
+        `);
 
         const aiWarnings = Array.isArray(data.warnings) ? data.warnings.filter(w => w) : [];
         if (aiWarnings.length > 0) {
@@ -1483,7 +1515,10 @@
     }
 
     function fmtNumber(n) {
-        return n.toLocaleString(document.documentElement.lang || 'es', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        return n.toLocaleString(document.documentElement?.lang || 'es', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
     }
 
     function parseLocaleNumber(str) {
@@ -1552,6 +1587,7 @@
         if (irpfEl) { irpfEl.value = fmtNumber(totalIrpf); }
         const totalEl = document.getElementById('invoice_total');
         if (totalEl) { totalEl.value = fmtNumber(totalFinal); }
+        updateValidationWarnings();
 
         // Detect rounding mismatch with original invoice total
         const roundingAlert = document.getElementById('aiscan-rounding-alert');
@@ -2100,6 +2136,7 @@
                 const row = deleteBtn.closest('.aiscan-line-row');
                 if (row && document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').length > 1) {
                     row.remove();
+                    calcAllLineTotals();
                 }
             }
             const addBtn = e.target.closest('#aiscan-add-line-btn');
@@ -2109,6 +2146,7 @@
                 container.insertAdjacentHTML('beforeend', buildLineRow(
                     {descripcion: '', cantidad: 1, pvpunitario: 0, dtopor: 0, iva: 0, irpf: 0}, newIndex
                 ));
+                calcAllLineTotals();
             }
 
             // Modal accept — sync values to row, then close
@@ -2816,8 +2854,12 @@
     if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
         globalThis.__aiscanWorkflowTestHooks = {
             applySelectionRange,
+            calcAllLineTotals,
+            checkTotalMismatch,
             finalizeAnalyzedDoc,
+            getValidationWarnings,
             handleMultiInvoiceResponse,
+            renderReviewPanel,
             renderSidebar,
             state,
         };

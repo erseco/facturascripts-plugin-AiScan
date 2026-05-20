@@ -271,3 +271,34 @@ test('handleMultiInvoiceResponse re-indexes documents correctly', () => {
     // Original first document is untouched
     assert.equal(hooks.state.documents[0].extractedData.invoice.number, 'EXISTING');
 });
+
+test('getValidationWarnings drops stale total mismatch warnings after totals are corrected', () => {
+    const {hooks} = loadTestHooks();
+
+    const warnings = hooks.getValidationWarnings({
+        invoice: {total: 21.30},
+        lines: [
+            {cantidad: 1, pvpunitario: 10, iva: 0, irpf: 0},
+            {cantidad: 1, pvpunitario: 11.3, iva: 0, irpf: 0},
+        ],
+        _validation_errors: ['Duplicado detectado', 'aiscan-total-mismatch'],
+        _total_mismatch_warning: 'aiscan-total-mismatch',
+    });
+
+    assert.deepEqual(warnings, ['Duplicado detectado']);
+});
+
+test('getValidationWarnings recalculates the current total mismatch warning', () => {
+    const {hooks} = loadTestHooks();
+
+    const warnings = hooks.getValidationWarnings({
+        invoice: {total: 21.30},
+        lines: [
+            {cantidad: 1, pvpunitario: 10, iva: 0, irpf: 0},
+            {cantidad: 1, pvpunitario: 15, iva: 0, irpf: 0},
+        ],
+        _validation_errors: [],
+    });
+
+    assert.deepEqual(warnings, ['aiscan-total-mismatch']);
+});
