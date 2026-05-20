@@ -662,8 +662,9 @@ class AiScanInvoice extends Controller
             return;
         }
 
+        $updateStockPurchaseData = $this->toBool($data['update_stock_purchase_data'] ?? false);
         $mapper = new InvoiceMapper();
-        $result = $mapper->mapToInvoice($data, $invoiceId, $importMode);
+        $result = $mapper->mapToInvoice($data, $invoiceId, $importMode, $updateStockPurchaseData);
 
         if (!$result['success']) {
             http_response_code(422);
@@ -671,7 +672,11 @@ class AiScanInvoice extends Controller
             return;
         }
 
-        echo json_encode(['success' => true, 'invoice_id' => $result['invoice_id']]);
+        echo json_encode([
+            'success' => true,
+            'invoice_id' => $result['invoice_id'],
+            'warnings' => $result['warnings'],
+        ]);
     }
 
     private function handleImportBatch(): void
@@ -687,6 +692,7 @@ class AiScanInvoice extends Controller
 
         $documents = $batch['documents'] ?? [];
         $importMode = $batch['import_mode'] ?? 'lines';
+        $updateStockPurchaseData = $this->toBool($batch['update_stock_purchase_data'] ?? false);
         $results = [];
         $mapper = new InvoiceMapper();
 
@@ -758,7 +764,10 @@ class AiScanInvoice extends Controller
             ];
 
             $docImportMode = $doc['import_mode'] ?? $importMode;
-            $result = $mapper->mapToInvoice($extracted, null, $docImportMode);
+            $docUpdateStock = array_key_exists('update_stock_purchase_data', $doc)
+                ? $this->toBool($doc['update_stock_purchase_data'])
+                : $updateStockPurchaseData;
+            $result = $mapper->mapToInvoice($extracted, null, $docImportMode, $docUpdateStock);
 
             if ($result['success']) {
                 $invoiceCode = $this->resolveInvoiceCode($result['invoice_id']);
@@ -796,6 +805,7 @@ class AiScanInvoice extends Controller
                 'invoice_id' => $result['invoice_id'],
                 'error' => $result['success'] ? null : implode('; ', $result['errors']),
                 'original_name' => $doc['original_name'] ?? '',
+                'warnings' => $result['warnings'],
             ];
         }
 
@@ -918,5 +928,22 @@ class AiScanInvoice extends Controller
             return $invoice->codigo;
         }
         return null;
+    }
+
+    private function toBool($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
     }
 }

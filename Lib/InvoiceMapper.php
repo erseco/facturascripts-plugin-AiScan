@@ -35,6 +35,7 @@ class InvoiceMapper
     public function __construct(
         private readonly AttachmentService $attachmentService = new AttachmentService(),
         private readonly ProductMatcher $productMatcher = new ProductMatcher(),
+        private readonly PurchaseLineInventoryUpdater $purchaseLineInventoryUpdater = new PurchaseLineInventoryUpdater(),
         private readonly SupplierService $supplierService = new SupplierService()
     ) {
     }
@@ -42,9 +43,10 @@ class InvoiceMapper
     public function mapToInvoice(
         array $extractedData,
         ?int $invoiceId = null,
-        string $importMode = 'lines'
+        string $importMode = 'lines',
+        bool $updateStockPurchaseData = false
     ): array {
-        $result = ['success' => false, 'invoice_id' => null, 'errors' => []];
+        $result = ['success' => false, 'invoice_id' => null, 'errors' => [], 'warnings' => []];
 
         try {
             if ($invoiceId) {
@@ -129,6 +131,11 @@ class InvoiceMapper
             $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
 
             $this->setReceivedStatus($invoice);
+
+            if ($updateStockPurchaseData) {
+                $updateResult = $this->purchaseLineInventoryUpdater->update($invoice, $lines);
+                $result['warnings'] = $updateResult['warnings'];
+            }
 
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;

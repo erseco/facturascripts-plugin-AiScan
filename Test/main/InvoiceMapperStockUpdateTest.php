@@ -1,0 +1,315 @@
+<?php
+
+/**
+ * This file is part of AiScan plugin for FacturaScripts.
+ * Copyright (C) 2026 Ernesto Serrano <info@ernesto.es>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+namespace FacturaScripts\Test\Plugins;
+
+use FacturaScripts\Core\Tools;
+use FacturaScripts\Core\Where;
+use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\Producto;
+use FacturaScripts\Dinamic\Model\ProductoProveedor;
+use FacturaScripts\Dinamic\Model\Proveedor;
+use FacturaScripts\Dinamic\Model\Stock;
+use FacturaScripts\Dinamic\Model\Variante;
+use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
+use FacturaScripts\Test\Traits\LogErrorsTrait;
+use FacturaScripts\Test\Traits\RandomDataTrait;
+use PHPUnit\Framework\TestCase;
+
+final class InvoiceMapperStockUpdateTest extends TestCase
+{
+    use LogErrorsTrait;
+    use RandomDataTrait;
+
+    /** @var FacturaProveedor[] */
+    private array $invoicesToDelete = [];
+
+    /** @var Producto[] */
+    private array $productsToDelete = [];
+
+    /** @var Proveedor[] */
+    private array $suppliersToDelete = [];
+
+    protected function setUp(): void
+    {
+        Tools::settingsSet('default', 'updatesupplierprices', false);
+        Tools::settingsSave();
+    }
+
+    public function testMapToInvoiceKeepsBehaviorWhenStockUpdateDisabled(): void
+    {
+        [$supplier, $product] = $this->createSupplierAndProduct();
+        $result = $this->mapInvoice($supplier->codproveedor, [[
+            'referencia' => $product->referencia,
+            'description' => 'Producto controlado',
+            'quantity' => 3,
+            'unit_price' => 12.5,
+            'tax_rate' => 21,
+        ]], false);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['warnings']);
+        $this->assertSame(0.0, $this->getStockQuantity($product->referencia));
+        $this->assertNull($this->findSupplierProduct($supplier->codproveedor, $product->referencia));
+        $this->assertSame(0, (int) $this->getImportedInvoice($result['invoice_id'])->getLines()[0]->actualizastock);
+    }
+
+    public function testMapToInvoiceAddsStockAndUpdatesPurchaseDataWhenEnabled(): void
+    {
+        [$supplier, $product] = $this->createSupplierAndProduct();
+        $result = $this->mapInvoice($supplier->codproveedor, [[
+            'referencia' => $product->referencia,
+            'description' => 'Producto controlado',
+            'quantity' => 3,
+            'unit_price' => 12.5,
+            'tax_rate' => 21,
+        ]], true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['warnings']);
+        $this->assertSame(3.0, $this->getStockQuantity($product->referencia));
+
+        $supplierProduct = $this->findSupplierProduct($supplier->codproveedor, $product->referencia);
+        $this->assertNotNull($supplierProduct);
+        $this->assertEqualsWithDelta(12.5, $supplierProduct->precio, 0.0001);
+    }
+
+    public function testMapToInvoiceSkipsStockForNonStockControlledProduct(): void
+    {
+        [$supplier, $product] = $this->createSupplierAndProduct(true);
+        $result = $this->mapInvoice($supplier->codproveedor, [[
+            'referencia' => $product->referencia,
+            'description' => 'Servicio sin stock',
+            'quantity' => 2,
+            'unit_price' => 14,
+            'tax_rate' => 21,
+        ]], true);
+
+        $this->assertTrue($result['success']);
+        $this->assertContainsTranslation('aiscan-stock-line-skipped-not-controlled', $result['warnings'], '1');
+        $this->assertSame(0.0, $this->getStockQuantity($product->referencia));
+
+        $supplierProduct = $this->findSupplierProduct($supplier->codproveedor, $product->referencia);
+        $this->assertNotNull($supplierProduct);
+        $this->assertEqualsWithDelta(14.0, $supplierProduct->precio, 0.0001);
+    }
+
+    public function testMapToInvoiceSkipsUnmatchedProductSafely(): void
+    {
+        $supplier = $this->createSupplier();
+        $result = $this->mapInvoice($supplier->codproveedor, [[
+            'description' => 'Producto sin coincidencia ' . mt_rand(1000, 9999),
+            'quantity' => 2,
+            'unit_price' => 10,
+            'tax_rate' => 21,
+        ]], true);
+
+        $this->assertTrue($result['success']);
+        $this->assertContainsTranslation('aiscan-stock-line-skipped-no-product', $result['warnings'], '1');
+        $this->assertCount(1, $this->getImportedInvoice($result['invoice_id'])->getLines());
+    }
+
+    public function testMapToInvoiceIgnoresInvalidPriceForPurchaseData(): void
+    {
+        [$supplier, $product] = $this->createSupplierAndProduct();
+        $result = $this->mapInvoice($supplier->codproveedor, [[
+            'referencia' => $product->referencia,
+            'description' => 'Producto controlado',
+            'quantity' => 4,
+            'unit_price' => 0,
+            'tax_rate' => 21,
+        ]], true);
+
+        $this->assertTrue($result['success']);
+        $this->assertContainsTranslation('aiscan-purchase-data-line-skipped-invalid-price', $result['warnings'], '1');
+        $this->assertSame(4.0, $this->getStockQuantity($product->referencia));
+        $this->assertNull($this->findSupplierProduct($supplier->codproveedor, $product->referencia));
+    }
+
+    public function testMapToInvoiceIgnoresInvalidQuantityForStockUpdate(): void
+    {
+        [$supplier, $product] = $this->createSupplierAndProduct();
+        $result = $this->mapInvoice($supplier->codproveedor, [[
+            'referencia' => $product->referencia,
+            'description' => 'Producto controlado',
+            'quantity' => 0,
+            'unit_price' => 9.5,
+            'tax_rate' => 21,
+        ]], true);
+
+        $this->assertTrue($result['success']);
+        $this->assertContainsTranslation('aiscan-stock-line-skipped-invalid-quantity', $result['warnings'], '1');
+        $this->assertSame(0.0, $this->getStockQuantity($product->referencia));
+
+        $supplierProduct = $this->findSupplierProduct($supplier->codproveedor, $product->referencia);
+        $this->assertNotNull($supplierProduct);
+        $this->assertEqualsWithDelta(9.5, $supplierProduct->precio, 0.0001);
+    }
+
+    public function testMapToInvoiceUpdatesEachEligibleLineIndependently(): void
+    {
+        [$supplier, $firstProduct] = $this->createSupplierAndProduct();
+        $secondProduct = $this->createProduct();
+
+        $result = $this->mapInvoice($supplier->codproveedor, [
+            [
+                'referencia' => $firstProduct->referencia,
+                'description' => 'Producto A',
+                'quantity' => 2,
+                'unit_price' => 5,
+                'tax_rate' => 21,
+            ],
+            [
+                'referencia' => $secondProduct->referencia,
+                'description' => 'Producto B',
+                'quantity' => 3,
+                'unit_price' => 7,
+                'tax_rate' => 21,
+            ],
+        ], true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['warnings']);
+        $this->assertSame(2.0, $this->getStockQuantity($firstProduct->referencia));
+        $this->assertSame(3.0, $this->getStockQuantity($secondProduct->referencia));
+        $this->assertNotNull($this->findSupplierProduct($supplier->codproveedor, $firstProduct->referencia));
+        $this->assertNotNull($this->findSupplierProduct($supplier->codproveedor, $secondProduct->referencia));
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->invoicesToDelete as $invoice) {
+            if ($invoice->exists()) {
+                $invoice->delete();
+            }
+        }
+
+        foreach ($this->suppliersToDelete as $supplier) {
+            if ($supplier->exists()) {
+                $supplier->getDefaultAddress()->delete();
+                $supplier->delete();
+            }
+        }
+
+        foreach ($this->productsToDelete as $product) {
+            if ($product->exists()) {
+                $product->delete();
+            }
+        }
+
+        $this->logErrors();
+    }
+
+    /**
+     * @return array{0: Proveedor, 1: Producto}
+     */
+    private function createSupplierAndProduct(bool $noStock = false): array
+    {
+        return [$this->createSupplier(), $this->createProduct($noStock)];
+    }
+
+    private function createSupplier(): Proveedor
+    {
+        $supplier = $this->getRandomSupplier('AiScan stock test');
+        $this->assertTrue($supplier->save(), 'supplier-save-failed');
+        $this->suppliersToDelete[] = $supplier;
+
+        return $supplier;
+    }
+
+    private function createProduct(bool $noStock = false): Producto
+    {
+        $product = $this->getRandomProduct();
+        $product->nostock = $noStock;
+        $this->assertTrue($product->save(), 'product-save-failed');
+        $this->productsToDelete[] = $product;
+
+        return $product;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $lines
+     */
+    private function mapInvoice(string $supplierCode, array $lines, bool $updateStockPurchaseData): array
+    {
+        $mapper = new InvoiceMapper();
+        $result = $mapper->mapToInvoice([
+            'invoice' => [
+                'number' => 'AI-' . mt_rand(10000, 99999),
+                'issue_date' => '2026-05-20',
+                'currency' => 'EUR',
+                'summary' => 'AiScan stock update test',
+            ],
+            'supplier' => [
+                'matched_supplier_id' => $supplierCode,
+                'match_status' => 'matched',
+            ],
+            'lines' => $lines,
+        ], null, 'lines', $updateStockPurchaseData);
+
+        if (!empty($result['invoice_id'])) {
+            $this->invoicesToDelete[] = $this->getImportedInvoice($result['invoice_id']);
+        }
+
+        return $result;
+    }
+
+    private function getImportedInvoice(int $invoiceId): FacturaProveedor
+    {
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($invoiceId), 'invoice-load-failed');
+
+        return $invoice;
+    }
+
+    private function getStockQuantity(string $reference): float
+    {
+        $variant = new Variante();
+        $this->assertTrue($variant->loadWhere([Where::eq('referencia', $reference)]), 'variant-load-failed');
+
+        $stock = new Stock();
+        $where = [Where::eq('referencia', $reference)];
+        if (false === $stock->loadWhere($where)) {
+            return 0.0;
+        }
+
+        return (float) $stock->cantidad;
+    }
+
+    private function findSupplierProduct(string $supplierCode, string $reference): ?ProductoProveedor
+    {
+        $product = new ProductoProveedor();
+        $where = [
+            Where::eq('codproveedor', $supplierCode),
+            Where::eq('referencia', $reference),
+        ];
+
+        return $product->loadWhere($where) ? $product : null;
+    }
+
+    /**
+     * @param array<int, string> $warnings
+     */
+    private function assertContainsTranslation(string $key, array $warnings, string $line): void
+    {
+        $message = Tools::lang()->trans($key, ['%line%' => $line]);
+        $this->assertContains($message, $warnings);
+    }
+}

@@ -230,7 +230,15 @@
                         <button type="button" class="btn btn-outline-secondary" id="aiscan-back-to-review">
                             <i class="fa-solid fa-arrow-left me-1"></i>{{ i18n.trans('aiscan-back') }}
                         </button>
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-3 flex-wrap justify-content-end">
+                            <div class="form-check mb-0 text-start">
+                                <input class="form-check-input" type="checkbox" id="aiscan-update-stock-purchase-data">
+                                <label class="form-check-label small fw-semibold" for="aiscan-update-stock-purchase-data">
+                                    {{ i18n.trans('aiscan-update-stock-purchase-data') }}
+                                </label>
+                                <div class="form-text mt-0">{{ i18n.trans('aiscan-update-stock-purchase-data-help') }}</div>
+                            </div>
+                            <span class="text-muted small" id="aiscan-import-option-summary"></span>
                             <span class="text-muted small" id="aiscan-import-count"></span>
                             <button type="button" class="btn btn-success" id="aiscan-import-all-btn">
                                 <i class="fa-solid fa-file-import me-1"></i>{{ i18n.trans('aiscan-import-all') }}
@@ -287,6 +295,8 @@
         'aiscan-import-all': '{{ i18n.trans('aiscan-import-all')|e('js') }}',
         'aiscan-import-complete': '{{ i18n.trans('aiscan-import-complete')|e('js') }}',
         'aiscan-import-count': '{{ i18n.trans('aiscan-import-count')|e('js') }}',
+        'aiscan-import-option-stock-summary': '{{ i18n.trans('aiscan-import-option-stock-summary')|e('js') }}',
+        'aiscan-import-warnings': '{{ i18n.trans('aiscan-import-warnings')|e('js') }}',
         'aiscan-import-mode-required': '{{ i18n.trans('aiscan-import-mode-required')|e('js') }}',
         'aiscan-importing': '{{ i18n.trans('aiscan-importing')|e('js') }}',
         'aiscan-initial-review-message': '{{ i18n.trans('aiscan-initial-review-message')|e('js') }}',
@@ -303,6 +313,8 @@
         'aiscan-saved': '{{ i18n.trans('aiscan-saved')|e('js') }}',
         'aiscan-scanned-supplier-invoice': '{{ i18n.trans('aiscan-scanned-supplier-invoice')|e('js') }}',
         'aiscan-selected-supplier': '{{ i18n.trans('aiscan-selected-supplier')|e('js') }}',
+        'aiscan-stock-update-disabled': '{{ i18n.trans('aiscan-stock-update-disabled')|e('js') }}',
+        'aiscan-stock-update-enabled': '{{ i18n.trans('aiscan-stock-update-enabled')|e('js') }}',
         'aiscan-status-analyzed': '{{ i18n.trans('aiscan-status-analyzed')|e('js') }}',
         'aiscan-status-analyzing': '{{ i18n.trans('aiscan-status-analyzing')|e('js') }}',
         'aiscan-status-discarded': '{{ i18n.trans('aiscan-status-discarded')|e('js') }}',
@@ -314,6 +326,7 @@
         'aiscan-supplier-ambiguous': '{{ i18n.trans('aiscan-supplier-ambiguous')|e('js') }}',
         'aiscan-supplier-created-on-save': '{{ i18n.trans('aiscan-supplier-created-on-save')|e('js') }}',
         'aiscan-supplier-not-found-on-save': '{{ i18n.trans('aiscan-supplier-not-found-on-save')|e('js') }}',
+        'aiscan-update-stock-purchase-data': '{{ i18n.trans('aiscan-update-stock-purchase-data')|e('js') }}',
         'aiscan-undecided-remaining': '{{ i18n.trans('aiscan-undecided-remaining')|e('js') }}',
         'aiscan-upload-and-analyze': '{{ i18n.trans('aiscan-upload-and-analyze')|e('js') }}',
         'aiscan-uploading-file': '{{ i18n.trans('aiscan-uploading-file')|e('js') }}',

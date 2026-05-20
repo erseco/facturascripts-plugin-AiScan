@@ -32,7 +32,8 @@ Open **AiScan Configuration** and set at least one provider credential:
 2. Click **Scan Invoice**.
 3. Upload a PDF or image invoice.
 4. Review the extracted data.
-5. Save the purchase invoice and attached source file.
+5. In the import summary, optionally enable **Update stock and purchase data from invoice lines**.
+6. Save the purchase invoice and attached source file.
 
 ## 6. Stop the environment
 
