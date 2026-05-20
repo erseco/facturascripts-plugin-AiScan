@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
@@ -29,13 +30,11 @@ use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Dinamic\Model\Stock;
 use FacturaScripts\Dinamic\Model\Variante;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
-use FacturaScripts\Test\Traits\LogErrorsTrait;
 use FacturaScripts\Test\Traits\RandomDataTrait;
 use PHPUnit\Framework\TestCase;
 
 final class InvoiceMapperStockUpdateTest extends TestCase
 {
-    use LogErrorsTrait;
     use RandomDataTrait;
 
     /** @var FacturaProveedor[] */
@@ -311,5 +310,32 @@ final class InvoiceMapperStockUpdateTest extends TestCase
     {
         $message = Tools::lang()->trans($key, ['%line%' => $line]);
         $this->assertContains($message, $warnings);
+    }
+
+    protected function logErrors(bool $force = false): void
+    {
+        if ($this->getStatus() > 1 || $force) {
+            foreach (MiniLog::read('', ['critical', 'error', 'warning']) as $item) {
+                error_log($item['message']);
+                if (!empty($item['context'])) {
+                    error_log(print_r($item['context'], true));
+                }
+            }
+
+            $queries = [];
+            foreach (MiniLog::read('database') as $item) {
+                $queries[] = $item['message'];
+            }
+
+            $filePath = Tools::folder('MyFiles', 'test_error_' . date('Y-m-d_H-i-s_') . rand(0, 1000) . '.log');
+            file_put_contents($filePath, implode(PHP_EOL, $queries) . PHP_EOL, FILE_APPEND);
+            error_log('Database queries in ' . $filePath . PHP_EOL);
+
+            foreach (array_slice($queries, -5) as $query) {
+                error_log($query);
+            }
+        }
+
+        MiniLog::clear();
     }
 }
