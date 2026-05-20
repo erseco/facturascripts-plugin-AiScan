@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\SchemaValidator;
 use PHPUnit\Framework\TestCase;
 
@@ -37,16 +38,31 @@ final class SchemaValidatorTest extends TestCase
     public function testValidateReturnsMissingInvoiceSectionError(): void
     {
         $errors = $this->validator->validate([]);
-        $this->assertContains('Missing invoice section', $errors);
+        $this->assertContains(Tools::lang()->trans('aiscan-missing-invoice-section'), $errors);
     }
 
     public function testValidateReturnsMissingRequiredFieldErrors(): void
     {
         $errors = $this->validator->validate(['invoice' => []]);
         $this->assertNotEmpty($errors);
-        $this->assertContains('Missing required invoice field: number', $errors);
-        $this->assertContains('Missing required invoice field: issue_date', $errors);
-        $this->assertContains('Missing required invoice field: total', $errors);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('number'),
+            ]),
+            $errors
+        );
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('date'),
+            ]),
+            $errors
+        );
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('total'),
+            ]),
+            $errors
+        );
     }
 
     public function testValidatePassesWithRequiredFields(): void
@@ -73,7 +89,16 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('mismatch', $errors[0]);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-tax-mismatch', [
+                '%subtotal%' => '100.00',
+                '%tax%' => '21.00',
+                '%withholding%' => '0.00',
+                '%computed%' => '121.00',
+                '%declared%' => '200.00',
+            ]),
+            $errors
+        );
     }
 
     public function testValidatePassesWhenArithmeticIsCorrect(): void
@@ -120,7 +145,16 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('mismatch', $errors[0]);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-tax-mismatch', [
+                '%subtotal%' => '100.00',
+                '%tax%' => '21.00',
+                '%withholding%' => '15.00',
+                '%computed%' => '106.00',
+                '%declared%' => '121.00',
+            ]),
+            $errors
+        );
     }
 
     public function testValidateToleratesSmallRounding(): void
@@ -147,7 +181,7 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $this->assertContains(
-            'Issue date must use YYYY-MM-DD format',
+            Tools::lang()->trans('aiscan-issue-date-must-use-yyyy-mm-dd-format'),
             $errors
         );
     }
@@ -163,7 +197,7 @@ final class SchemaValidatorTest extends TestCase
             ],
         ]);
         $this->assertContains(
-            'Due date must use YYYY-MM-DD format',
+            Tools::lang()->trans('aiscan-due-date-must-use-yyyy-mm-dd-format'),
             $errors
         );
     }
@@ -197,11 +231,11 @@ final class SchemaValidatorTest extends TestCase
         ]);
 
         $this->assertContains(
-            'Currency must be a 3-letter ISO code',
+            Tools::lang()->trans('aiscan-currency-must-be-a-3-letter-iso-code'),
             $errors
         );
         $this->assertContains(
-            'Missing line description at index 0',
+            Tools::lang()->trans('aiscan-missing-line-description-at-index', ['%index%' => '0']),
             $errors
         );
     }
@@ -229,7 +263,7 @@ final class SchemaValidatorTest extends TestCase
             ],
             'taxes' => 'invalid',
         ]);
-        $this->assertContains('Taxes must be an array', $errors);
+        $this->assertContains(Tools::lang()->trans('aiscan-taxes-must-be-array'), $errors);
     }
 
     public function testValidateRejectsLinesAsNonArray(): void
@@ -242,7 +276,7 @@ final class SchemaValidatorTest extends TestCase
             ],
             'lines' => 'invalid',
         ]);
-        $this->assertContains('Lines must be an array', $errors);
+        $this->assertContains(Tools::lang()->trans('aiscan-lines-must-be-array'), $errors);
     }
 
     public function testValidateDoesNotIncludeAiWarnings(): void
@@ -289,18 +323,21 @@ final class SchemaValidatorTest extends TestCase
                 ['description' => ''],
             ],
         ]);
-        $this->assertContains(
-            'Missing line description at index 1',
-            $errors
-        );
-        $this->assertContains(
-            'Missing line description at index 2',
-            $errors
-        );
-        $this->assertNotContains(
-            'Missing line description at index 0',
-            $errors
-        );
+        $this->assertSame([
+            Tools::lang()->trans('aiscan-missing-line-description-at-index', ['%index%' => '1']),
+            Tools::lang()->trans('aiscan-missing-line-description-at-index', ['%index%' => '2']),
+        ], $errors);
+    }
+
+    public function testTranslateInvoiceFieldUsesLocalizedLabelsAndFallback(): void
+    {
+        $method = new \ReflectionMethod($this->validator, 'translateInvoiceField');
+        $method->setAccessible(true);
+
+        $this->assertSame(Tools::lang()->trans('number'), $method->invoke($this->validator, 'number'));
+        $this->assertSame(Tools::lang()->trans('date'), $method->invoke($this->validator, 'issue_date'));
+        $this->assertSame(Tools::lang()->trans('expiration'), $method->invoke($this->validator, 'due_date'));
+        $this->assertSame('custom_field', $method->invoke($this->validator, 'custom_field'));
     }
 
     // ── normalize() ─────────────────────────────────────────
