@@ -21,15 +21,14 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
-use FacturaScripts\Core\Plugins;
+use FacturaScripts\Core\Model\FacturaProveedor;
+use FacturaScripts\Core\Model\Producto;
+use FacturaScripts\Core\Model\ProductoProveedor;
+use FacturaScripts\Core\Model\Proveedor;
+use FacturaScripts\Core\Model\Stock;
+use FacturaScripts\Core\Model\Variante;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
-use FacturaScripts\Dinamic\Model\FacturaProveedor;
-use FacturaScripts\Dinamic\Model\Producto;
-use FacturaScripts\Dinamic\Model\ProductoProveedor;
-use FacturaScripts\Dinamic\Model\Proveedor;
-use FacturaScripts\Dinamic\Model\Stock;
-use FacturaScripts\Dinamic\Model\Variante;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use PHPUnit\Framework\TestCase;
 
@@ -43,13 +42,6 @@ final class InvoiceMapperStockUpdateTest extends TestCase
 
     /** @var Proveedor[] */
     private array $suppliersToDelete = [];
-
-    public static function setUpBeforeClass(): void
-    {
-        if (!class_exists(Proveedor::class)) {
-            Plugins::deploy(true, true);
-        }
-    }
 
     protected function setUp(): void
     {
