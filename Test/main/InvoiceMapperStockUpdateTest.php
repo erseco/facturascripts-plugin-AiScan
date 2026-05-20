@@ -60,7 +60,10 @@ final class InvoiceMapperStockUpdateTest extends TestCase
         );
         self::aliasDynamicClass(CoreCuentaEspecial::class, 'FacturaScripts\\Dinamic\\Model\\CuentaEspecial');
         self::aliasDynamicClass(FacturaProveedor::class, 'FacturaScripts\\Dinamic\\Model\\FacturaProveedor');
-        self::aliasDynamicClass(CoreLineaFacturaProveedor::class, 'FacturaScripts\\Dinamic\\Model\\LineaFacturaProveedor');
+        self::aliasDynamicClass(
+            CoreLineaFacturaProveedor::class,
+            'FacturaScripts\\Dinamic\\Model\\LineaFacturaProveedor'
+        );
         self::aliasDynamicClass(Producto::class, 'FacturaScripts\\Dinamic\\Model\\Producto');
         self::aliasDynamicClass(ProductoProveedor::class, 'FacturaScripts\\Dinamic\\Model\\ProductoProveedor');
         self::aliasDynamicClass(Proveedor::class, 'FacturaScripts\\Dinamic\\Model\\Proveedor');
