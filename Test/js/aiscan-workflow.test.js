@@ -52,6 +52,9 @@ function loadTestHooks() {
         },
         document: {
             addEventListener() {},
+            documentElement: {
+                lang: 'es',
+            },
             getElementById(id) {
                 return getElement(id);
             },

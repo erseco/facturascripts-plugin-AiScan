@@ -107,15 +107,30 @@
         return null;
     }
 
-    function getValidationWarnings(data) {
-        const validationErrors = Array.isArray(data?._validation_errors) ? data._validation_errors : [];
+    function filterOutDynamicWarnings(data) {
+        const staticValidationErrors = Array.isArray(data?._validation_errors) ? data._validation_errors : [];
         const dynamicWarnings = [data?._total_mismatch_warning].filter(Boolean);
-        const warnings = validationErrors.filter(message => !dynamicWarnings.includes(message));
+        return staticValidationErrors.filter(message => !dynamicWarnings.includes(message));
+    }
+
+    function getValidationWarnings(data) {
+        const warnings = filterOutDynamicWarnings(data);
         const totalMismatch = checkTotalMismatch(data);
         if (totalMismatch) {
             warnings.push(totalMismatch.message);
         }
         return warnings;
+    }
+
+    function renderValidationWarningsHtml(validationErrors) {
+        if (validationErrors.length === 0) {
+            return '';
+        }
+
+        return `
+            <strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
+            <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
+        `;
     }
 
     function updateValidationWarnings() {
@@ -134,10 +149,7 @@
         }
 
         container.className = 'alert alert-danger py-2';
-        container.innerHTML = `
-            <strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
-            <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
-        `;
+        container.innerHTML = renderValidationWarningsHtml(validationErrors);
     }
 
     function checkInBatchDuplicate(doc) {
@@ -499,7 +511,7 @@
      * Apply post-analysis checks to a single analyzed document.
      */
     function finalizeAnalyzedDoc(doc) {
-        const warnings = Array.isArray(doc.extractedData?._validation_errors) ? [...doc.extractedData._validation_errors] : [];
+        const warnings = filterOutDynamicWarnings(doc.extractedData);
         let needsReview = warnings.length > 0;
 
         // Server-side duplicate: invoice already exists in FS
@@ -1052,10 +1064,7 @@
 
         review.insertAdjacentHTML('beforeend', `
             <div id="aiscan-validation-warnings" class="${validationErrors.length > 0 ? 'alert alert-danger py-2' : 'd-none'}">
-                ${validationErrors.length > 0
-                    ? `<strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-validation-warnings'))}</strong>
-                    <ul class="mb-0 small">${validationErrors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
-                    : ''}
+                ${renderValidationWarningsHtml(validationErrors)}
             </div>
         `);
 
@@ -1515,10 +1524,7 @@
     }
 
     function fmtNumber(n) {
-        return n.toLocaleString(document.documentElement?.lang || 'es', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
+        return n.toLocaleString(document.documentElement.lang || 'es', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
     function parseLocaleNumber(str) {
