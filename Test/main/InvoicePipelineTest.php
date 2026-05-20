@@ -185,14 +185,10 @@ final class InvoicePipelineTest extends TestCase
         $normalized = $this->validator->normalize($raw);
         $errors = $this->validator->validate($normalized);
 
-        $foundDateError = false;
-        foreach ($errors as $error) {
-            if (stripos($error, 'date') !== false) {
-                $foundDateError = true;
-                break;
-            }
-        }
-        $this->assertTrue($foundDateError, 'Expected a date-related validation error');
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-issue-date-must-use-yyyy-mm-dd-format'),
+            $errors
+        );
     }
 
     // ── Arithmetic consistency tests ───────────────────────────────────
