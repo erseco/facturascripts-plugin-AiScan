@@ -305,18 +305,10 @@ final class SchemaValidatorTest extends TestCase
                 ['description' => ''],
             ],
         ]);
-        $this->assertContains(
+        $this->assertSame([
             Tools::lang()->trans('aiscan-missing-line-description-at-index', ['%index%' => '1']),
-            $errors
-        );
-        $this->assertContains(
             Tools::lang()->trans('aiscan-missing-line-description-at-index', ['%index%' => '2']),
-            $errors
-        );
-        $this->assertNotContains(
-            Tools::lang()->trans('aiscan-missing-line-description-at-index', ['%index%' => '0']),
-            $errors
-        );
+        ], $errors);
     }
 
     public function testTranslateInvoiceFieldUsesLocalizedLabelsAndFallback(): void

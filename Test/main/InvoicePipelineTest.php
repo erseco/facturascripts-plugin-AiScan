@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\SchemaValidator;
 use PHPUnit\Framework\TestCase;
@@ -152,8 +153,13 @@ final class InvoicePipelineTest extends TestCase
         $normalized = $this->validator->normalize($raw);
         $errors = $this->validator->validate($normalized);
 
-        $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('number', $errors[0]);
+        $this->assertCount(1, $errors);
+        $this->assertSame(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('number'),
+            ]),
+            $errors[0]
+        );
     }
 
     public function testValidateRejectsMissingTotal(): void
@@ -163,8 +169,13 @@ final class InvoicePipelineTest extends TestCase
         $normalized = $this->validator->normalize($raw);
         $errors = $this->validator->validate($normalized);
 
-        $this->assertNotEmpty($errors);
-        $this->assertStringContainsString('total', $errors[0]);
+        $this->assertCount(1, $errors);
+        $this->assertSame(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('total'),
+            ]),
+            $errors[0]
+        );
     }
 
     public function testValidateRejectsBadDateFormat(): void
