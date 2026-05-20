@@ -30,13 +30,10 @@ use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Dinamic\Model\Stock;
 use FacturaScripts\Dinamic\Model\Variante;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
-use FacturaScripts\Test\Traits\RandomDataTrait;
 use PHPUnit\Framework\TestCase;
 
 final class InvoiceMapperStockUpdateTest extends TestCase
 {
-    use RandomDataTrait;
-
     /** @var FacturaProveedor[] */
     private array $invoicesToDelete = [];
 
@@ -310,6 +307,27 @@ final class InvoiceMapperStockUpdateTest extends TestCase
     {
         $message = Tools::lang()->trans($key, ['%line%' => $line]);
         $this->assertContains($message, $warnings);
+    }
+
+    private function getRandomSupplier(string $testName = ''): Proveedor
+    {
+        $supplier = new Proveedor();
+        $supplier->cifnif = mt_rand(1, 99999999) . 'J';
+        $supplier->nombre = 'Proveedor Rand ' . mt_rand(1, 999);
+        $supplier->observaciones = $testName;
+        $supplier->razonsocial = 'Empresa ' . mt_rand(1, 999);
+
+        return $supplier;
+    }
+
+    private function getRandomProduct(): Producto
+    {
+        $num = mt_rand(1, 99999);
+        $product = new Producto();
+        $product->referencia = 'test' . $num;
+        $product->descripcion = 'Test Product ' . $num;
+
+        return $product;
     }
 
     protected function logErrors(bool $force = false): void
