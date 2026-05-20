@@ -108,4 +108,12 @@ final class ExtractionServiceTest extends TestCase
         $this->assertStringContainsString('invoices', $prompt);
         $this->assertStringContainsString('page_range', $prompt);
     }
+
+    public function testDefaultSystemPromptExplainsWrappedLineDescriptions(): void
+    {
+        $prompt = ExtractionService::getDefaultSystemPrompt();
+        $this->assertStringContainsString('wrapped across multiple OCR/text lines', $prompt);
+        $this->assertStringContainsString('COCA COLA O CRISTAL', $prompt);
+        $this->assertStringContainsString('NOT separate lines', $prompt);
+    }
 }

@@ -192,6 +192,11 @@ Field-specific rules:
   extract ONLY the top-level summary lines (one per group with the group total),
   NOT the individual sub-items. The sub-items are detail — the group total is the line.
   Example: "Client A: 4.48€" with sub-items below → one line: descripcion="Client A", pvpunitario=4.48
+  If a description is wrapped across multiple OCR/text lines, MERGE all fragments into a single invoice line.
+  Continuation fragments without their own quantity, unit price, or line total are NOT separate lines.
+  NEVER return both a partial description and the longer merged description as two different lines.
+  Example: "COCA COLA" on one OCR row and "O CRISTAL 1 1,80 1,98" on the next row
+  usually means ONE line: descripcion="COCA COLA O CRISTAL", cantidad=1, pvpunitario=1.8.
 - lines.cantidad: REQUIRED. Default to 1 if not visible but a line exists.
 - lines.pvpunitario: REQUIRED. Unit price BEFORE discount and BEFORE tax.
   Use the "Precio", "Precio Unidad", "Precio Unit.", "Price" column — NOT "Importe" or "Total".
