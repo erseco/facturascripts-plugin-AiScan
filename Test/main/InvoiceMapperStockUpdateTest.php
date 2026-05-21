@@ -21,6 +21,7 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
+use FacturaScripts\Core\Lib\FiscalNumberValidator as CoreFiscalNumberValidator;
 use FacturaScripts\Core\Lib\RegimenIVA as CoreRegimenIVA;
 use FacturaScripts\Core\Model\Contacto as CoreContacto;
 use FacturaScripts\Core\Model\CuentaBancoProveedor as CoreCuentaBancoProveedor;
@@ -52,6 +53,10 @@ final class InvoiceMapperStockUpdateTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
+        self::aliasDynamicClass(
+            CoreFiscalNumberValidator::class,
+            'FacturaScripts\\Dinamic\\Lib\\FiscalNumberValidator'
+        );
         self::aliasDynamicClass(CoreRegimenIVA::class, 'FacturaScripts\\Dinamic\\Lib\\RegimenIVA');
         self::aliasDynamicClass(CoreContacto::class, 'FacturaScripts\\Dinamic\\Model\\Contacto');
         self::aliasDynamicClass(
