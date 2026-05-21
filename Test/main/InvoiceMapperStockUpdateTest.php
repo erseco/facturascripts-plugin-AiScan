@@ -21,22 +21,11 @@
 namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
-use FacturaScripts\Core\Lib\FiscalNumberValidator as CoreFiscalNumberValidator;
-use FacturaScripts\Core\Lib\RegimenIVA as CoreRegimenIVA;
-use FacturaScripts\Core\Model\Contacto as CoreContacto;
-use FacturaScripts\Core\Model\CuentaBancoProveedor as CoreCuentaBancoProveedor;
-use FacturaScripts\Core\Model\CuentaEspecial as CoreCuentaEspecial;
-use FacturaScripts\Core\Model\EstadoDocumento as CoreEstadoDocumento;
 use FacturaScripts\Core\Model\FacturaProveedor;
-use FacturaScripts\Core\Model\IdentificadorFiscal as CoreIdentificadorFiscal;
-use FacturaScripts\Core\Model\Impuesto as CoreImpuesto;
-use FacturaScripts\Core\Model\LineaFacturaProveedor as CoreLineaFacturaProveedor;
 use FacturaScripts\Core\Model\Producto;
 use FacturaScripts\Core\Model\ProductoProveedor;
 use FacturaScripts\Core\Model\Proveedor;
-use FacturaScripts\Core\Model\Retencion as CoreRetencion;
 use FacturaScripts\Core\Model\Stock;
-use FacturaScripts\Core\Model\Subcuenta as CoreSubcuenta;
 use FacturaScripts\Core\Model\Variante;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
@@ -56,48 +45,20 @@ final class InvoiceMapperStockUpdateTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        self::aliasDynamicClass(
-            CoreFiscalNumberValidator::class,
-            'FacturaScripts\\Dinamic\\Lib\\FiscalNumberValidator'
-        );
-        self::aliasDynamicClass(
-            CoreIdentificadorFiscal::class,
-            'FacturaScripts\\Dinamic\\Model\\IdentificadorFiscal'
-        );
-        self::aliasDynamicClass(CoreImpuesto::class, 'FacturaScripts\\Dinamic\\Model\\Impuesto');
-        self::aliasDynamicClass(CoreRegimenIVA::class, 'FacturaScripts\\Dinamic\\Lib\\RegimenIVA');
-        self::aliasDynamicClass(CoreContacto::class, 'FacturaScripts\\Dinamic\\Model\\Contacto');
-        self::aliasDynamicClass(
-            CoreCuentaBancoProveedor::class,
-            'FacturaScripts\\Dinamic\\Model\\CuentaBancoProveedor'
-        );
-        self::aliasDynamicClass(CoreCuentaEspecial::class, 'FacturaScripts\\Dinamic\\Model\\CuentaEspecial');
-        self::aliasDynamicClass(CoreEstadoDocumento::class, 'FacturaScripts\\Dinamic\\Model\\EstadoDocumento');
-        self::aliasDynamicClass(FacturaProveedor::class, 'FacturaScripts\\Dinamic\\Model\\FacturaProveedor');
-        self::aliasDynamicClass(
-            CoreLineaFacturaProveedor::class,
-            'FacturaScripts\\Dinamic\\Model\\LineaFacturaProveedor'
-        );
-        self::aliasDynamicClass(Producto::class, 'FacturaScripts\\Dinamic\\Model\\Producto');
-        self::aliasDynamicClass(ProductoProveedor::class, 'FacturaScripts\\Dinamic\\Model\\ProductoProveedor');
-        self::aliasDynamicClass(Proveedor::class, 'FacturaScripts\\Dinamic\\Model\\Proveedor');
-        self::aliasDynamicClass(CoreRetencion::class, 'FacturaScripts\\Dinamic\\Model\\Retencion');
-        self::aliasDynamicClass(Stock::class, 'FacturaScripts\\Dinamic\\Model\\Stock');
-        self::aliasDynamicClass(CoreSubcuenta::class, 'FacturaScripts\\Dinamic\\Model\\Subcuenta');
-        self::aliasDynamicClass(Variante::class, 'FacturaScripts\\Dinamic\\Model\\Variante');
+        spl_autoload_register(function (string $class): void {
+            if (str_starts_with($class, 'FacturaScripts\\Dinamic\\')) {
+                $coreClass = str_replace('\\Dinamic\\', '\\Core\\', $class);
+                if (!class_exists($class, false) && class_exists($coreClass)) {
+                    class_alias($coreClass, $class);
+                }
+            }
+        }, true, true);
     }
 
     protected function setUp(): void
     {
         Tools::settingsSet('default', 'updatesupplierprices', false);
         Tools::settingsSave();
-    }
-
-    private static function aliasDynamicClass(string $originalClass, string $dynamicClass): void
-    {
-        if (!class_exists($dynamicClass) && class_exists($originalClass)) {
-            class_alias($originalClass, $dynamicClass);
-        }
     }
 
     public function testMapToInvoiceKeepsBehaviorWhenStockUpdateDisabled(): void
