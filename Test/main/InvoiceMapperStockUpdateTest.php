@@ -344,7 +344,7 @@ final class InvoiceMapperStockUpdateTest extends TestCase
 
     protected function logErrors(bool $force = false): void
     {
-        if ($this->getStatus() > 1 || $force) {
+        if (!$this->status()->isSuccess() || $force) {
             foreach (MiniLog::read('', ['critical', 'error', 'warning']) as $item) {
                 error_log($item['message']);
                 if (!empty($item['context'])) {

@@ -27,6 +27,33 @@ if (!defined('FS_TIMEZONE')) {
     define('FS_TIMEZONE', 'Europe/Madrid');
 }
 
+// Constants normally defined by Kernel::init() from DB settings.
+// Provide defaults so tests work even when phpunit-plugins.xml uses this
+// bootstrap instead of the FacturaScripts Test/test-plugins.php bootstrap.
+if (!defined('FS_NF0')) {
+    define('FS_NF0', 2);
+}
+
+if (!defined('FS_NF1')) {
+    define('FS_NF1', ',');
+}
+
+if (!defined('FS_NF2')) {
+    define('FS_NF2', ' ');
+}
+
+if (!defined('FS_CODPAIS')) {
+    define('FS_CODPAIS', 'ESP');
+}
+
+if (!defined('FS_CURRENCY_POS')) {
+    define('FS_CURRENCY_POS', 'right');
+}
+
+if (!defined('FS_ITEM_LIMIT')) {
+    define('FS_ITEM_LIMIT', 50);
+}
+
 // Register plugin namespaces with the autoloader
 $loader = require FS_FOLDER . '/vendor/autoload.php';
 
