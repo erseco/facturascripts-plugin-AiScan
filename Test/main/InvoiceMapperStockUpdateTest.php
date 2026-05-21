@@ -26,6 +26,7 @@ use FacturaScripts\Core\Lib\RegimenIVA as CoreRegimenIVA;
 use FacturaScripts\Core\Model\Contacto as CoreContacto;
 use FacturaScripts\Core\Model\CuentaBancoProveedor as CoreCuentaBancoProveedor;
 use FacturaScripts\Core\Model\CuentaEspecial as CoreCuentaEspecial;
+use FacturaScripts\Core\Model\EstadoDocumento as CoreEstadoDocumento;
 use FacturaScripts\Core\Model\FacturaProveedor;
 use FacturaScripts\Core\Model\IdentificadorFiscal as CoreIdentificadorFiscal;
 use FacturaScripts\Core\Model\Impuesto as CoreImpuesto;
@@ -71,6 +72,7 @@ final class InvoiceMapperStockUpdateTest extends TestCase
             'FacturaScripts\\Dinamic\\Model\\CuentaBancoProveedor'
         );
         self::aliasDynamicClass(CoreCuentaEspecial::class, 'FacturaScripts\\Dinamic\\Model\\CuentaEspecial');
+        self::aliasDynamicClass(CoreEstadoDocumento::class, 'FacturaScripts\\Dinamic\\Model\\EstadoDocumento');
         self::aliasDynamicClass(FacturaProveedor::class, 'FacturaScripts\\Dinamic\\Model\\FacturaProveedor');
         self::aliasDynamicClass(
             CoreLineaFacturaProveedor::class,
