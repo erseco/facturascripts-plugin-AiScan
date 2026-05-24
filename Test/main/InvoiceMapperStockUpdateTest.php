@@ -72,7 +72,7 @@ final class InvoiceMapperStockUpdateTest extends TestCase
             'tax_rate' => 21,
         ]], false);
 
-        $this->assertTrue($result['success']);
+        $this->assertTrue($result['success'], 'mapInvoice failed: ' . implode('; ', $result['errors'] ?? []));
         $this->assertSame([], $result['warnings']);
         $this->assertSame(0.0, $this->getStockQuantity($product->referencia));
         $this->assertNull($this->findSupplierProduct($supplier->codproveedor, $product->referencia));
