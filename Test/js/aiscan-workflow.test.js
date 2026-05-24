@@ -58,6 +58,9 @@ function loadTestHooks() {
             getElementById(id) {
                 return getElement(id);
             },
+            querySelectorAll() {
+                return [];
+            },
             createElement() {
                 return {
                     innerHTML: '',
@@ -75,6 +78,12 @@ function loadTestHooks() {
     context.globalThis = context;
     context.window = context;
     context.__AISCAN_TEST__ = true;
+    context.aiscanPaymentMethods = [
+        {code: 'CONT', description: 'Contado'},
+        {code: 'TRANS', description: 'Transferencia'},
+        {code: 'TAR', description: 'Tarjeta'},
+    ];
+    context.aiscanDefaultCodpago = 'CONT';
 
     vm.createContext(context);
     vm.runInContext(script, context);
@@ -304,4 +313,64 @@ test('getValidationWarnings recalculates the current total mismatch warning', ()
     });
 
     assert.deepEqual(warnings, ['aiscan-total-mismatch']);
+});
+
+test('buildPaymentMethodSelect renders options with correct selection', () => {
+    const {hooks} = loadTestHooks();
+
+    const html = hooks.buildPaymentMethodSelect('TRANS');
+
+    assert.match(html, /value="TRANS".*selected/);
+    assert.match(html, /value="CONT"/);
+    assert.match(html, /value="TAR"/);
+    assert.match(html, /id="invoice_codpago"/);
+});
+
+test('collectFormData captures codpago from DOM select element', () => {
+    const {elements, hooks} = loadTestHooks();
+
+    hooks.state.codpago = 'TRANS';
+
+    // Simulate that the review panel has children (so collectFormData reads DOM)
+    elements['aiscan-review'] = {
+        id: 'aiscan-review',
+        innerHTML: '',
+        checked: false,
+        disabled: false,
+        indeterminate: false,
+        value: '',
+        children: {length: 1},
+        querySelectorAll() { return []; },
+        addEventListener() {},
+        classList: { add() {}, remove() {}, toggle() {} },
+    };
+
+    // Set the payment method select value (simulating user selection)
+    elements['invoice_codpago'] = {
+        id: 'invoice_codpago',
+        innerHTML: '',
+        checked: false,
+        disabled: false,
+        indeterminate: false,
+        value: 'TRANS',
+        querySelectorAll() { return []; },
+        addEventListener() {},
+        classList: { add() {}, remove() {}, toggle() {} },
+    };
+
+    const baseData = {
+        invoice: {number: 'F-001', issue_date: '2025-01-01'},
+        supplier: {name: 'Test'},
+        lines: [],
+    };
+
+    const result = hooks.collectFormData(baseData);
+
+    assert.equal(result.invoice.codpago, 'TRANS');
+});
+
+test('state has codpago field for payment method tracking', () => {
+    const {hooks} = loadTestHooks();
+
+    assert.ok('codpago' in hooks.state);
 });

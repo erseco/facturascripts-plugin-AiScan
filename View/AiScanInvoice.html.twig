@@ -76,6 +76,14 @@
                                         {% endif %}
                                     </select>
                                 </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold" for="aiscan-payment-method-select">{{ i18n.trans('aiscan-payment-method') }}</label>
+                                    <select class="form-select" id="aiscan-payment-method-select">
+                                        {% for pm in paymentMethods %}
+                                            <option value="{{ pm.codpago }}"{% if pm.codpago == defaultCodpago %} selected{% endif %}>{{ pm.descripcion }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                                 <button type="button" class="btn btn-primary w-100" id="aiscan-upload-btn" disabled>
                                     <i class="fa-solid fa-cloud-arrow-up me-1"></i>{{ i18n.trans('aiscan-upload-and-analyze') }}
                                 </button>
@@ -262,6 +270,12 @@
             {code: '{{ ret.codretencion }}', description: '{{ ret.descripcion|e('js') }}', rate: {{ ret.porcentaje }}},
         {% endfor %}
     ];
+    window.aiscanPaymentMethods = [
+        {% for pm in paymentMethods %}
+            {code: '{{ pm.codpago }}', description: '{{ pm.descripcion|e('js') }}'},
+        {% endfor %}
+    ];
+    window.aiscanDefaultCodpago = '{{ defaultCodpago|e('js') }}';
     window.aiscanI18n = {
         'aiscan-ai-notes': '{{ i18n.trans('aiscan-ai-notes')|e('js') }}',
         'aiscan-analysis-completed': '{{ i18n.trans('aiscan-analysis-completed')|e('js') }}',
@@ -280,6 +294,7 @@
         'aiscan-duplicate-in-batch': '{{ i18n.trans('aiscan-duplicate-in-batch')|e('js') }}',
         'aiscan-duplicate-invoice-exists': '{{ i18n.trans('aiscan-duplicate-invoice-exists')|e('js') }}',
         'aiscan-no-supplier-matched': '{{ i18n.trans('aiscan-no-supplier-matched')|e('js') }}',
+        'aiscan-payment-method': '{{ i18n.trans('aiscan-payment-method')|e('js') }}',
         'aiscan-section-invoice': '{{ i18n.trans('aiscan-section-invoice')|e('js') }}',
         'aiscan-section-products': '{{ i18n.trans('aiscan-section-products')|e('js') }}',
         'aiscan-more-options': '{{ i18n.trans('aiscan-more-options')|e('js') }}',

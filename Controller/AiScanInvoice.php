@@ -64,11 +64,15 @@ class AiScanInvoice extends Controller
             $service = new ExtractionService();
             $impuesto = new \FacturaScripts\Dinamic\Model\Impuesto();
             $retencion = new \FacturaScripts\Dinamic\Model\Retencion();
+            $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
+            $defaultCodpago = Tools::settings('default', 'codpago', '');
             $this->view('AiScanInvoice.html.twig', [
                 'availableProviders' => $service->getAvailableProviderNames(),
                 'defaultProvider' => AiScanSettings::getDefaultProvider(),
                 'taxTypes' => $impuesto->all([], ['iva' => 'ASC'], 0, 0),
                 'withholdingTypes' => $retencion->all([], ['porcentaje' => 'ASC'], 0, 0),
+                'paymentMethods' => $formaPago->all([], ['descripcion' => 'ASC'], 0, 0),
+                'defaultCodpago' => $defaultCodpago,
             ]);
             return;
         }

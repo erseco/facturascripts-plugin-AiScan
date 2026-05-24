@@ -66,6 +66,19 @@ class InvoiceMapper
             $supplierData = $extractedData['supplier'] ?? [];
             $lines = $extractedData['lines'] ?? [];
 
+            $resolvedCodpago = null;
+            if (!empty($invoiceData['codpago'])) {
+                $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
+                if (!$formaPago->loadFromCode($invoiceData['codpago'])) {
+                    $result['errors'][] = Tools::lang()->trans(
+                        'aiscan-invalid-payment-method',
+                        ['%codpago%' => (string) $invoiceData['codpago']]
+                    );
+                    return $result;
+                }
+                $resolvedCodpago = $formaPago->codpago;
+            }
+
             $supplier = $this->supplierService->resolve($supplierData);
             if ($supplier instanceof Proveedor) {
                 $invoice->setSubject($supplier);
@@ -91,6 +104,10 @@ class InvoiceMapper
                 if ($divisa->loadFromCode(strtoupper($invoiceData['currency']))) {
                     $invoice->coddivisa = $divisa->coddivisa;
                 }
+            }
+
+            if ($resolvedCodpago !== null) {
+                $invoice->codpago = $resolvedCodpago;
             }
 
             $invoice->observaciones = $this->buildNotes($invoiceData);
@@ -169,6 +186,7 @@ class InvoiceMapper
                 ? $lineData['referencia']
                 : $this->productMatcher->findReference($lineData);
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+            $line->actualizastock = 0;
             $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
             $line->descripcion = trim((string) $desc);
             $line->cantidad = max(1, (float) ($lineData['quantity'] ?? $lineData['cantidad'] ?? 1));
