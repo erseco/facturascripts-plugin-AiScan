@@ -16,6 +16,7 @@
         documents: [],
         currentIndex: 0,
         importMode: null,
+        codpago: null,
         useHistory: false,
         availableProviders: [],
         defaultProvider: null,
@@ -264,6 +265,16 @@
                 document.getElementById('aiscan-import-mode-error')?.classList.add('d-none');
             });
         });
+
+        const paymentMethodSelect = document.getElementById('aiscan-payment-method-select');
+        if (paymentMethodSelect) {
+            state.codpago = paymentMethodSelect.value || window.aiscanDefaultCodpago || '';
+            paymentMethodSelect.addEventListener('change', () => {
+                state.codpago = paymentMethodSelect.value;
+            });
+        } else {
+            state.codpago = window.aiscanDefaultCodpago || '';
+        }
 
         const historyCheckbox = document.getElementById('use-history');
         if (historyCheckbox) {
@@ -1121,8 +1132,14 @@
                 <div style="flex:1">${buildInput(trans('date'), 'invoice_issue_date', invoice.issue_date || '', 'date', null, confidence.issue_date)}</div>
                 <div style="flex:1">${buildInput(trans('expiration'), 'invoice_due_date', invoice.due_date || '', 'date')}</div>
             </div>
-            <div class="mb-1">
-                <input class="form-control form-control-sm text-truncate" id="invoice_summary" type="text" value="${escapeAttr(invoice.summary || '')}" placeholder="${escapeAttr(trans('summary'))}">
+            <div class="d-flex gap-2 mb-1">
+                <div style="flex:2">
+                    <input class="form-control form-control-sm text-truncate" id="invoice_summary" type="text" value="${escapeAttr(invoice.summary || '')}" placeholder="${escapeAttr(trans('summary'))}">
+                </div>
+                <div style="flex:1">
+                    <label class="form-label small mb-1">${escapeHtml(trans('aiscan-payment-method'))}</label>
+                    ${buildPaymentMethodSelect(invoice.codpago || doc._codpago || state.codpago)}
+                </div>
             </div>
             ${invoice.payment_terms ? `<input type="hidden" id="invoice_payment_terms" value="${escapeAttr(invoice.payment_terms)}">` : ''}
         `));
@@ -1411,6 +1428,17 @@
         } catch (e) {
             // silent
         }
+    }
+
+    function buildPaymentMethodSelect(selectedCode) {
+        const methods = window.aiscanPaymentMethods || [];
+        const code = selectedCode || '';
+        let options = '';
+        for (const m of methods) {
+            const sel = m.code === code;
+            options += `<option value="${escapeAttr(m.code)}"${sel ? ' selected' : ''}>${escapeHtml(m.description)}</option>`;
+        }
+        return `<select class="form-select form-select-sm" id="invoice_codpago">${options}</select>`;
     }
 
     function buildTaxSelect(selectedRate, selectedCode) {
@@ -2373,6 +2401,7 @@
         if (ptEl) {
             data.invoice.payment_terms = ptEl.value;
         }
+        data.invoice.codpago = valOr('invoice_codpago', data.invoice.codpago || state.codpago);
 
         data.supplier.name = valOr('supplier_name', data.supplier.name);
         data.supplier.tax_id = valOr('supplier_tax_id', data.supplier.tax_id);
@@ -2640,14 +2669,20 @@
         importBtn.disabled = true;
         importBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-importing'))}`;
 
-        const documents = state.documents.map(doc => ({
-            status: doc.status,
-            extracted_data: doc.extractedData,
-            tmp_file: doc.tmpFile,
-            mime_type: doc.mimeType,
-            original_name: doc.originalName,
-            import_mode: doc._importMode || state.importMode,
-        }));
+        const documents = state.documents.map(doc => {
+            const extracted = doc.extractedData ? JSON.parse(JSON.stringify(doc.extractedData)) : null;
+            if (extracted && extracted.invoice && !extracted.invoice.codpago) {
+                extracted.invoice.codpago = state.codpago;
+            }
+            return {
+                status: doc.status,
+                extracted_data: extracted,
+                tmp_file: doc.tmpFile,
+                mime_type: doc.mimeType,
+                original_name: doc.originalName,
+                import_mode: doc._importMode || state.importMode,
+            };
+        });
 
         try {
             const response = await fetch('AiScanInvoice?action=import-batch', {
@@ -2860,8 +2895,10 @@
     if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
         globalThis.__aiscanWorkflowTestHooks = {
             applySelectionRange,
+            buildPaymentMethodSelect,
             calcAllLineTotals,
             checkTotalMismatch,
+            collectFormData,
             finalizeAnalyzedDoc,
             getValidationWarnings,
             handleMultiInvoiceResponse,

@@ -169,4 +169,65 @@ final class InvoiceMapperTest extends TestCase
         $method->setAccessible(true);
         return $method->invoke($this->mapper, $lines, $invoiceData);
     }
+
+    // ── Payment method validation ───────────────────────────
+
+    public function testMapToInvoiceRejectsInvalidPaymentMethod(): void
+    {
+        $extracted = [
+            'invoice' => [
+                'number' => 'TEST-001',
+                'issue_date' => '2025-01-01',
+                'codpago' => 'NONEXISTENT_CODPAGO_XYZ',
+            ],
+            'supplier' => [
+                'name' => 'Test Supplier',
+                'tax_id' => 'B12345678',
+            ],
+            'lines' => [
+                ['description' => 'Item 1', 'quantity' => 1, 'unit_price' => 100],
+            ],
+        ];
+
+        $result = $this->mapper->mapToInvoice($extracted);
+
+        $this->assertFalse($result['success']);
+        $this->assertNotEmpty($result['errors']);
+        $this->assertStringContainsString('NONEXISTENT_CODPAGO_XYZ', $result['errors'][0]);
+    }
+
+    public function testMapToInvoiceAcceptsValidPaymentMethod(): void
+    {
+        $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
+        $methods = $formaPago->all([], [], 0, 1);
+        if (empty($methods)) {
+            $this->markTestSkipped('No payment methods available in the test database.');
+        }
+
+        $validCode = $methods[0]->codpago;
+
+        $extracted = [
+            'invoice' => [
+                'number' => 'TEST-002',
+                'issue_date' => '2025-01-01',
+                'codpago' => $validCode,
+            ],
+            'supplier' => [
+                'name' => 'Test Supplier',
+                'tax_id' => 'B12345678',
+            ],
+            'lines' => [
+                ['description' => 'Item 1', 'quantity' => 1, 'unit_price' => 100],
+            ],
+        ];
+
+        $result = $this->mapper->mapToInvoice($extracted);
+
+        // If it fails, it shouldn't be because of the payment method
+        if (!$result['success']) {
+            foreach ($result['errors'] as $error) {
+                $this->assertStringNotContainsString($validCode, $error);
+            }
+        }
+    }
 }
