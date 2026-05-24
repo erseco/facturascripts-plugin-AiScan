@@ -249,9 +249,14 @@ final class InvoiceMapperStockUpdateTest extends TestCase
         }
         if (empty($supplier->codserie)) {
             $series = (new \FacturaScripts\Dinamic\Model\Serie())->all([], [], 0, 1);
-            if (!empty($series)) {
-                $supplier->codserie = $series[0]->codserie;
+            if (empty($series)) {
+                $newSerie = new \FacturaScripts\Dinamic\Model\Serie();
+                $newSerie->codserie = 'A';
+                $newSerie->descripcion = 'Serie A';
+                $newSerie->save();
+                $series = [$newSerie];
             }
+            $supplier->codserie = $series[0]->codserie;
         }
 
         $this->assertTrue($supplier->save(), 'supplier-save-failed');
