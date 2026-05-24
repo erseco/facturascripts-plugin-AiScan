@@ -174,6 +174,10 @@ final class InvoiceMapperTest extends TestCase
 
     public function testMapToInvoiceRejectsInvalidPaymentMethod(): void
     {
+        if (!class_exists('FacturaScripts\\Dinamic\\Model\\FacturaProveedor')) {
+            $this->markTestSkipped('FacturaScripts Dinamic models are not available in this environment.');
+        }
+
         $extracted = [
             'invoice' => [
                 'number' => 'TEST-001',
@@ -198,6 +202,10 @@ final class InvoiceMapperTest extends TestCase
 
     public function testMapToInvoiceAcceptsValidPaymentMethod(): void
     {
+        if (!class_exists('FacturaScripts\\Dinamic\\Model\\FormaPago')) {
+            $this->markTestSkipped('FacturaScripts Dinamic models are not available in this environment.');
+        }
+
         $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
         $methods = $formaPago->all([], [], 0, 1);
         if (empty($methods)) {
