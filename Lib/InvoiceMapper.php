@@ -64,6 +64,19 @@ class InvoiceMapper
             $supplierData = $extractedData['supplier'] ?? [];
             $lines = $extractedData['lines'] ?? [];
 
+            $resolvedCodpago = null;
+            if (!empty($invoiceData['codpago'])) {
+                $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
+                if (!$formaPago->loadFromCode($invoiceData['codpago'])) {
+                    $result['errors'][] = Tools::lang()->trans(
+                        'aiscan-invalid-payment-method',
+                        ['%codpago%' => (string) $invoiceData['codpago']]
+                    );
+                    return $result;
+                }
+                $resolvedCodpago = $formaPago->codpago;
+            }
+
             $supplier = $this->supplierService->resolve($supplierData);
             if ($supplier instanceof Proveedor) {
                 $invoice->setSubject($supplier);
@@ -91,17 +104,8 @@ class InvoiceMapper
                 }
             }
 
-            if (!empty($invoiceData['codpago'])) {
-                $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
-                if ($formaPago->loadFromCode($invoiceData['codpago'])) {
-                    $invoice->codpago = $formaPago->codpago;
-                } else {
-                    $result['errors'][] = Tools::lang()->trans(
-                        'aiscan-invalid-payment-method',
-                        ['%codpago%' => (string) $invoiceData['codpago']]
-                    );
-                    return $result;
-                }
+            if ($resolvedCodpago !== null) {
+                $invoice->codpago = $resolvedCodpago;
             }
 
             $invoice->observaciones = $this->buildNotes($invoiceData);
