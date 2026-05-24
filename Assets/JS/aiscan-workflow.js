@@ -1137,7 +1137,7 @@
                     <input class="form-control form-control-sm text-truncate" id="invoice_summary" type="text" value="${escapeAttr(invoice.summary || '')}" placeholder="${escapeAttr(trans('summary'))}">
                 </div>
                 <div style="flex:1">
-                    <label class="form-label small mb-1">${escapeHtml(trans('aiscan-payment-method'))}</label>
+                    <label class="form-label small mb-1" for="invoice_codpago">${escapeHtml(trans('aiscan-payment-method'))}</label>
                     ${buildPaymentMethodSelect(invoice.codpago || doc._codpago || state.codpago)}
                 </div>
             </div>
