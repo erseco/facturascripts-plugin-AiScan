@@ -236,6 +236,24 @@ final class InvoiceMapperStockUpdateTest extends TestCase
     private function createSupplier(): Proveedor
     {
         $supplier = $this->getRandomSupplier('AiScan stock test');
+
+        // Ensure codpago / codserie are populated. Some bare-bones test
+        // environments do not seed sensible defaults on Proveedor, which
+        // makes the downstream FacturaProveedor save fail with NOT NULL
+        // constraint errors on codpago / codserie.
+        if (empty($supplier->codpago)) {
+            $paymentMethods = (new \FacturaScripts\Dinamic\Model\FormaPago())->all([], [], 0, 1);
+            if (!empty($paymentMethods)) {
+                $supplier->codpago = $paymentMethods[0]->codpago;
+            }
+        }
+        if (empty($supplier->codserie)) {
+            $series = (new \FacturaScripts\Dinamic\Model\Serie())->all([], [], 0, 1);
+            if (!empty($series)) {
+                $supplier->codserie = $series[0]->codserie;
+            }
+        }
+
         $this->assertTrue($supplier->save(), 'supplier-save-failed');
         $this->suppliersToDelete[] = $supplier;
 
