@@ -70,10 +70,15 @@ class InvoiceMapper
             if (!empty($invoiceData['codpago'])) {
                 $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
                 if (!$formaPago->loadFromCode($invoiceData['codpago'])) {
-                    $result['errors'][] = Tools::lang()->trans(
+                    $codpago = (string) $invoiceData['codpago'];
+                    $message = Tools::lang()->trans(
                         'aiscan-invalid-payment-method',
-                        ['%codpago%' => (string) $invoiceData['codpago']]
+                        ['%codpago%' => $codpago]
                     );
+                    if (!str_contains($message, $codpago)) {
+                        $message .= ': ' . $codpago;
+                    }
+                    $result['errors'][] = $message;
                     return $result;
                 }
                 $resolvedCodpago = $formaPago->codpago;
@@ -147,9 +152,8 @@ class InvoiceMapper
 
             $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
 
-            $this->setReceivedStatus($invoice);
-
             if ($updateStockPurchaseData) {
+                $this->setReceivedStatus($invoice);
                 $updateResult = $this->inventoryUpdater->update($invoice, $lines);
                 $result['warnings'] = $updateResult['warnings'];
             }

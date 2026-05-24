@@ -61,6 +61,7 @@ class PurchaseLineInventoryUpdater
             $product = $variant->getProducto();
 
             if ($rawQuantity <= 0) {
+                $this->disableStockUpdate($line);
                 $result['warnings'][] = Tools::lang()->trans(
                     'aiscan-stock-line-skipped-invalid-quantity',
                     ['%line%' => $lineNumber]
@@ -112,6 +113,16 @@ class PurchaseLineInventoryUpdater
         }
 
         $line->actualizastock = 1;
+        return $line->save();
+    }
+
+    private function disableStockUpdate(LineaFacturaProveedor $line): bool
+    {
+        if ((int) $line->actualizastock === 0) {
+            return true;
+        }
+
+        $line->actualizastock = 0;
         return $line->save();
     }
 
