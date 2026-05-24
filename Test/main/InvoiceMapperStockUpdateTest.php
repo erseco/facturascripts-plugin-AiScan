@@ -367,7 +367,16 @@ final class InvoiceMapperStockUpdateTest extends TestCase
 
     protected function logErrors(bool $force = false): void
     {
-        if (!$this->status()->isSuccess() || $force) {
+        // PHPUnit 13 exposes ->status()->isSuccess(); PHPUnit 9 exposes
+        // ->getStatus() (int) where 0 means PASSED. Support both.
+        $hasFailure = false;
+        if (method_exists($this, 'status')) {
+            $hasFailure = !$this->status()->isSuccess();
+        } elseif (method_exists($this, 'getStatus')) {
+            $hasFailure = $this->getStatus() !== 0;
+        }
+
+        if ($hasFailure || $force) {
             foreach (MiniLog::read('', ['critical', 'error', 'warning']) as $item) {
                 error_log($item['message']);
                 if (!empty($item['context'])) {
