@@ -152,10 +152,13 @@ class InvoiceMapper
 
             $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
 
+            $this->setReceivedStatus($invoice);
+
             if ($updateStockPurchaseData) {
-                $this->setReceivedStatus($invoice);
                 $updateResult = $this->inventoryUpdater->update($invoice, $lines);
                 $result['warnings'] = $updateResult['warnings'];
+            } else {
+                $this->inventoryUpdater->revertAll($invoice);
             }
 
             $result['success'] = true;

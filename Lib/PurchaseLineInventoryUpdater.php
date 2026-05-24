@@ -106,6 +106,13 @@ class PurchaseLineInventoryUpdater
         return $result;
     }
 
+    public function revertAll(FacturaProveedor $invoice): void
+    {
+        foreach ($invoice->getLines() as $line) {
+            $this->disableStockUpdate($line);
+        }
+    }
+
     private function enableStockUpdate(LineaFacturaProveedor $line): bool
     {
         if ((int) $line->actualizastock === 1) {
