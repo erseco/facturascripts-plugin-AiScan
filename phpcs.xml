@@ -17,6 +17,7 @@
     <exclude-pattern>XMLView/</exclude-pattern>
     <exclude-pattern>Test/bootstrap.php</exclude-pattern>
     <exclude-pattern>Test/install-plugins.php</exclude-pattern>
+    <exclude-pattern>Test/e2e-smoke.php</exclude-pattern>
 
     <!-- Include PSR-12 standard -->
     <rule ref="PSR12"/>
