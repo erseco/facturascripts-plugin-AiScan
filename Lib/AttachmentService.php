@@ -47,21 +47,23 @@ class AttachmentService
             return;
         }
 
-        $originalName = basename((string) ($uploadData['original_name'] ?? ''));
-        if (!empty($originalName)) {
-            $safeName = preg_replace('/[^a-zA-Z0-9_\-.]/', '-', $originalName);
-            $destPath = $tmpDir . DIRECTORY_SEPARATOR . $safeName;
-            if (!file_exists($destPath)) {
-                rename($tmpPath, $destPath);
-                $tmpFile = $safeName;
-            }
+        $tmpFile = $this->moveTemporaryFileToMyFilesRoot($tmpPath, $tmpFile);
+        if (empty($tmpFile)) {
+            Tools::log()->warning('AiScan could not move temporary attachment into MyFiles root.');
+            return;
         }
 
         $attachedFile = new AttachedFile();
-        $attachedFile->path = 'aiscan_tmp/' . $tmpFile;
+        $attachedFile->path = $tmpFile;
         if (false === $attachedFile->save()) {
+            $fullPath = FS_FOLDER . '/MyFiles/' . $tmpFile;
+            if (is_file($fullPath)) {
+                unlink($fullPath);
+            }
             return;
         }
+
+        $this->applyOriginalFileName($attachedFile, (string) ($uploadData['original_name'] ?? ''));
 
         $relation = new AttachedFileRelation();
         $relation->idfile = $attachedFile->idfile;
@@ -74,5 +76,55 @@ class AttachmentService
         if (false === $relation->save()) {
             $attachedFile->delete();
         }
+    }
+
+    private function applyOriginalFileName(AttachedFile $attachedFile, string $originalName): void
+    {
+        if ('' === trim($originalName)) {
+            return;
+        }
+
+        $safeName = $this->sanitizeStoredFileName($originalName);
+        if (empty($safeName) || $attachedFile->filename === $safeName) {
+            return;
+        }
+
+        $attachedFile->filename = $safeName;
+        $attachedFile->save();
+    }
+
+    private function moveTemporaryFileToMyFilesRoot(string $tmpPath, string $tmpFile): string
+    {
+        $destDir = FS_FOLDER . '/MyFiles';
+        $extension = strtolower(pathinfo($tmpFile, PATHINFO_EXTENSION));
+        $baseName = pathinfo($tmpFile, PATHINFO_FILENAME);
+        $destFile = $tmpFile;
+        $counter = 1;
+
+        while (file_exists($destDir . '/' . $destFile)) {
+            $destFile = $baseName . '_' . $counter . (!empty($extension) ? '.' . $extension : '');
+            ++$counter;
+        }
+
+        $destPath = $destDir . '/' . $destFile;
+        if (rename($tmpPath, $destPath)) {
+            return $destFile;
+        }
+
+        Tools::log()->warning('AiScan could not stage attachment file.', [
+            '%source%' => $tmpPath,
+            '%destination%' => $destPath,
+        ]);
+        return '';
+    }
+
+    private function sanitizeStoredFileName(string $originalName): string
+    {
+        $baseName = basename(trim($originalName));
+        if (empty($baseName)) {
+            return '';
+        }
+
+        return (string) preg_replace('/[^a-zA-Z0-9_\-.]/', '-', $baseName);
     }
 }
