@@ -35,6 +35,7 @@ class InvoiceMapper
     public function __construct(
         private readonly AttachmentService $attachmentService = new AttachmentService(),
         private readonly ProductMatcher $productMatcher = new ProductMatcher(),
+        private readonly PurchaseLineInventoryUpdater $inventoryUpdater = new PurchaseLineInventoryUpdater(),
         private readonly SupplierService $supplierService = new SupplierService()
     ) {
     }
@@ -42,9 +43,10 @@ class InvoiceMapper
     public function mapToInvoice(
         array $extractedData,
         ?int $invoiceId = null,
-        string $importMode = 'lines'
+        string $importMode = 'lines',
+        bool $updateStockPurchaseData = false
     ): array {
-        $result = ['success' => false, 'invoice_id' => null, 'errors' => []];
+        $result = ['success' => false, 'invoice_id' => null, 'errors' => [], 'warnings' => []];
 
         try {
             if ($invoiceId) {
@@ -68,10 +70,15 @@ class InvoiceMapper
             if (!empty($invoiceData['codpago'])) {
                 $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
                 if (!$formaPago->loadFromCode($invoiceData['codpago'])) {
-                    $result['errors'][] = Tools::lang()->trans(
+                    $codpago = (string) $invoiceData['codpago'];
+                    $message = Tools::lang()->trans(
                         'aiscan-invalid-payment-method',
-                        ['%codpago%' => (string) $invoiceData['codpago']]
+                        ['%codpago%' => $codpago]
                     );
+                    if (!str_contains($message, $codpago)) {
+                        $message .= ': ' . $codpago;
+                    }
+                    $result['errors'][] = $message;
                     return $result;
                 }
                 $resolvedCodpago = $formaPago->codpago;
@@ -147,6 +154,15 @@ class InvoiceMapper
 
             $this->setReceivedStatus($invoice);
 
+            // Total mode aggregates lines by tax and has no linked products,
+            // so stock/purchase-data updates do not apply (skip to avoid noise).
+            if ($updateStockPurchaseData && $importMode !== 'total') {
+                $updateResult = $this->inventoryUpdater->update($invoice, $lines);
+                $result['warnings'] = $updateResult['warnings'];
+            } else {
+                $this->inventoryUpdater->revertAll($invoice);
+            }
+
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
         } catch (\Exception $e) {
@@ -179,6 +195,7 @@ class InvoiceMapper
                 ? $lineData['referencia']
                 : $this->productMatcher->findReference($lineData);
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+            $line->actualizastock = 0;
             $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
             $line->descripcion = trim((string) $desc);
             $line->cantidad = max(1, (float) ($lineData['quantity'] ?? $lineData['cantidad'] ?? 1));

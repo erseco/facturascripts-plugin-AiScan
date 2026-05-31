@@ -16,6 +16,7 @@
         documents: [],
         currentIndex: 0,
         importMode: null,
+        updateStockPurchaseData: false,
         codpago: null,
         useHistory: false,
         availableProviders: [],
@@ -2585,6 +2586,14 @@
             showStep('review');
             renderCurrentDocument();
         });
+        const updateStockCheckbox = document.getElementById('aiscan-update-stock-purchase-data');
+        if (updateStockCheckbox) {
+            updateStockCheckbox.checked = state.updateStockPurchaseData;
+            updateStockCheckbox.addEventListener('change', () => {
+                state.updateStockPurchaseData = updateStockCheckbox.checked;
+                buildImportSummary();
+            });
+        }
         document.getElementById('aiscan-import-all-btn')?.addEventListener('click', executeImport);
     }
 
@@ -2598,6 +2607,10 @@
             const invoice = doc.extractedData?.invoice || {};
             const supplier = doc.extractedData?.supplier || {};
             const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
+            const warnings = Array.isArray(doc.importWarnings) ? doc.importWarnings : [];
+            const warningBadge = warnings.length > 0
+                ? ` <span class="badge text-bg-warning aiscan-warning-badge" role="button" data-warning-index="${i}" title="${escapeAttr(trans('aiscan-import-warnings'))}" style="cursor:pointer"><i class="fa-solid fa-triangle-exclamation me-1"></i>${warnings.length}</span>`
+                : '';
             return `
                 <tr>
                     <td>${i + 1}</td>
@@ -2609,7 +2622,7 @@
                     <td>${doc.status === STATUS.FAILED && doc.error
                         ? `<span class="badge ${info.cls}" role="button" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(doc.error)}" data-error="${escapeAttr(doc.error)}" style="cursor:pointer"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span>`
                         : `<span class="badge ${info.cls}"><i class="fa-solid ${info.icon} me-1"></i>${escapeHtml(trans('aiscan-status-' + doc.status))}</span>`
-                    }</td>
+                    }${warningBadge}</td>
                     <td>${doc.status !== STATUS.DISCARDED && doc.status !== STATUS.FAILED && doc.status !== STATUS.IMPORTED ? `<button class="btn btn-sm btn-outline-danger aiscan-toggle-discard" data-index="${i}"><i class="fa-solid fa-ban"></i></button>` : ''}${doc.status === STATUS.IMPORTED && doc.invoiceId ? `<a href="EditFacturaProveedor?code=${encodeURIComponent(doc.invoiceId)}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-eye"></i></a>` : ''}</td>
                 </tr>
             `;
@@ -2633,10 +2646,26 @@
             });
         });
 
+        tbody.querySelectorAll('[data-warning-index]').forEach(el => {
+            el.addEventListener('click', () => {
+                const doc = state.documents[parseInt(el.dataset.warningIndex, 10)];
+                showWarningModal(doc?.importWarnings || []);
+            });
+        });
+
         const countEl = document.getElementById('aiscan-import-count');
         if (countEl) {
             const importable = state.documents.filter(d => d.status === STATUS.READY || d.status === STATUS.ANALYZED).length;
             countEl.textContent = trans('aiscan-import-count', {'%count%': String(importable), '%total%': String(state.documents.length)});
+        }
+
+        const optionSummaryEl = document.getElementById('aiscan-import-option-summary');
+        if (optionSummaryEl) {
+            optionSummaryEl.textContent = trans('aiscan-import-option-stock-summary', {
+                '%status%': state.updateStockPurchaseData
+                    ? trans('aiscan-stock-update-enabled')
+                    : trans('aiscan-stock-update-disabled'),
+            });
         }
     }
 
@@ -2664,6 +2693,35 @@
         new bootstrap.Modal(modal).show();
     }
 
+    function showWarningModal(warnings) {
+        if (!Array.isArray(warnings) || warnings.length === 0) {
+            return;
+        }
+
+        let modal = document.getElementById('aiscan-warning-modal');
+        if (!modal) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="aiscan-warning-modal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header py-2">
+                                <h6 class="modal-title"><i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>${escapeHtml(trans('aiscan-import-warnings'))}</h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" id="aiscan-warning-modal-body"></div>
+                            <div class="modal-footer py-1">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">${escapeHtml(trans('close'))}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+            modal = document.getElementById('aiscan-warning-modal');
+        }
+
+        document.getElementById('aiscan-warning-modal-body').innerHTML = `<ul class="mb-0">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+        new bootstrap.Modal(modal).show();
+    }
+
     async function executeImport() {
         const importBtn = document.getElementById('aiscan-import-all-btn');
         importBtn.disabled = true;
@@ -2681,6 +2739,7 @@
                 mime_type: doc.mimeType,
                 original_name: doc.originalName,
                 import_mode: doc._importMode || state.importMode,
+                update_stock_purchase_data: state.updateStockPurchaseData,
             };
         });
 
@@ -2688,7 +2747,12 @@
             const response = await fetch('AiScanInvoice?action=import-batch', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({documents, import_mode: state.importMode, provider: state.defaultProvider}),
+                body: JSON.stringify({
+                    documents,
+                    import_mode: state.importMode,
+                    provider: state.defaultProvider,
+                    update_stock_purchase_data: state.updateStockPurchaseData,
+                }),
             });
             const data = await response.json();
 
@@ -2704,11 +2768,14 @@
                 if (result.status === 'imported') {
                     doc.status = STATUS.IMPORTED;
                     doc.invoiceId = result.invoice_id;
+                    doc.importWarnings = result.warnings || [];
                 } else if (result.status === 'error') {
                     doc.status = STATUS.FAILED;
                     doc.error = result.error;
+                    doc.importWarnings = result.warnings || [];
                 } else if (result.status === 'skipped') {
                     doc.status = STATUS.DISCARDED;
+                    doc.importWarnings = result.warnings || [];
                 }
             });
 
@@ -2902,6 +2969,7 @@
             finalizeAnalyzedDoc,
             getValidationWarnings,
             handleMultiInvoiceResponse,
+            buildImportSummary,
             renderReviewPanel,
             renderSidebar,
             state,

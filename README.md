@@ -26,6 +26,7 @@ Cada documento se procesa de forma independiente y el resultado se presenta en u
 - **IA local en Google Chrome**: también puede usar la `Browser Prompt API` de Chrome para ejecutar el análisis en local, sin enviar la factura a servicios externos
 - **Detalle de líneas editable**: modal de edición para cada línea con búsqueda de productos, impuestos, retenciones y descuentos
 - **Detección de proveedores y productos**: empareja automáticamente proveedores por NIF/CIF o nombre, y busca productos existentes por SKU o descripción
+- **Actualización opcional de stock y compra**: al importar puedes activar que las líneas actualicen existencias y datos de compra de productos ya vinculados
 - **Validación y normalización**: revisa el esquema devuelto por la IA antes de mapearlo a la factura
 - **Adjunta el original**: guarda el PDF o imagen subida como archivo adjunto de la factura
 - **Prompt base + instrucciones adicionales**: el prompt de extracción se mantiene actualizado con cada versión del plugin; el usuario puede añadir instrucciones propias que se concatenan al prompt base
@@ -61,8 +62,9 @@ Tras instalar el plugin, entra en **Administración > AiScan** desde el panel de
 3. Selecciona el proveedor de IA (o déjalo en el predeterminado).
 4. El análisis se lanza automáticamente en paralelo.
 5. Revisa los datos extraídos de cada documento: proveedor, cabecera, líneas e impuestos.
-6. Corrige lo necesario y confirma para crear la factura de compra.
-7. Si has subido varios archivos, el asistente te lleva al siguiente documento.
+6. En el resumen de importación, activa opcionalmente la actualización de stock y datos de compra si quieres aplicar las líneas al almacén.
+7. Corrige lo necesario y confirma para crear la factura de compra.
+8. Si has subido varios archivos, el asistente te lleva al siguiente documento.
 
 ## Detección de proveedores y productos
 
