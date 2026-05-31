@@ -374,3 +374,39 @@ test('state has codpago field for payment method tracking', () => {
 
     assert.ok('codpago' in hooks.state);
 });
+
+test('resolveAutocompleteKeyAction moves the highlight with arrow keys', () => {
+    const {hooks} = loadTestHooks();
+    const normalize = value => JSON.parse(JSON.stringify(value));
+
+    assert.deepEqual(
+        normalize(hooks.resolveAutocompleteKeyAction('ArrowDown', true, -1, 3)),
+        {type: 'highlight', index: 0, preventDefault: true}
+    );
+    assert.deepEqual(
+        normalize(hooks.resolveAutocompleteKeyAction('ArrowDown', true, 0, 3)),
+        {type: 'highlight', index: 1, preventDefault: true}
+    );
+    assert.deepEqual(
+        normalize(hooks.resolveAutocompleteKeyAction('ArrowUp', true, 1, 3)),
+        {type: 'highlight', index: 0, preventDefault: true}
+    );
+});
+
+test('resolveAutocompleteKeyAction selects with tab and closes with escape', () => {
+    const {hooks} = loadTestHooks();
+    const normalize = value => JSON.parse(JSON.stringify(value));
+
+    assert.deepEqual(
+        normalize(hooks.resolveAutocompleteKeyAction('Tab', true, 1, 3)),
+        {type: 'select', index: 1, moveFocus: true, preventDefault: true}
+    );
+    assert.deepEqual(
+        normalize(hooks.resolveAutocompleteKeyAction('Enter', true, 0, 3)),
+        {type: 'select', index: 0, moveFocus: false, preventDefault: true}
+    );
+    assert.deepEqual(
+        normalize(hooks.resolveAutocompleteKeyAction('Escape', true, 0, 3)),
+        {type: 'close', preventDefault: true}
+    );
+});
