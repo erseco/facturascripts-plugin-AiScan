@@ -1,0 +1,65 @@
+{
+    "document_type": "invoice",
+    "supplier": {
+        "name": "Transitarios Atlántico S.A.U.",
+        "tax_id": "A35000020",
+        "email": null,
+        "phone": null,
+        "website": null,
+        "address": null
+    },
+    "customer": {
+        "name": "Empresa Demo S.L.",
+        "tax_id": "B00000000",
+        "address": null
+    },
+    "invoice": {
+        "number": "FRA-35227021",
+        "issue_date": "2025-07-17",
+        "due_date": null,
+        "currency": "EUR",
+        "subtotal": 72.63,
+        "tax_amount": 1.82,
+        "withholding_amount": 0,
+        "total": 74.45,
+        "summary": "Despacho de importación y suplidos",
+        "payment_terms": "30 días fecha factura"
+    },
+    "taxes": [
+        {
+            "name": "IGIC 7%",
+            "rate": 7,
+            "base": 26.00,
+            "amount": 1.82
+        }
+    ],
+    "lines": [
+        {
+            "description": "Despacho de importación (Cabildo)",
+            "quantity": 1,
+            "unit_price": 26.00,
+            "discount": 0,
+            "tax_rate": 7,
+            "line_total": 26.00,
+            "sku": null
+        },
+        {
+            "description": "Suplidos IGIC (no sujeto art. 22.3C Ley 20/1991)",
+            "quantity": 1,
+            "unit_price": 46.63,
+            "discount": 0,
+            "tax_rate": 0,
+            "line_total": 46.63,
+            "sku": null
+        }
+    ],
+    "confidence": {
+        "supplier_name": 0.94,
+        "supplier_tax_id": 0.97,
+        "invoice_number": 0.96,
+        "issue_date": 0.95,
+        "total": 0.98,
+        "lines": 0.90
+    },
+    "warnings": []
+}
