@@ -27,6 +27,7 @@ use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
+use FacturaScripts\Plugins\AiScan\Lib\StoragePathHelper;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
@@ -259,7 +260,7 @@ class AiScanInvoice extends Controller
             );
         }
 
-        $tmpDir = FS_FOLDER . '/MyFiles/aiscan_tmp';
+        $tmpDir = StoragePathHelper::absoluteDirectory();
         if (!is_dir($tmpDir)) {
             mkdir($tmpDir, 0700, true);
         }
@@ -341,7 +342,7 @@ class AiScanInvoice extends Controller
             echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-file-name')]);
             return;
         }
-        $tmpPath = FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile;
+        $tmpPath = StoragePathHelper::absoluteFile($tmpFile);
 
         if (!file_exists($tmpPath)) {
             http_response_code(404);
@@ -631,7 +632,7 @@ class AiScanInvoice extends Controller
             echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-file-name')]);
             return;
         }
-        $tmpPath = FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile;
+        $tmpPath = StoragePathHelper::absoluteFile($tmpFile);
 
         if (!file_exists($tmpPath)) {
             http_response_code(404);

@@ -638,7 +638,7 @@ PROMPT;
         }
 
         $realPath = realpath($filePath);
-        $expectedDir = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp');
+        $expectedDir = realpath(StoragePathHelper::absoluteDirectory());
         if ($realPath === false || $expectedDir === false || strpos($realPath, $expectedDir) !== 0) {
             return '';
         }

@@ -35,8 +35,8 @@ class AttachmentService
             return;
         }
 
-        $tmpDir = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp');
-        $tmpPath = realpath(FS_FOLDER . '/MyFiles/aiscan_tmp/' . $tmpFile);
+        $tmpDir = realpath(StoragePathHelper::absoluteDirectory());
+        $tmpPath = realpath(StoragePathHelper::absoluteFile($tmpFile));
         $prefix = false === $tmpDir ? '' : rtrim($tmpDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         if (
             false === $tmpDir
@@ -58,7 +58,7 @@ class AttachmentService
         }
 
         $attachedFile = new AttachedFile();
-        $attachedFile->path = 'aiscan_tmp/' . $tmpFile;
+        $attachedFile->path = StoragePathHelper::relativeFile($tmpFile);
         if (false === $attachedFile->save()) {
             return;
         }
