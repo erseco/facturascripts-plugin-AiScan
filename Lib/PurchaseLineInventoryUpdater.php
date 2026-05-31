@@ -48,7 +48,10 @@ class PurchaseLineInventoryUpdater
             $rawUnitPrice = $this->getNumber($sourceLine, ['unit_price', 'pvpunitario'], $line->pvpunitario);
             $lineNumber = (string) ($index + 1);
 
-            if (!$this->hasLinkedProduct($line->referencia)) {
+            $variant = new Variante();
+            $hasProduct = !empty($line->referencia)
+                && $variant->loadWhere([Where::eq('referencia', $line->referencia)]);
+            if (false === $hasProduct) {
                 $result['warnings'][] = Tools::lang()->trans(
                     'aiscan-stock-line-skipped-no-product',
                     ['%line%' => $lineNumber]
@@ -56,8 +59,6 @@ class PurchaseLineInventoryUpdater
                 continue;
             }
 
-            $variant = new Variante();
-            $variant->loadWhere([Where::eq('referencia', $line->referencia)]);
             $product = $variant->getProducto();
 
             if ($rawQuantity <= 0) {
@@ -180,15 +181,5 @@ class PurchaseLineInventoryUpdater
         }
 
         return $fallback;
-    }
-
-    private function hasLinkedProduct(?string $reference): bool
-    {
-        if (empty($reference)) {
-            return false;
-        }
-
-        $variant = new Variante();
-        return $variant->loadWhere([Where::eq('referencia', $reference)]);
     }
 }

@@ -154,7 +154,9 @@ class InvoiceMapper
 
             $this->setReceivedStatus($invoice);
 
-            if ($updateStockPurchaseData) {
+            // Total mode aggregates lines by tax and has no linked products,
+            // so stock/purchase-data updates do not apply (skip to avoid noise).
+            if ($updateStockPurchaseData && $importMode !== 'total') {
                 $updateResult = $this->inventoryUpdater->update($invoice, $lines);
                 $result['warnings'] = $updateResult['warnings'];
             } else {
