@@ -50,15 +50,19 @@ final class AiScanInvoiceControllerTest extends TestCase
         $this->assertSame('image/png', $result[1]['type']);
     }
 
-    public function testResolveMimeTypeFallsBackToExtensionForOctetStream(): void
+    public function testResolveMimeTypeFallsBackToExtensionForGenericMimeTypes(): void
     {
         $controller = $this->buildController();
-        $tmpFile = tempnam(sys_get_temp_dir(), 'aiscan-octet-');
+        $tmpFile = tempnam(sys_get_temp_dir(), 'aiscan-generic-');
         if (false === $tmpFile) {
             self::fail('Failed to create temporary file for MIME fallback test.');
         }
 
-        file_put_contents($tmpFile, random_bytes(32));
+        // Deterministic plain-text content detected as text/plain (a generic
+        // type), so resolveMimeType must fall back to the pdf extension.
+        // Avoid random_bytes(), which finfo can detect as a concrete type
+        // (e.g. application/x-dosexec) and make this test flaky.
+        file_put_contents($tmpFile, 'This is plain text content without PDF structure.');
 
         try {
             $result = $this->callResolveMimeType($controller, $tmpFile, 'pdf');

@@ -74,6 +74,10 @@ final class InvoicePipelineTest extends TestCase
             'two-lines-mixed-tax-with-retention' => ['F-2024-014'],
             'simple-1-line-low-amount' => ['F-2024-021'],
             'simplified-receipt-igic-included' => ['F-2026-026-igic-included'],
+            'professional-irpf-vat-exempt' => ['F-2025-004'],
+            'legal-services-igic-7' => ['F-2025-005'],
+            'logistics-mixed-igic-and-suplido' => ['F-2025-006'],
+            'feed-single-line-zero-igic' => ['F-2025-007'],
         ];
     }
 

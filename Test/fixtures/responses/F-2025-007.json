@@ -1,0 +1,49 @@
+{
+    "document_type": "invoice",
+    "supplier": {
+        "name": "Piensos del Norte S.C.P.",
+        "tax_id": "F35000030",
+        "email": null,
+        "phone": null,
+        "website": null,
+        "address": null
+    },
+    "customer": {
+        "name": "Empresa Demo S.L.",
+        "tax_id": "B00000000",
+        "address": null
+    },
+    "invoice": {
+        "number": "FZ-100666",
+        "issue_date": "2025-06-30",
+        "due_date": null,
+        "currency": "EUR",
+        "subtotal": 1.50,
+        "tax_amount": 0.00,
+        "withholding_amount": 0,
+        "total": 1.50,
+        "summary": "Maíz extra",
+        "payment_terms": "Ventas crédito"
+    },
+    "taxes": [],
+    "lines": [
+        {
+            "description": "Maíz extra",
+            "quantity": 3,
+            "unit_price": 0.50,
+            "discount": 0,
+            "tax_rate": 0,
+            "line_total": 1.50,
+            "sku": "1035"
+        }
+    ],
+    "confidence": {
+        "supplier_name": 0.93,
+        "supplier_tax_id": 0.96,
+        "invoice_number": 0.95,
+        "issue_date": 0.97,
+        "total": 0.99,
+        "lines": 0.96
+    },
+    "warnings": []
+}
