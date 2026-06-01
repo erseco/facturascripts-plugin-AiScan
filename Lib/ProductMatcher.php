@@ -25,7 +25,16 @@ use FacturaScripts\Dinamic\Model\Variante;
 
 class ProductMatcher
 {
-    public function findReference(array $lineData): ?string
+    /**
+     * Resolves the product reference for a line.
+     *
+     * Order of precedence: exact SKU/barcode, then a unique description match.
+     * As a last resort (issue #53), if a supplier-history suggestion is given,
+     * it is returned so the line is pre-filled with the supplier's usual
+     * product instead of staying unlinked. The suggestion never overrides a
+     * real match.
+     */
+    public function findReference(array $lineData, ?string $suggestedReference = null): ?string
     {
         $sku = trim((string) ($lineData['sku'] ?? ''));
         if (!empty($sku)) {
@@ -38,16 +47,15 @@ class ProductMatcher
         }
 
         $description = trim((string) ($lineData['description'] ?? ''));
-        if (mb_strlen($description) < 4) {
-            return null;
+        if (mb_strlen($description) >= 4) {
+            $variant = new Variante();
+            $results = $variant->codeModelSearch($description, 'referencia');
+            if (count($results) === 1) {
+                return $results[0]->code ?? null;
+            }
         }
 
-        $variant = new Variante();
-        $results = $variant->codeModelSearch($description, 'referencia');
-        if (count($results) !== 1) {
-            return null;
-        }
-
-        return $results[0]->code ?? null;
+        $suggestion = trim((string) ($suggestedReference ?? ''));
+        return $suggestion !== '' ? $suggestion : null;
     }
 }

@@ -1904,7 +1904,8 @@
 
     function buildLineRow(line, index) {
         const ref = line.referencia || line.sku || '';
-        const matchBadge = buildProductMatchBadge(ref);
+        const refSource = line.referencia_source || '';
+        const matchBadge = buildProductMatchBadge(ref, refSource);
         const modalId = 'aiscan-line-modal-' + index;
         const resultsId = 'aiscan-line-product-results-' + index;
         const desc = line.descripcion || line.description || '';
@@ -2034,10 +2035,14 @@
         </div>`;
     }
 
-    function buildProductMatchBadge(reference) {
-        return reference
-            ? `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(reference)}"><i class="fa-solid fa-link"></i></span>`
-            : `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
+    function buildProductMatchBadge(reference, source) {
+        if (!reference) {
+            return `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
+        }
+        if (source === 'history') {
+            return `<span class="badge text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-product-suggested-history') + ': ' + reference)}"><i class="fa-solid fa-clock-rotate-left"></i></span>`;
+        }
+        return `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(reference)}"><i class="fa-solid fa-link"></i></span>`;
     }
 
     function setLineProductMatch(row, reference) {
@@ -3206,6 +3211,7 @@
         globalThis.__aiscanWorkflowTestHooks = {
             applySelectionRange,
             buildPaymentMethodSelect,
+            buildProductMatchBadge,
             calcAllLineTotals,
             checkTotalMismatch,
             collectFormData,

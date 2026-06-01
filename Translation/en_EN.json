@@ -116,6 +116,7 @@
     "aiscan-no-file-specified": "No file specified.",
     "aiscan-no-file-uploaded": "No file uploaded.",
     "aiscan-no-product": "No product assigned",
+    "aiscan-product-suggested-history": "Suggested from supplier history",
     "aiscan-no-preview": "No preview available",
     "aiscan-no-providers": "No AI providers configured. Go to AiScan settings.",
     "aiscan-no-results": "No results",

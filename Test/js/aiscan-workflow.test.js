@@ -410,3 +410,27 @@ test('resolveAutocompleteKeyAction selects with tab and closes with escape', () 
         {type: 'close', preventDefault: true}
     );
 });
+
+test('buildProductMatchBadge renders the unlinked state without a reference', () => {
+    const {hooks} = loadTestHooks();
+    const badge = hooks.buildProductMatchBadge('');
+    assert.match(badge, /text-bg-secondary/);
+    assert.match(badge, /fa-unlink/);
+});
+
+test('buildProductMatchBadge renders a green link for a real match', () => {
+    const {hooks} = loadTestHooks();
+    const badge = hooks.buildProductMatchBadge('REF-1');
+    assert.match(badge, /text-bg-success/);
+    assert.match(badge, /fa-link/);
+    assert.match(badge, /REF-1/);
+});
+
+test('buildProductMatchBadge renders the history suggestion state', () => {
+    const {hooks} = loadTestHooks();
+    const badge = hooks.buildProductMatchBadge('REF-1', 'history');
+    assert.match(badge, /text-bg-warning/);
+    assert.match(badge, /fa-clock-rotate-left/);
+    assert.match(badge, /REF-1/);
+    assert.doesNotMatch(badge, /text-bg-success/);
+});
