@@ -1167,6 +1167,10 @@
         review.appendChild(buildSection(trans('aiscan-section-supplier'), supplierBody,
             {collapsed: supplierMatched, headerExtra: supplierSummary}));
 
+        if (supplierMatched && supplier.matched_supplier_id) {
+            review.appendChild(buildDefaultProductSection(supplier));
+        }
+
         review.appendChild(buildSection(trans('aiscan-section-invoice'), `
             <div class="d-flex gap-2 mb-1">
                 <div style="flex:2">${buildInput(trans('number'), 'invoice_number', invoice.number || '', 'text', null, confidence.invoice_number)}</div>
@@ -1340,29 +1344,26 @@
 
     function buildDefaultProductSection(supplier) {
         const codproveedor = supplier.matched_supplier_id || '';
-        const section = document.createElement('div');
-        section.className = 'card mb-3';
-        section.innerHTML = `
-            <div class="card-header py-2">${escapeHtml(trans('aiscan-default-product'))}</div>
-            <div class="card-body py-2">
-                <div class="mb-2">
-                    <label class="form-label small mb-1">${escapeHtml(trans('aiscan-default-product-help'))}</label>
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control" id="aiscan-product-search" placeholder="${escapeAttr(trans('search'))}">
-                        <button class="btn btn-outline-secondary" type="button" id="aiscan-product-search-btn"><i class="fa-solid fa-search"></i></button>
-                    </div>
-                    <div id="aiscan-product-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
+        const body = `
+            <div class="mb-2">
+                <label class="form-label small mb-1">${escapeHtml(trans('aiscan-default-product-help'))}</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" id="aiscan-product-search" placeholder="${escapeAttr(trans('search'))}">
+                    <button class="btn btn-outline-secondary" type="button" id="aiscan-product-search-btn"><i class="fa-solid fa-search"></i></button>
                 </div>
-                <div class="mb-2">
-                    <label class="form-label small mb-1" for="default_product_ref">${escapeHtml(trans('reference'))}</label>
-                    <input class="form-control form-control-sm" id="default_product_ref" type="text" value="" data-codproveedor="${escapeAttr(codproveedor)}">
-                </div>
-                <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-save-default-product">
-                    <i class="fa-solid fa-floppy-disk me-1"></i>${escapeHtml(trans('aiscan-save-default-product'))}
-                </button>
-                <span class="small text-muted ms-2" id="aiscan-default-product-status"></span>
+                <div id="aiscan-product-results" class="list-group mt-1" style="max-height:150px;overflow-y:auto"></div>
             </div>
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="default_product_ref">${escapeHtml(trans('reference'))}</label>
+                <input class="form-control form-control-sm" id="default_product_ref" type="text" value="" data-codproveedor="${escapeAttr(codproveedor)}">
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-save-default-product">
+                <i class="fa-solid fa-floppy-disk me-1"></i>${escapeHtml(trans('aiscan-save-default-product'))}
+            </button>
+            <span class="small text-muted ms-2" id="aiscan-default-product-status"></span>
         `;
+
+        const section = buildSection(trans('aiscan-default-product'), body, {collapsed: true});
 
         setTimeout(() => {
             if (codproveedor) {
@@ -1904,7 +1905,8 @@
 
     function buildLineRow(line, index) {
         const ref = line.referencia || line.sku || '';
-        const matchBadge = buildProductMatchBadge(ref);
+        const refSource = line.referencia_source || '';
+        const matchBadge = buildProductMatchBadge(ref, refSource);
         const modalId = 'aiscan-line-modal-' + index;
         const resultsId = 'aiscan-line-product-results-' + index;
         const desc = line.descripcion || line.description || '';
@@ -2034,10 +2036,14 @@
         </div>`;
     }
 
-    function buildProductMatchBadge(reference) {
-        return reference
-            ? `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(reference)}"><i class="fa-solid fa-link"></i></span>`
-            : `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
+    function buildProductMatchBadge(reference, source) {
+        if (!reference) {
+            return `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
+        }
+        if (source === 'history') {
+            return `<span class="badge text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-product-suggested-history') + ': ' + reference)}"><i class="fa-solid fa-clock-rotate-left"></i></span>`;
+        }
+        return `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(reference)}"><i class="fa-solid fa-link"></i></span>`;
     }
 
     function setLineProductMatch(row, reference) {
@@ -3206,6 +3212,7 @@
         globalThis.__aiscanWorkflowTestHooks = {
             applySelectionRange,
             buildPaymentMethodSelect,
+            buildProductMatchBadge,
             calcAllLineTotals,
             checkTotalMismatch,
             collectFormData,

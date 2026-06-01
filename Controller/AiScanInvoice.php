@@ -410,6 +410,12 @@ class AiScanInvoice extends Controller
                     $matchResult['candidates']
                 );
             }
+
+            // issue #53: pre-fill lines without a product using the supplier's
+            // usual product (most repeated, ties broken by most recent).
+            if (!empty($extracted['supplier']['matched_supplier_id'])) {
+                $this->suggestSupplierProducts($extracted);
+            }
         }
 
         // Check for duplicate invoice already in FacturaScripts
@@ -420,6 +426,33 @@ class AiScanInvoice extends Controller
         }
 
         return $extracted;
+    }
+
+    /**
+     * Pre-fills extracted lines that have no product reference with the
+     * supplier's usual product, flagging them as a history suggestion so the
+     * review screen shows a distinct (editable) badge. Issue #53.
+     */
+    private function suggestSupplierProducts(array &$extracted): void
+    {
+        if (empty($extracted['lines']) || !is_array($extracted['lines'])) {
+            return;
+        }
+
+        $service = new HistoricalContextService();
+        $suggestion = $service->getSuggestedProduct($extracted['supplier']['matched_supplier_id']);
+        if (empty($suggestion['referencia'])) {
+            return;
+        }
+
+        foreach ($extracted['lines'] as &$line) {
+            if (!empty(trim((string) ($line['referencia'] ?? '')))) {
+                continue;
+            }
+            $line['referencia'] = $suggestion['referencia'];
+            $line['referencia_source'] = 'history';
+        }
+        unset($line);
     }
 
     private function handleMatchSupplier(): void

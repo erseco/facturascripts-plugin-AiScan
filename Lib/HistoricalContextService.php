@@ -22,6 +22,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
 
 class HistoricalContextService
 {
@@ -96,5 +97,106 @@ class HistoricalContextService
             . 'but always prioritize evidence from the current document.';
 
         return implode("\n", $parts);
+    }
+
+    /**
+     * Suggests the product this supplier most likely bills, to pre-fill lines
+     * that could not be matched otherwise (issue #53).
+     *
+     * Priority:
+     *   1. The product manually pinned for the supplier (AiScanSupplierProduct).
+     *   2. The most frequent product across previous invoices
+     *      (ties broken by most recent), via rankProductsFromLines().
+     *
+     * @return array{referencia: string, description: string}|null
+     */
+    public function getSuggestedProduct(string $codproveedor): ?array
+    {
+        if (empty($codproveedor)) {
+            return null;
+        }
+
+        $pinned = AiScanSupplierProduct::getForSupplier($codproveedor);
+        if ($pinned && !empty($pinned->referencia)) {
+            return [
+                'referencia' => $pinned->referencia,
+                'description' => (string) ($pinned->description ?? ''),
+            ];
+        }
+
+        $invoice = new FacturaProveedor();
+        $where = [Where::eq('codproveedor', $codproveedor)];
+        $orderBy = ['fecha' => 'DESC'];
+        $invoices = $invoice->all($where, $orderBy, 0, self::MAX_INVOICES);
+
+        if (empty($invoices)) {
+            return null;
+        }
+
+        $historyLines = [];
+        foreach ($invoices as $inv) {
+            foreach ($inv->getLines() as $line) {
+                $historyLines[] = [
+                    'referencia' => (string) ($line->referencia ?? ''),
+                    'description' => mb_substr(trim((string) $line->descripcion), 0, 100),
+                    'date' => (string) $inv->fecha,
+                ];
+            }
+        }
+
+        $ranking = self::rankProductsFromLines($historyLines);
+        if (empty($ranking)) {
+            return null;
+        }
+
+        return [
+            'referencia' => $ranking[0]['referencia'],
+            'description' => $ranking[0]['description'],
+        ];
+    }
+
+    /**
+     * Pure ranking helper (no DB): orders product references by frequency
+     * (descending), breaking ties by the most recent date. Lines without a
+     * referencia are ignored.
+     *
+     * @param array<array{referencia?: string, description?: string, date?: string}> $lines
+     *
+     * @return array<array{referencia: string, description: string, count: int, last_date: string}>
+     */
+    public static function rankProductsFromLines(array $lines): array
+    {
+        $stats = [];
+        foreach ($lines as $line) {
+            $referencia = trim((string) ($line['referencia'] ?? ''));
+            if ($referencia === '') {
+                continue;
+            }
+
+            $date = (string) ($line['date'] ?? '');
+            if (!isset($stats[$referencia])) {
+                $stats[$referencia] = [
+                    'referencia' => $referencia,
+                    'description' => (string) ($line['description'] ?? ''),
+                    'count' => 0,
+                    'last_date' => $date,
+                ];
+            }
+
+            $stats[$referencia]['count']++;
+            if ($date > $stats[$referencia]['last_date']) {
+                $stats[$referencia]['last_date'] = $date;
+                if (!empty($line['description'])) {
+                    $stats[$referencia]['description'] = (string) $line['description'];
+                }
+            }
+        }
+
+        $ranking = array_values($stats);
+        usort($ranking, static function (array $a, array $b): int {
+            return [$b['count'], $b['last_date']] <=> [$a['count'], $a['last_date']];
+        });
+
+        return $ranking;
     }
 }

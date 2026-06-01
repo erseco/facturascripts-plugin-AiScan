@@ -36,7 +36,8 @@ class InvoiceMapper
         private readonly AttachmentService $attachmentService = new AttachmentService(),
         private readonly ProductMatcher $productMatcher = new ProductMatcher(),
         private readonly PurchaseLineInventoryUpdater $inventoryUpdater = new PurchaseLineInventoryUpdater(),
-        private readonly SupplierService $supplierService = new SupplierService()
+        private readonly SupplierService $supplierService = new SupplierService(),
+        private readonly HistoricalContextService $historicalContext = new HistoricalContextService()
     ) {
     }
 
@@ -143,7 +144,7 @@ class InvoiceMapper
             $taxes = $extractedData['taxes'] ?? [];
             $invoiceLines = $importMode === 'total' && empty($lines)
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
-                : $this->buildLinesMode($invoice, $lines, $invoiceData);
+                : $this->buildLinesMode($invoice, $lines, $invoiceData, $supplier);
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
                 $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
@@ -185,15 +186,27 @@ class InvoiceMapper
         return implode("\n\n", array_unique($parts));
     }
 
-    private function buildLinesMode(FacturaProveedor $invoice, array $lines, array $invoiceData): array
-    {
+    private function buildLinesMode(
+        FacturaProveedor $invoice,
+        array $lines,
+        array $invoiceData,
+        ?Proveedor $supplier = null
+    ): array {
         $preparedLines = $this->prepareLines($lines, $invoiceData);
         $invoiceLines = [];
+
+        // issue #53: fallback to the supplier's usual product for lines that
+        // cannot be matched by SKU or description.
+        $suggestedReference = null;
+        if ($supplier) {
+            $suggestion = $this->historicalContext->getSuggestedProduct($supplier->codproveedor);
+            $suggestedReference = $suggestion['referencia'] ?? null;
+        }
 
         foreach ($preparedLines as $lineData) {
             $reference = !empty($lineData['referencia'])
                 ? $lineData['referencia']
-                : $this->productMatcher->findReference($lineData);
+                : $this->productMatcher->findReference($lineData, $suggestedReference);
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
             $line->actualizastock = 0;
             $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
