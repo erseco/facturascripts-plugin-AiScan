@@ -20,9 +20,9 @@
 
 namespace FacturaScripts\Plugins\AiScan\Model;
 
-use FacturaScripts\Core\Template\ModelClass;
-use FacturaScripts\Core\Template\ModelTrait;
-use FacturaScripts\Core\Where;
+use FacturaScripts\Core\Base\DataBase\DataBaseWhere;
+use FacturaScripts\Core\Model\Base\ModelClass;
+use FacturaScripts\Core\Model\Base\ModelTrait;
 
 class AiScanSupplierProduct extends ModelClass
 {
@@ -64,7 +64,7 @@ class AiScanSupplierProduct extends ModelClass
 
     public static function getForSupplier(string $codproveedor): ?self
     {
-        $where = [Where::eq('codproveedor', $codproveedor)];
+        $where = [new DataBaseWhere('codproveedor', $codproveedor)];
         $found = self::all($where, [], 0, 1);
         return $found[0] ?? null;
     }
