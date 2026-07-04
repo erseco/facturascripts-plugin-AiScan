@@ -154,6 +154,44 @@ final class InvoiceMapperTest extends TestCase
         $this->assertEqualsWithDelta(0.0, $result[0]['unit_price'], 0.01);
     }
 
+    // Regression for issue #61: "factura con IGIC que se refleja en el total
+    // pero no en el asiento". The AI extraction reports the 7% IGIC rate only
+    // in the aggregate `taxes` breakdown, not on the line itself. When real
+    // lines are supplied (so prepareLines() would otherwise just pass them
+    // through untouched), it must still infer and attach the correct tax
+    // rate from the `taxes` bucket. Otherwise Calculator books the line at
+    // 0% and the resulting accounting entry (asiento) does not reflect the
+    // IGIC, even though the invoice total (built from top-level fields)
+    // looks correct in the review screen.
+    public function testPrepareLinesInfersTaxRateFromTaxesArrayWhenLineOmitsIt(): void
+    {
+        $lines = [
+            [
+                'description' => 'Factura por tarjetas de visita, rediseño y vinilo.',
+                'quantity' => 1,
+                'unit_price' => 92.55,
+            ],
+        ];
+        $invoiceData = [
+            'subtotal' => 92.55,
+            'tax_amount' => 6.48,
+            'total' => 99.03,
+        ];
+        $taxes = [
+            ['rate' => 7.0, 'base' => 92.55, 'amount' => 6.48],
+        ];
+
+        $result = $this->callPrepareLines($lines, $invoiceData, $taxes);
+
+        $this->assertCount(1, $result);
+        $inferredRate = $result[0]['tax_rate'] ?? $result[0]['iva'] ?? null;
+        $this->assertNotNull(
+            $inferredRate,
+            'prepareLines() should infer a tax rate from the taxes array when the line omits it'
+        );
+        $this->assertEqualsWithDelta(7.0, $inferredRate, 0.01);
+    }
+
     // ── helpers ──────────────────────────────────────────────
 
     private function callBuildNotes(array $invoiceData): string
@@ -163,11 +201,11 @@ final class InvoiceMapperTest extends TestCase
         return $method->invoke($this->mapper, $invoiceData);
     }
 
-    private function callPrepareLines(array $lines, array $invoiceData): array
+    private function callPrepareLines(array $lines, array $invoiceData, array $taxes = []): array
     {
         $method = new \ReflectionMethod(InvoiceMapper::class, 'prepareLines');
         $method->setAccessible(true);
-        return $method->invoke($this->mapper, $lines, $invoiceData);
+        return $method->invoke($this->mapper, $lines, $invoiceData, $taxes);
     }
 
     // ── Payment method validation ───────────────────────────

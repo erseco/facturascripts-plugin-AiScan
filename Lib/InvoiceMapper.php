@@ -144,7 +144,7 @@ class InvoiceMapper
             $taxes = $extractedData['taxes'] ?? [];
             $invoiceLines = $importMode === 'total' && empty($lines)
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
-                : $this->buildLinesMode($invoice, $lines, $invoiceData, $supplier);
+                : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
                 $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
@@ -190,9 +190,10 @@ class InvoiceMapper
         FacturaProveedor $invoice,
         array $lines,
         array $invoiceData,
+        array $taxes = [],
         ?Proveedor $supplier = null
     ): array {
-        $preparedLines = $this->prepareLines($lines, $invoiceData);
+        $preparedLines = $this->prepareLines($lines, $invoiceData, $taxes);
         $invoiceLines = [];
 
         // issue #53: fallback to the supplier's usual product for lines that
@@ -292,10 +293,10 @@ class InvoiceMapper
         return [$line];
     }
 
-    private function prepareLines(array $lines, array $invoiceData): array
+    private function prepareLines(array $lines, array $invoiceData, array $taxes = []): array
     {
         if (!empty($lines)) {
-            return $lines;
+            return $this->inferMissingTaxRate($lines, $invoiceData, $taxes);
         }
 
         return [[
@@ -305,6 +306,72 @@ class InvoiceMapper
             'discount' => 0,
             'tax_rate' => $this->computeTaxRate($invoiceData),
         ]];
+    }
+
+    /**
+     * Issue #61: some AI extractions only report the tax rate in the invoice-level
+     * `taxes` breakdown, leaving it out of the individual lines. Calculator then
+     * books those lines at 0%, so the total looks right but the accounting entry
+     * (asiento) does not reflect the tax. Infer the missing rate from the
+     * breakdown, but only when it is unambiguous: a single tax entry whose
+     * base/amount reconcile with the invoice totals and with the sum of the
+     * lines, and no suplido lines (which are excluded from the taxable base).
+     */
+    private function inferMissingTaxRate(array $lines, array $invoiceData, array $taxes): array
+    {
+        if (count($taxes) !== 1) {
+            return $lines;
+        }
+
+        $tax = $taxes[0];
+        $rate = (float) ($tax['rate'] ?? 0);
+        $base = (float) ($tax['base'] ?? 0);
+        $amount = (float) ($tax['amount'] ?? 0);
+        $tolerance = 0.01;
+
+        if (abs($amount) < 0.001) {
+            return $lines;
+        }
+
+        $subtotal = (float) ($invoiceData['subtotal'] ?? 0);
+        $taxAmount = (float) ($invoiceData['tax_amount'] ?? 0);
+        if (abs($base - $subtotal) > $tolerance || abs($amount - $taxAmount) > $tolerance) {
+            return $lines;
+        }
+
+        $linesSubtotal = 0.0;
+        foreach ($lines as $line) {
+            if (!empty($line['suplido'] ?? false)) {
+                return $lines;
+            }
+            $quantity = (float) ($line['quantity'] ?? $line['cantidad'] ?? 1);
+            $unitPrice = (float) ($line['unit_price'] ?? $line['pvpunitario'] ?? 0);
+            $discount = (float) ($line['discount'] ?? $line['dtopor'] ?? 0);
+            $linesSubtotal += $quantity * $unitPrice * (1 - $discount / 100);
+        }
+
+        if (abs($linesSubtotal - $base) > $tolerance) {
+            return $lines;
+        }
+
+        foreach ($lines as &$line) {
+            if (!$this->lineHasTaxInfo($line)) {
+                $line['tax_rate'] = $rate;
+            }
+        }
+        unset($line);
+
+        return $lines;
+    }
+
+    private function lineHasTaxInfo(array $line): bool
+    {
+        $taxRate = $line['tax_rate'] ?? $line['iva'] ?? null;
+        if ($taxRate !== null && $taxRate !== '') {
+            return true;
+        }
+
+        return !empty($line['codimpuesto'] ?? $line['tax_code'] ?? '');
     }
 
     private function computeTaxRate(array $invoiceData): float
