@@ -26,6 +26,15 @@ Open **AiScan Configuration** and set at least one provider credential:
 - Mistral
 - OpenAI-compatible endpoint
 
+### Optional: debug / mock mode (no API keys)
+
+1. In **AiScan Configuration**, enable **debug mode** (`debug_mode`).
+2. In **Compras → AiScan**, choose provider **`mock`**.
+3. Pick a fixture (or click **next fixture**) and upload any sample file from `Test/fixtures/`.
+4. Analyze: the response comes from `Test/fixtures/responses/*.json` (no AI call).
+
+Useful to verify the review UI and supplier default product suggestions without a live model.
+
 ## 5. Scan a supplier invoice
 
 1. Open a purchase invoice.

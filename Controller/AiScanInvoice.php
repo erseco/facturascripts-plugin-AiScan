@@ -27,6 +27,7 @@ use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
+use FacturaScripts\Plugins\AiScan\Lib\MockFixtureResolver;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
@@ -67,6 +68,8 @@ class AiScanInvoice extends Controller
             $retencion = new \FacturaScripts\Dinamic\Model\Retencion();
             $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
             $defaultCodpago = Tools::settings('default', 'codpago', '');
+            $debugMode = AiScanSettings::isDebugMode();
+            $fixtureResolver = new MockFixtureResolver();
             $this->view('AiScanInvoice.html.twig', [
                 'availableProviders' => $service->getAvailableProviderNames(),
                 'defaultProvider' => AiScanSettings::getDefaultProvider(),
@@ -74,6 +77,8 @@ class AiScanInvoice extends Controller
                 'withholdingTypes' => $retencion->all([], ['porcentaje' => 'ASC'], 0, 0),
                 'paymentMethods' => $formaPago->all([], ['descripcion' => 'ASC'], 0, 0),
                 'defaultCodpago' => $defaultCodpago,
+                'debugMode' => $debugMode,
+                'mockFixtures' => $debugMode ? $fixtureResolver->listFixtureNames() : [],
             ]);
             return;
         }
@@ -124,6 +129,12 @@ class AiScanInvoice extends Controller
                     break;
                 case 'get-historical-context':
                     $this->handleGetHistoricalContext();
+                    break;
+                case 'suggest-supplier-products':
+                    $this->handleSuggestSupplierProducts();
+                    break;
+                case 'list-mock-fixtures':
+                    $this->handleListMockFixtures();
                     break;
                 default:
                     http_response_code(400);
@@ -364,13 +375,15 @@ class AiScanInvoice extends Controller
         }
 
         $provider = $this->request()->get('provider', '');
+        $mockFixture = $this->request()->get('mock_fixture', '');
         $service = new ExtractionService();
         $extracted = $service->extractFromFile(
             $tmpPath,
             $mimeType,
             $provider ?: null,
             $importMode,
-            $historicalContext
+            $historicalContext,
+            $mockFixture !== '' ? $mockFixture : null
         );
 
         // Multi-invoice: the AI returned several invoices from one document
@@ -430,9 +443,14 @@ class AiScanInvoice extends Controller
     }
 
     /**
-     * Pre-fills extracted lines that have no product reference with the
+     * Pre-fills extracted lines that have no *valid* product reference with the
      * supplier's usual product, flagging them as a history suggestion so the
      * review screen shows a distinct (editable) badge. Issue #53.
+     *
+     * Mejoras respecto a PR #55:
+     * - Limpia referencias inventadas por la IA que no existen en el catálogo.
+     * - Acepta sugerencia desde producto fijado, histórico por referencia o
+     *   histórico por descripción (facturas previas sin producto enlazado).
      */
     private function suggestSupplierProducts(array &$extracted): void
     {
@@ -440,16 +458,38 @@ class AiScanInvoice extends Controller
             return;
         }
 
-        $service = new HistoricalContextService();
-        $suggestion = $service->getSuggestedProduct($extracted['supplier']['matched_supplier_id']);
-        if (empty($suggestion['referencia'])) {
+        $codproveedor = (string) ($extracted['supplier']['matched_supplier_id'] ?? '');
+        if ($codproveedor === '') {
             return;
         }
 
+        $service = new HistoricalContextService();
+        $suggestion = $service->getSuggestedProduct($codproveedor);
+        if (empty($suggestion['referencia'])) {
+            $extracted['_product_suggestion'] = null;
+            return;
+        }
+
+        $extracted['_product_suggestion'] = $suggestion;
+
+        $variant = new \FacturaScripts\Dinamic\Model\Variante();
         foreach ($extracted['lines'] as &$line) {
-            if (!empty(trim((string) ($line['referencia'] ?? '')))) {
-                continue;
+            $currentRef = trim((string) ($line['referencia'] ?? $line['sku'] ?? ''));
+            if ($currentRef !== '') {
+                // Mantener solo si el producto existe; si no, es basura de la IA.
+                if ($variant->loadWhere([\FacturaScripts\Core\Where::eq('referencia', $currentRef)])) {
+                    continue;
+                }
+                // También aceptar codbarras exacto
+                if ($variant->loadWhere([\FacturaScripts\Core\Where::eq('codbarras', $currentRef)])) {
+                    $line['referencia'] = $variant->referencia;
+                    continue;
+                }
+                // Referencia inválida → se puede sobrescribir con la sugerencia
+                $line['referencia'] = '';
+                unset($line['sku']);
             }
+
             $line['referencia'] = $suggestion['referencia'];
             $line['referencia_source'] = 'history';
         }
@@ -659,6 +699,53 @@ class AiScanInvoice extends Controller
         $service = new HistoricalContextService();
         $context = $service->buildContext($codproveedor);
         echo json_encode(['context' => $context]);
+    }
+
+    /**
+     * Sugiere producto habitual del proveedor y devuelve la referencia para
+     * rellenar líneas en la UI cuando el usuario selecciona proveedor a mano.
+     */
+    private function handleSuggestSupplierProducts(): void
+    {
+        $codproveedor = trim((string) $this->request()->get('codproveedor', ''));
+        if ($codproveedor === '') {
+            echo json_encode(['found' => false]);
+            return;
+        }
+
+        $service = new HistoricalContextService();
+        $suggestion = $service->getSuggestedProduct($codproveedor);
+        if (empty($suggestion['referencia'])) {
+            echo json_encode(['found' => false]);
+            return;
+        }
+
+        echo json_encode([
+            'found' => true,
+            'referencia' => $suggestion['referencia'],
+            'description' => $suggestion['description'] ?? '',
+            'source' => $suggestion['source'] ?? 'history',
+        ]);
+    }
+
+    private function handleListMockFixtures(): void
+    {
+        if (!AiScanSettings::isDebugMode()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Mock fixtures only available in debug mode']);
+            return;
+        }
+
+        $resolver = new MockFixtureResolver();
+        $names = $resolver->listFixtureNames();
+        $current = $this->request()->get('current', '');
+        $next = $resolver->nextFixtureName($current !== '' ? $current : null);
+
+        echo json_encode([
+            'fixtures' => $names,
+            'next' => $next,
+            'current' => $current,
+        ]);
     }
 
     private function handleGetText(): void

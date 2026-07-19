@@ -7,6 +7,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- Producto habitual del proveedor (#53): limpia referencias inventadas por la IA, sugiere al
+  elegir proveedor en la revisión, y si el histórico no tiene referencias enlazadas intenta
+  emparejar por **descripción** de líneas anteriores
 - Forma de pago duplicada (subida + revisión): solo se muestra en el panel de revisión (#57)
 - Contado / tarjeta (plazo 0 o `FormaPago.pagado`) dejan la factura y los recibos como **pagados**,
   con vencimiento en la fecha de la factura, aunque el seed de FacturaScripts tenga `pagado=false` (#57)
@@ -16,6 +19,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 
+- **Modo mock de depuración** (sin IA): con `debug_mode` activo aparece el proveedor `mock` y
+  un panel para elegir/rotar fixtures de `Test/fixtures/responses/`. Documentado en QUICKSTART
+  y AGENTS.md. Sirve para validar UI y la sugerencia de producto (#53) sin claves API.
 - Selector **Importar como proveedor / acreedor** en la pantalla de subida y en el panel de revisión.
   Al crear o reutilizar un tercero se aplica el flag `Proveedor.acreedor` de FacturaScripts, que decide
   la subcuenta contable especial (PROVEE vs ACREED). Cubre la parte contable de #58 y #59.

@@ -61,6 +61,25 @@ All three require Docker (`make upd` starts the container automatically).
 
 ---
 
+## Debug / mock mode (no AI calls)
+
+When **debug_mode** is enabled in **Administración → AiScan**, the `mock` provider becomes
+available. It returns recorded JSON from `Test/fixtures/responses/` without calling any
+external API. Use it to validate the upload → review → import UI (product suggestions,
+confidence badges, payment flags, etc.) without keys.
+
+1. Enable **Modo depuración** in AiScan settings (and clear cache if needed).
+2. Open **Compras → AiScan**. A yellow **Modo depuración / Mock** panel appears.
+3. Select provider **`mock`**, pick a fixture (or use **▶ next fixture**), upload any PDF/image
+   (content is ignored; the fixture drives the extraction), analyze and review.
+4. Matching: if the uploaded file name contains a fixture id (e.g. `F-2024-004.pdf`), that
+   fixture is preferred; otherwise the selected fixture / first fixture is used.
+5. Fixtures live under `Test/fixtures/responses/*.json` (`export-ignore`d from release ZIPs).
+
+Do **not** leave `debug_mode` / `mock` as default in production.
+
+---
+
 ## End-to-end validation (real AI extraction → purchase invoice)
 
 Unit tests cover the pipeline with recorded JSON responses (`Test/fixtures/responses/`)
