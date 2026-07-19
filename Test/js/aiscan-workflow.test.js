@@ -434,3 +434,63 @@ test('buildProductMatchBadge renders the history suggestion state', () => {
     assert.match(badge, /REF-1/);
     assert.doesNotMatch(badge, /text-bg-success/);
 });
+
+// ── Tipo de tercero (proveedor / acreedor) ─────────────────────────────
+
+test('normalizePartyType reconoce proveedor y acreedor en español e inglés', () => {
+    const {hooks} = loadTestHooks();
+    assert.equal(hooks.normalizePartyType('supplier'), hooks.PARTY_SUPPLIER);
+    assert.equal(hooks.normalizePartyType('proveedor'), hooks.PARTY_SUPPLIER);
+    assert.equal(hooks.normalizePartyType('creditor'), hooks.PARTY_CREDITOR);
+    assert.equal(hooks.normalizePartyType('acreedor'), hooks.PARTY_CREDITOR);
+    assert.equal(hooks.normalizePartyType('ACREEDOR'), hooks.PARTY_CREDITOR);
+    assert.equal(hooks.normalizePartyType(''), hooks.PARTY_SUPPLIER);
+});
+
+test('applyPartyTypeToSupplier marca is_creditor al importar como acreedor', () => {
+    const {hooks} = loadTestHooks();
+    const supplier = hooks.applyPartyTypeToSupplier({name: 'Gestoría Demo'}, 'creditor');
+    assert.equal(supplier.party_type, hooks.PARTY_CREDITOR);
+    assert.equal(supplier.is_creditor, true);
+    assert.equal(supplier.name, 'Gestoría Demo');
+});
+
+test('applyPartyTypeToSupplier marca is_creditor=false al importar como proveedor', () => {
+    const {hooks} = loadTestHooks();
+    const supplier = hooks.applyPartyTypeToSupplier({name: 'Almacén Demo', is_creditor: true}, 'supplier');
+    assert.equal(supplier.party_type, hooks.PARTY_SUPPLIER);
+    assert.equal(supplier.is_creditor, false);
+});
+
+test('finalizeAnalyzedDoc propaga el partyType del estado al proveedor extraído', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.partyType = hooks.PARTY_CREDITOR;
+    const doc = {
+        status: 'analyzing',
+        extractedData: {
+            invoice: {number: 'F-AC-1', total: 121},
+            supplier: {name: 'Asesoría Legal SL', tax_id: 'B12345678'},
+            lines: [{descripcion: 'Honorarios', cantidad: 1, pvpunitario: 100, iva: 21}],
+            taxes: [],
+            confidence: {},
+            warnings: [],
+        },
+    };
+
+    hooks.finalizeAnalyzedDoc(doc);
+
+    assert.equal(doc.extractedData.supplier.party_type, hooks.PARTY_CREDITOR);
+    assert.equal(doc.extractedData.supplier.is_creditor, true);
+    assert.equal(doc._partyType, hooks.PARTY_CREDITOR);
+});
+
+test('resolveDocPartyType prioriza el tipo guardado en el documento sobre el estado global', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.partyType = hooks.PARTY_SUPPLIER;
+    const doc = {
+        extractedData: {
+            supplier: {party_type: 'creditor', is_creditor: true},
+        },
+    };
+    assert.equal(hooks.resolveDocPartyType(doc), hooks.PARTY_CREDITOR);
+});

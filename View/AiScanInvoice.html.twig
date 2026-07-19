@@ -77,6 +77,14 @@
                                     </select>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label fw-semibold" for="aiscan-party-type-select">{{ i18n.trans('aiscan-party-type') }}</label>
+                                    <select class="form-select" id="aiscan-party-type-select">
+                                        <option value="supplier" selected>{{ i18n.trans('aiscan-party-type-supplier') }}</option>
+                                        <option value="creditor">{{ i18n.trans('aiscan-party-type-creditor') }}</option>
+                                    </select>
+                                    <div class="form-text">{{ i18n.trans('aiscan-party-type-help') }}</div>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label fw-semibold" for="aiscan-payment-method-select">{{ i18n.trans('aiscan-payment-method') }}</label>
                                     <select class="form-select" id="aiscan-payment-method-select">
                                         {% for pm in paymentMethods %}
@@ -295,6 +303,10 @@
         'aiscan-duplicate-invoice-exists': '{{ i18n.trans('aiscan-duplicate-invoice-exists')|e('js') }}',
         'aiscan-no-supplier-matched': '{{ i18n.trans('aiscan-no-supplier-matched')|e('js') }}',
         'aiscan-payment-method': '{{ i18n.trans('aiscan-payment-method')|e('js') }}',
+        'aiscan-party-type': '{{ i18n.trans('aiscan-party-type')|e('js') }}',
+        'aiscan-party-type-supplier': '{{ i18n.trans('aiscan-party-type-supplier')|e('js') }}',
+        'aiscan-party-type-creditor': '{{ i18n.trans('aiscan-party-type-creditor')|e('js') }}',
+        'aiscan-party-type-help': '{{ i18n.trans('aiscan-party-type-help')|e('js') }}',
         'aiscan-section-invoice': '{{ i18n.trans('aiscan-section-invoice')|e('js') }}',
         'aiscan-section-products': '{{ i18n.trans('aiscan-section-products')|e('js') }}',
         'aiscan-more-options': '{{ i18n.trans('aiscan-more-options')|e('js') }}',
