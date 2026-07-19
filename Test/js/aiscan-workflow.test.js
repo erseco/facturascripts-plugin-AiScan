@@ -494,3 +494,66 @@ test('resolveDocPartyType prioriza el tipo guardado en el documento sobre el est
     };
     assert.equal(hooks.resolveDocPartyType(doc), hooks.PARTY_CREDITOR);
 });
+
+// ── Confianza visual (issue #56) ───────────────────────────────────────
+
+test('resolveFieldConfidence fuerza 0% cuando el valor del CIF está vacío', () => {
+    const {hooks} = loadTestHooks();
+    assert.equal(hooks.resolveFieldConfidence('', 0.7), 0);
+    assert.equal(hooks.resolveFieldConfidence('   ', 0.95), 0);
+    assert.equal(hooks.resolveFieldConfidence(null, 0.7), 0);
+});
+
+test('resolveFieldConfidence conserva la confianza cuando hay CIF', () => {
+    const {hooks} = loadTestHooks();
+    assert.equal(hooks.resolveFieldConfidence('B12345678', 0.7), 0.7);
+    assert.equal(hooks.resolveFieldConfidence('B12345678', 70), 0.7);
+});
+
+test('confidenceBadgeClass usa umbrales rojo <50, amarillo 50-80, verde >=80', () => {
+    const {hooks} = loadTestHooks();
+    assert.equal(hooks.confidenceBadgeClass(0), 'text-bg-danger');
+    assert.equal(hooks.confidenceBadgeClass(0.49), 'text-bg-danger');
+    assert.equal(hooks.confidenceBadgeClass(0.5), 'text-bg-warning');
+    assert.equal(hooks.confidenceBadgeClass(0.7), 'text-bg-warning');
+    assert.equal(hooks.confidenceBadgeClass(0.79), 'text-bg-warning');
+    assert.equal(hooks.confidenceBadgeClass(0.8), 'text-bg-success');
+    assert.equal(hooks.confidenceBadgeClass(0.99), 'text-bg-success');
+});
+
+test('buildConfidenceBadge muestra 0% rojo si no hay CIF aunque la IA diga 70%', () => {
+    const {hooks} = loadTestHooks();
+    const badge = hooks.buildConfidenceBadge('', 0.7);
+    assert.match(badge, /text-bg-danger/);
+    assert.match(badge, />0%</);
+    assert.doesNotMatch(badge, /text-bg-success/);
+    assert.doesNotMatch(badge, />70%</);
+});
+
+test('buildConfidenceBadge muestra 70% amarillo con valor presente', () => {
+    const {hooks} = loadTestHooks();
+    const badge = hooks.buildConfidenceBadge('B12345678', 0.7);
+    assert.match(badge, /text-bg-warning/);
+    assert.match(badge, />70%</);
+});
+
+test('finalizeAnalyzedDoc fuerza needs_review y confianza 0 si falta CIF', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        status: 'analyzing',
+        extractedData: {
+            invoice: {number: 'F-1', total: 100},
+            supplier: {name: 'Proveedor sin CIF', tax_id: ''},
+            lines: [{descripcion: 'Servicio', cantidad: 1, pvpunitario: 100, iva: 0}],
+            confidence: {supplier_tax_id: 0.7, supplier_name: 0.9},
+            warnings: [],
+        },
+    };
+    hooks.finalizeAnalyzedDoc(doc);
+    assert.equal(doc.extractedData.confidence.supplier_tax_id, 0);
+    assert.equal(doc.status, 'needs_review');
+    assert.ok(
+        (doc.extractedData._validation_errors || []).some(w => /cif|nif|tax/i.test(String(w)))
+        || (doc.extractedData._validation_errors || []).length > 0
+    );
+});

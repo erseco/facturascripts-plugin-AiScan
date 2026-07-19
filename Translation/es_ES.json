@@ -89,6 +89,7 @@
     "aiscan-queued-for-analysis": "Esta factura está en cola esperando a ser analizada.",
     "aiscan-invoice": "Escanear Factura",
     "aiscan-missing-invoice-section": "Falta la sección de factura.",
+    "aiscan-missing-supplier-tax-id": "No se ha detectado el CIF/NIF del proveedor. Revísalo antes de importar.",
     "aiscan-missing-required-invoice-field": "Falta el campo obligatorio de la factura: %field%",
     "aiscan-taxes-must-be-array": "Los impuestos deben ser una lista.",
     "aiscan-lines-must-be-array": "Las líneas deben ser una lista.",

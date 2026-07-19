@@ -962,4 +962,86 @@ final class SchemaValidatorTest extends TestCase
         $this->assertSame('2025-03-01', $first['invoice']['issue_date']);
         $this->assertEqualsWithDelta(1234.56, $first['invoice']['total'], 0.01);
     }
+
+    // ── confidence / issue #56 ──────────────────────────────
+
+    /**
+     * @testdox Si el CIF está vacío, normalize fuerza confidence.supplier_tax_id a 0
+     */
+    public function testNormalizeFuerzaConfianzaCeroSiCifVacio(): void
+    {
+        $normalized = $this->validator->normalize([
+            'supplier' => [
+                'name' => 'Proveedor sin CIF',
+                'tax_id' => '',
+            ],
+            'invoice' => [
+                'number' => 'F-56',
+                'issue_date' => '2026-06-01',
+                'total' => 100,
+            ],
+            'confidence' => [
+                'supplier_name' => 0.9,
+                'supplier_tax_id' => 0.7,
+            ],
+            'lines' => [],
+            'taxes' => [],
+            'warnings' => [],
+        ]);
+
+        $this->assertSame(0.0, (float) $normalized['confidence']['supplier_tax_id']);
+        $this->assertEqualsWithDelta(0.9, (float) $normalized['confidence']['supplier_name'], 0.001);
+    }
+
+    /**
+     * @testdox Con CIF presente se conserva la confianza de la IA (acotada a 0-1)
+     */
+    public function testNormalizeConservaConfianzaSiHayCif(): void
+    {
+        $normalized = $this->validator->normalize([
+            'supplier' => [
+                'name' => 'Proveedor con CIF',
+                'tax_id' => 'B12345678',
+            ],
+            'invoice' => [
+                'number' => 'F-56B',
+                'issue_date' => '2026-06-01',
+                'total' => 50,
+            ],
+            'confidence' => [
+                'supplier_tax_id' => 0.85,
+            ],
+            'lines' => [],
+            'taxes' => [],
+            'warnings' => [],
+        ]);
+
+        $this->assertEqualsWithDelta(0.85, (float) $normalized['confidence']['supplier_tax_id'], 0.001);
+    }
+
+    /**
+     * @testdox Confidence en escala 0-100 se normaliza a 0-1
+     */
+    public function testNormalizeEscalaConfidenceDeCeroACien(): void
+    {
+        $normalized = $this->validator->normalize([
+            'supplier' => [
+                'name' => 'Proveedor',
+                'tax_id' => 'A11111111',
+            ],
+            'invoice' => [
+                'number' => 'F-56C',
+                'issue_date' => '2026-06-01',
+                'total' => 10,
+            ],
+            'confidence' => [
+                'supplier_tax_id' => 70,
+            ],
+            'lines' => [],
+            'taxes' => [],
+            'warnings' => [],
+        ]);
+
+        $this->assertEqualsWithDelta(0.7, (float) $normalized['confidence']['supplier_tax_id'], 0.001);
+    }
 }
