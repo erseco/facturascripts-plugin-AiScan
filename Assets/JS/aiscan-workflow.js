@@ -311,15 +311,8 @@
             });
         });
 
-        const paymentMethodSelect = document.getElementById('aiscan-payment-method-select');
-        if (paymentMethodSelect) {
-            state.codpago = paymentMethodSelect.value || window.aiscanDefaultCodpago || '';
-            paymentMethodSelect.addEventListener('change', () => {
-                state.codpago = paymentMethodSelect.value;
-            });
-        } else {
-            state.codpago = window.aiscanDefaultCodpago || '';
-        }
+        // Forma de pago solo en revisión (#57). Aquí solo se fija el valor por defecto.
+        state.codpago = window.aiscanDefaultCodpago || '';
 
         const partyTypeSelect = document.getElementById('aiscan-party-type-select');
         if (partyTypeSelect) {

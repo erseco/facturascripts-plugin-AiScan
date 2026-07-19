@@ -21,12 +21,14 @@
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Lib\Calculator;
+use FacturaScripts\Core\Lib\ReceiptGenerator;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\EstadoDocumento;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
 
@@ -67,9 +69,9 @@ class InvoiceMapper
             $supplierData = $extractedData['supplier'] ?? [];
             $lines = $extractedData['lines'] ?? [];
 
-            $resolvedCodpago = null;
+            $resolvedFormaPago = null;
             if (!empty($invoiceData['codpago'])) {
-                $formaPago = new \FacturaScripts\Dinamic\Model\FormaPago();
+                $formaPago = new FormaPago();
                 if (!$formaPago->loadFromCode($invoiceData['codpago'])) {
                     $codpago = (string) $invoiceData['codpago'];
                     $message = Tools::lang()->trans(
@@ -82,7 +84,7 @@ class InvoiceMapper
                     $result['errors'][] = $message;
                     return $result;
                 }
-                $resolvedCodpago = $formaPago->codpago;
+                $resolvedFormaPago = $formaPago;
             }
 
             $supplier = $this->supplierService->resolve($supplierData);
@@ -101,9 +103,8 @@ class InvoiceMapper
                 $invoice->fecha = $invoiceData['issue_date'];
             }
 
-            if (!empty($invoiceData['due_date'])) {
-                $invoice->vencimiento = $invoiceData['due_date'];
-            }
+            // Nota: FacturaProveedor no tiene columna vencimiento; el vencimiento
+            // real vive en los recibos (ReciboProveedor) y se aplica más abajo.
 
             if (!empty($invoiceData['currency'])) {
                 $divisa = new Divisa();
@@ -112,8 +113,8 @@ class InvoiceMapper
                 }
             }
 
-            if ($resolvedCodpago !== null) {
-                $invoice->codpago = $resolvedCodpago;
+            if ($resolvedFormaPago instanceof FormaPago) {
+                $invoice->codpago = $resolvedFormaPago->codpago;
             }
 
             $invoice->observaciones = $this->buildNotes($invoiceData);
@@ -149,6 +150,12 @@ class InvoiceMapper
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
                 $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
                 return $result;
+            }
+
+            // Tras calcular líneas FS genera recibos. Ajustamos vencimiento y
+            // pagado según la forma de pago (issue #57: contado/tarjeta).
+            if ($resolvedFormaPago instanceof FormaPago) {
+                $this->applyPaymentMethodToReceipts($invoice, $resolvedFormaPago, $invoiceData);
             }
 
             $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
@@ -409,5 +416,90 @@ class InvoiceMapper
             $invoice->save();
             return;
         }
+    }
+
+    /**
+     * Decide si la forma de pago es inmediata (contado / tarjeta / "ya pagado").
+     *
+     * FacturaScripts usa FormaPago.pagado, pero el seed por defecto deja CONT
+     * y TARJETA con pagado=false y plazovencimiento=0. Ese plazo 0 se trata
+     * aquí como pago inmediato (issue #57).
+     */
+    private function isImmediatePayment(FormaPago $formaPago): bool
+    {
+        return (bool) $formaPago->pagado || (int) $formaPago->plazovencimiento === 0;
+    }
+
+    /**
+     * Calcula el vencimiento de recibo según forma de pago y datos de la IA.
+     *
+     * - Inmediata: fecha de la factura
+     * - A plazo con due_date de la IA: se respeta
+     * - A plazo sin due_date: FormaPago::getExpiration()
+     */
+    private function resolveReceiptDueDate(
+        FacturaProveedor $invoice,
+        FormaPago $formaPago,
+        array $invoiceData
+    ): string {
+        if ($this->isImmediatePayment($formaPago)) {
+            return (string) $invoice->fecha;
+        }
+
+        $dueDate = trim((string) ($invoiceData['due_date'] ?? ''));
+        if ($dueDate !== '') {
+            return $dueDate;
+        }
+
+        return $formaPago->getExpiration((string) $invoice->fecha);
+    }
+
+    /**
+     * Ajusta recibos (vencimiento + pagado) y sincroniza FacturaProveedor.pagada.
+     *
+     * En facturas de compra el vencimiento no está en la cabecera: vive en
+     * ReciboProveedor. El flag pagada de la factura se recalcula desde los
+     * importes de recibos pagados (ReceiptGenerator::update).
+     */
+    private function applyPaymentMethodToReceipts(
+        FacturaProveedor $invoice,
+        FormaPago $formaPago,
+        array $invoiceData
+    ): void {
+        $dueDate = $this->resolveReceiptDueDate($invoice, $formaPago, $invoiceData);
+        $isImmediate = $this->isImmediatePayment($formaPago);
+
+        $receipts = $invoice->getReceipts();
+        if (empty($receipts)) {
+            $generator = new ReceiptGenerator();
+            $generator->generate($invoice, 1);
+            $receipts = $invoice->getReceipts();
+        }
+
+        foreach ($receipts as $receipt) {
+            $changed = false;
+
+            if ((string) $receipt->vencimiento !== $dueDate) {
+                $receipt->vencimiento = $dueDate;
+                $changed = true;
+            }
+
+            if ($isImmediate && !$receipt->pagado) {
+                $receipt->pagado = true;
+                if (empty($receipt->fechapago)) {
+                    $receipt->fechapago = $invoice->fecha;
+                }
+                $changed = true;
+            }
+
+            if ($changed) {
+                $receipt->disableInvoiceUpdate(true);
+                $receipt->save();
+            }
+        }
+
+        $generator = new ReceiptGenerator();
+        $generator->update($invoice);
+        $invoice->loadFromCode($invoice->idfactura);
     }
 }
