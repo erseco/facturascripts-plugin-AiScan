@@ -18,6 +18,7 @@
         importMode: null,
         updateStockPurchaseData: false,
         codpago: null,
+        partyType: 'supplier',
         useHistory: false,
         availableProviders: [],
         defaultProvider: null,
@@ -27,6 +28,9 @@
         selectionAnchorIndex: null,
         sortField: 'upload_order',
     };
+
+    const PARTY_SUPPLIER = 'supplier';
+    const PARTY_CREDITOR = 'creditor';
 
     const STATUS = {
         PENDING: 'pending',
@@ -317,6 +321,16 @@
             state.codpago = window.aiscanDefaultCodpago || '';
         }
 
+        const partyTypeSelect = document.getElementById('aiscan-party-type-select');
+        if (partyTypeSelect) {
+            state.partyType = normalizePartyType(partyTypeSelect.value);
+            partyTypeSelect.addEventListener('change', () => {
+                state.partyType = normalizePartyType(partyTypeSelect.value);
+            });
+        } else {
+            state.partyType = PARTY_SUPPLIER;
+        }
+
         const historyCheckbox = document.getElementById('use-history');
         if (historyCheckbox) {
             historyCheckbox.addEventListener('change', () => {
@@ -324,6 +338,41 @@
             });
         }
     }
+
+    function normalizePartyType(value) {
+        const normalized = String(value || '').toLowerCase().trim();
+        if (normalized === PARTY_CREDITOR || normalized === 'acreedor') {
+            return PARTY_CREDITOR;
+        }
+        return PARTY_SUPPLIER;
+    }
+
+    function isCreditorPartyType(value) {
+        return normalizePartyType(value) === PARTY_CREDITOR;
+    }
+
+    function applyPartyTypeToSupplier(supplier, partyType) {
+        const target = supplier && typeof supplier === 'object' ? supplier : {};
+        const normalized = normalizePartyType(partyType);
+        target.party_type = normalized;
+        target.is_creditor = normalized === PARTY_CREDITOR;
+        return target;
+    }
+
+    function resolveDocPartyType(doc) {
+        if (doc?.extractedData?.supplier?.party_type) {
+            return normalizePartyType(doc.extractedData.supplier.party_type);
+        }
+        if (doc?.extractedData?.supplier && Object.prototype.hasOwnProperty.call(doc.extractedData.supplier, 'is_creditor')) {
+            return doc.extractedData.supplier.is_creditor ? PARTY_CREDITOR : PARTY_SUPPLIER;
+        }
+        if (doc?._partyType) {
+            return normalizePartyType(doc._partyType);
+        }
+        return normalizePartyType(state.partyType);
+    }
+
+
 
     function onFilesSelected(fileList) {
         const files = Array.from(fileList);
@@ -343,6 +392,7 @@
             extractedData: null,
             error: null,
             reviewDecision: null,
+            _partyType: state.partyType,
         }));
 
         const dropZone = document.getElementById('aiscan-drop-zone');
@@ -563,6 +613,15 @@
      * Apply post-analysis checks to a single analyzed document.
      */
     function finalizeAnalyzedDoc(doc) {
+        if (!doc.extractedData) {
+            doc.extractedData = {};
+        }
+        doc.extractedData.supplier = applyPartyTypeToSupplier(
+            doc.extractedData.supplier || {},
+            doc._partyType || state.partyType
+        );
+        doc._partyType = resolveDocPartyType(doc);
+
         const warnings = filterOutDynamicWarnings(doc.extractedData);
         let needsReview = warnings.length > 0;
 
@@ -1130,6 +1189,7 @@
             `);
         }
 
+        const partyType = resolveDocPartyType(doc);
         const supplierMatched = supplier.match_status === 'matched' || supplier.match_status === 'selected' || supplier.match_status === 'created';
         const badgeLabels = {
             matched: trans('aiscan-detected'),
@@ -1137,12 +1197,25 @@
             created: trans('aiscan-supplier-created'),
         };
         const badgeLabel = badgeLabels[supplier.match_status] || badgeLabels.matched;
+        const partyBadge = partyType === PARTY_CREDITOR
+            ? trans('aiscan-party-type-creditor')
+            : trans('aiscan-party-type-supplier');
         const supplierSummary = supplierMatched
-            ? ` <span class="text-muted fw-normal ms-2">&middot; ${escapeHtml(supplier.matched_name || supplier.name || '')} (${escapeHtml(supplier.tax_id || '')})</span> <span class="badge text-bg-success ms-1">${escapeHtml(badgeLabel)}</span>`
-            : (supplier.match_status === 'not_found' ? ` <span class="badge text-bg-warning ms-2">${escapeHtml(trans('aiscan-no-supplier-matched'))}</span>` : '');
+            ? ` <span class="text-muted fw-normal ms-2">&middot; ${escapeHtml(supplier.matched_name || supplier.name || '')} (${escapeHtml(supplier.tax_id || '')})</span> <span class="badge text-bg-success ms-1">${escapeHtml(badgeLabel)}</span> <span class="badge text-bg-info ms-1">${escapeHtml(partyBadge)}</span>`
+            : (supplier.match_status === 'not_found' ? ` <span class="badge text-bg-warning ms-2">${escapeHtml(trans('aiscan-no-supplier-matched'))}</span> <span class="badge text-bg-info ms-1">${escapeHtml(partyBadge)}</span>` : ` <span class="badge text-bg-info ms-1">${escapeHtml(partyBadge)}</span>`);
+
+        const partyTypeSelectHtml = `
+            <div class="mb-2">
+                <label class="form-label small mb-1" for="supplier_party_type">${escapeHtml(trans('aiscan-party-type'))}</label>
+                <select class="form-select form-select-sm" id="supplier_party_type">
+                    <option value="${PARTY_SUPPLIER}"${partyType === PARTY_SUPPLIER ? ' selected' : ''}>${escapeHtml(trans('aiscan-party-type-supplier'))}</option>
+                    <option value="${PARTY_CREDITOR}"${partyType === PARTY_CREDITOR ? ' selected' : ''}>${escapeHtml(trans('aiscan-party-type-creditor'))}</option>
+                </select>
+            </div>`;
 
         const supplierBody = supplierMatched
-            ? `<div class="d-flex gap-2 mb-1">
+            ? `${partyTypeSelectHtml}
+                <div class="d-flex gap-2 mb-1">
                     <div style="flex:2">${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}</div>
                     <div style="flex:1">${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}</div>
                 </div>
@@ -1153,7 +1226,8 @@
                 <input type="hidden" id="supplier_address" value="${escapeAttr(supplier.address || '')}">
                 <select id="supplier_match_select" class="d-none"><option value="${escapeAttr(supplier.matched_supplier_id || '')}" selected></option></select>
                 ${buildSupplierStatus(supplier)}`
-            : `<div class="d-flex gap-2 mb-1">
+            : `${partyTypeSelectHtml}
+                <div class="d-flex gap-2 mb-1">
                     <div style="flex:2">${buildInput(trans('name'), 'supplier_name', supplier.name || '', 'text', null, confidence.supplier_name)}</div>
                     <div style="flex:1">${buildInput(trans('tax-id'), 'supplier_tax_id', supplier.tax_id || '', 'text', null, confidence.supplier_tax_id)}</div>
                 </div>
@@ -2479,11 +2553,21 @@
                         resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
                         return;
                     }
-                    resultsDiv.innerHTML = items.map(s =>
-                        `<button type="button" class="list-group-item list-group-item-action small py-1" data-id="${escapeAttr(s.id)}" data-name="${escapeAttr(s.name)}" data-taxid="${escapeAttr(s.tax_id || '')}">
-                            <strong>${escapeHtml(s.name)}</strong> <span class="text-muted">${escapeHtml(s.tax_id || '')}</span>
-                        </button>`
-                    ).join('');
+                    resultsDiv.innerHTML = items.map(s => {
+                        const itemParty = normalizePartyType(s.party_type || (s.is_creditor ? PARTY_CREDITOR : PARTY_SUPPLIER));
+                        const partyLabel = itemParty === PARTY_CREDITOR
+                            ? trans('aiscan-party-type-creditor')
+                            : trans('aiscan-party-type-supplier');
+                        return `<button type="button" class="list-group-item list-group-item-action small py-1"
+                            data-id="${escapeAttr(s.id)}"
+                            data-name="${escapeAttr(s.name)}"
+                            data-taxid="${escapeAttr(s.tax_id || '')}"
+                            data-party-type="${escapeAttr(itemParty)}">
+                            <strong>${escapeHtml(s.name)}</strong>
+                            <span class="text-muted">${escapeHtml(s.tax_id || '')}</span>
+                            <span class="badge text-bg-light ms-1">${escapeHtml(partyLabel)}</span>
+                        </button>`;
+                    }).join('');
                 })
                 .catch(() => { resultsDiv.innerHTML = ''; });
         };
@@ -2514,9 +2598,31 @@
                 doc.extractedData.supplier.match_status = 'selected';
                 doc.extractedData.supplier.name = item.dataset.name;
                 doc.extractedData.supplier.tax_id = item.dataset.taxid;
+                // Keep the import party type selected by the user (page 1 / review),
+                // not the historical type of the matched record. On import, that
+                // choice updates Proveedor.acreedor when it differs.
+                applyPartyTypeToSupplier(doc.extractedData.supplier, resolveDocPartyType(doc));
             }
             renderReviewPanel(doc);
         });
+
+        const partyTypeSelect = document.getElementById('supplier_party_type');
+        if (partyTypeSelect) {
+            partyTypeSelect.addEventListener('change', () => {
+                const doc = currentDoc();
+                if (!doc) {
+                    return;
+                }
+                const partyType = normalizePartyType(partyTypeSelect.value);
+                doc._partyType = partyType;
+                if (doc.extractedData) {
+                    doc.extractedData.supplier = applyPartyTypeToSupplier(
+                        doc.extractedData.supplier || {},
+                        partyType
+                    );
+                }
+            });
+        }
 
         // Bind ambiguous supplier dropdown selection
         const matchSelect = document.getElementById('supplier_match_select');
@@ -2571,6 +2677,8 @@
         }
 
         try {
+            const doc = currentDoc();
+            const partyType = resolveDocPartyType(doc);
             const response = await fetch('AiScanInvoice?action=create-supplier', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -2579,6 +2687,8 @@
                     tax_id: taxIdEl?.value?.trim() || '',
                     email: emailEl?.value?.trim() || '',
                     phone: phoneEl?.value?.trim() || '',
+                    party_type: partyType,
+                    is_creditor: isCreditorPartyType(partyType),
                 }),
             });
             const data = await response.json();
@@ -2588,13 +2698,17 @@
             }
 
             // Update current document's supplier data
-            const doc = currentDoc();
             if (doc?.extractedData?.supplier) {
                 doc.extractedData.supplier.matched_supplier_id = data.supplier.id;
                 doc.extractedData.supplier.matched_name = data.supplier.name;
                 doc.extractedData.supplier.match_status = 'created';
                 doc.extractedData.supplier.name = data.supplier.name;
                 doc.extractedData.supplier.tax_id = data.supplier.tax_id;
+                applyPartyTypeToSupplier(
+                    doc.extractedData.supplier,
+                    data.supplier.party_type || partyType
+                );
+                doc._partyType = normalizePartyType(data.supplier.party_type || partyType);
             }
 
             // Re-render to show collapsed matched state
@@ -2658,6 +2772,10 @@
         data.supplier.email = valOr('supplier_email', data.supplier.email);
         data.supplier.phone = valOr('supplier_phone', data.supplier.phone);
         data.supplier.address = valOr('supplier_address', data.supplier.address);
+
+        const partyTypeEl = document.getElementById('supplier_party_type');
+        const partyType = normalizePartyType(partyTypeEl ? partyTypeEl.value : resolveDocPartyType({extractedData: data}));
+        applyPartyTypeToSupplier(data.supplier, partyType);
 
         const selectedSupplier = document.getElementById('supplier_match_select');
         if (selectedSupplier) {
@@ -2981,6 +3099,12 @@
             if (extracted && extracted.invoice && !extracted.invoice.codpago) {
                 extracted.invoice.codpago = state.codpago;
             }
+            if (extracted) {
+                extracted.supplier = applyPartyTypeToSupplier(
+                    extracted.supplier || {},
+                    resolveDocPartyType(doc)
+                );
+            }
             return {
                 status: doc.status,
                 extracted_data: extracted,
@@ -3210,6 +3334,7 @@
 
     if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
         globalThis.__aiscanWorkflowTestHooks = {
+            applyPartyTypeToSupplier,
             applySelectionRange,
             buildPaymentMethodSelect,
             buildProductMatchBadge,
@@ -3220,8 +3345,13 @@
             getValidationWarnings,
             handleMultiInvoiceResponse,
             buildImportSummary,
+            isCreditorPartyType,
+            normalizePartyType,
+            PARTY_CREDITOR,
+            PARTY_SUPPLIER,
             renderReviewPanel,
             resolveAutocompleteKeyAction,
+            resolveDocPartyType,
             renderSidebar,
             state,
         };

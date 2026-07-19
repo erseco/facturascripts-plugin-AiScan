@@ -28,6 +28,7 @@ use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
+use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportLine;
@@ -517,6 +518,10 @@ class AiScanInvoice extends Controller
             'id' => $s->codproveedor,
             'name' => $s->nombre,
             'tax_id' => $s->cifnif,
+            'is_creditor' => (bool) $s->acreedor,
+            'party_type' => $s->acreedor
+                ? SupplierService::PARTY_CREDITOR
+                : SupplierService::PARTY_SUPPLIER,
         ], array_slice($results, 0, 20));
 
         echo json_encode(['results' => $items]);
@@ -542,6 +547,9 @@ class AiScanInvoice extends Controller
             return;
         }
 
+        $supplierService = new SupplierService();
+        $isCreditor = $supplierService->resolveIsCreditor($data);
+
         $supplier = new \FacturaScripts\Dinamic\Model\Proveedor();
         $supplier->nombre = $name;
         $supplier->razonsocial = $name;
@@ -549,6 +557,7 @@ class AiScanInvoice extends Controller
         $supplier->email = trim((string) ($data['email'] ?? ''));
         $supplier->telefono1 = trim((string) ($data['phone'] ?? ''));
         $supplier->personafisica = false;
+        $supplier->acreedor = $isCreditor;
 
         if ($supplier->save()) {
             echo json_encode([
@@ -557,6 +566,10 @@ class AiScanInvoice extends Controller
                     'id' => $supplier->codproveedor,
                     'name' => $supplier->nombre,
                     'tax_id' => $supplier->cifnif,
+                    'is_creditor' => (bool) $supplier->acreedor,
+                    'party_type' => $supplier->acreedor
+                        ? SupplierService::PARTY_CREDITOR
+                        : SupplierService::PARTY_SUPPLIER,
                 ],
             ]);
         } else {
