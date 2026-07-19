@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Fixed
+
+- Forma de pago duplicada (subida + revisión): solo se muestra en el panel de revisión (#57)
+- Contado / tarjeta (plazo 0 o `FormaPago.pagado`) dejan la factura y los recibos como **pagados**,
+  con vencimiento en la fecha de la factura, aunque el seed de FacturaScripts tenga `pagado=false` (#57)
+
 ### Added
 
 - Selector **Importar como proveedor / acreedor** en la pantalla de subida y en el panel de revisión.

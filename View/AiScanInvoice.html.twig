@@ -84,14 +84,7 @@
                                     </select>
                                     <div class="form-text">{{ i18n.trans('aiscan-party-type-help') }}</div>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-semibold" for="aiscan-payment-method-select">{{ i18n.trans('aiscan-payment-method') }}</label>
-                                    <select class="form-select" id="aiscan-payment-method-select">
-                                        {% for pm in paymentMethods %}
-                                            <option value="{{ pm.codpago }}"{% if pm.codpago == defaultCodpago %} selected{% endif %}>{{ pm.descripcion }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
+                                {# Forma de pago solo en el panel de revisión (#57): evitar selector duplicado en subida. #}
                                 <button type="button" class="btn btn-primary w-100" id="aiscan-upload-btn" disabled>
                                     <i class="fa-solid fa-cloud-arrow-up me-1"></i>{{ i18n.trans('aiscan-upload-and-analyze') }}
                                 </button>
