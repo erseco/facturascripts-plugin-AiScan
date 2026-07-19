@@ -23,6 +23,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\GeminiProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\MistralProvider;
+use FacturaScripts\Plugins\AiScan\Lib\Provider\MockProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\OpenAICompatibleProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\OpenAIProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\ProviderInterface;
@@ -490,6 +491,8 @@ PROMPT;
             'gemini' => new GeminiProvider(),
             'mistral' => new MistralProvider(),
             'openai-compatible' => new OpenAICompatibleProvider(),
+            // Solo isAvailable() cuando debug_mode está activo
+            'mock' => new MockProvider(),
         ];
     }
 
@@ -498,13 +501,17 @@ PROMPT;
         string $mimeType,
         ?string $providerName = null,
         string $importMode = 'lines',
-        string $historicalContext = ''
+        string $historicalContext = '',
+        ?string $mockFixture = null
     ): array {
         if (!file_exists($filePath)) {
             throw new \RuntimeException('File not found: ' . $filePath);
         }
 
         $provider = $this->getProvider($providerName);
+        if ($provider instanceof MockProvider && $mockFixture !== null && $mockFixture !== '') {
+            $provider->setForcedFixture($mockFixture);
+        }
         $fileName = basename($filePath);
 
         $actualMimeType = $mimeType;

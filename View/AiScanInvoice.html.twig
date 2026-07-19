@@ -76,6 +76,28 @@
                                         {% endif %}
                                     </select>
                                 </div>
+                                {% if debugMode %}
+                                <div class="mb-3 border border-warning rounded p-2 bg-warning-subtle" id="aiscan-mock-panel">
+                                    <div class="small fw-semibold mb-1">
+                                        <i class="fa-solid fa-flask me-1"></i>{{ i18n.trans('aiscan-mock-mode-title') }}
+                                    </div>
+                                    <div class="form-text mb-2">{{ i18n.trans('aiscan-mock-mode-help') }}</div>
+                                    <div id="aiscan-mock-fixture-box">
+                                        <label class="form-label small mb-1" for="aiscan-mock-fixture-select">{{ i18n.trans('aiscan-mock-fixture') }}</label>
+                                        <div class="input-group input-group-sm">
+                                            <select class="form-select form-select-sm" id="aiscan-mock-fixture-select">
+                                                {% for name in mockFixtures %}
+                                                    <option value="{{ name }}">{{ name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="button" class="btn btn-outline-secondary" id="aiscan-mock-next-fixture" title="{{ i18n.trans('aiscan-mock-next-fixture') }}">
+                                                <i class="fa-solid fa-forward-step"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-text">{{ i18n.trans('aiscan-mock-fixture-help') }} <span id="aiscan-mock-current-label" class="fw-semibold"></span></div>
+                                    </div>
+                                </div>
+                                {% endif %}
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold" for="aiscan-party-type-select">{{ i18n.trans('aiscan-party-type') }}</label>
                                     <select class="form-select" id="aiscan-party-type-select">
@@ -277,6 +299,12 @@
         {% endfor %}
     ];
     window.aiscanDefaultCodpago = '{{ defaultCodpago|e('js') }}';
+    window.aiscanDebugMode = {{ debugMode ? 'true' : 'false' }};
+    window.aiscanMockFixtures = [
+        {% for name in mockFixtures %}
+            '{{ name|e('js') }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
     window.aiscanI18n = {
         'aiscan-ai-notes': '{{ i18n.trans('aiscan-ai-notes')|e('js') }}',
         'aiscan-analysis-completed': '{{ i18n.trans('aiscan-analysis-completed')|e('js') }}',

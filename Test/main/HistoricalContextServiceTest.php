@@ -8,14 +8,6 @@
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 namespace FacturaScripts\Test\Plugins;
@@ -83,5 +75,28 @@ final class HistoricalContextServiceTest extends TestCase
         $ranking = HistoricalContextService::rankProductsFromLines($lines);
 
         $this->assertSame('New name', $ranking[0]['description']);
+    }
+
+    /**
+     * @testdox Ranking por descripción ignora líneas con referencia y ordena por frecuencia
+     */
+    public function testRankDescriptionsFromLines(): void
+    {
+        $lines = [
+            ['referencia' => '', 'description' => 'Servicio recurrent', 'date' => '2026-01-01'],
+            ['referencia' => 'SKIP', 'description' => 'Con ref', 'date' => '2026-01-02'],
+            ['referencia' => '', 'description' => 'Otro', 'date' => '2026-01-03'],
+            ['referencia' => '', 'description' => 'Servicio recurrent', 'date' => '2026-02-01'],
+            ['referencia' => '', 'description' => 'ab', 'date' => '2026-03-01'], // too short
+        ];
+
+        $ranking = HistoricalContextService::rankDescriptionsFromLines($lines);
+
+        $this->assertSame('Servicio recurrent', $ranking[0]['description']);
+        $this->assertSame(2, $ranking[0]['count']);
+        $this->assertSame('Otro', $ranking[1]['description']);
+        foreach ($ranking as $item) {
+            $this->assertGreaterThanOrEqual(4, mb_strlen($item['description']));
+        }
     }
 }

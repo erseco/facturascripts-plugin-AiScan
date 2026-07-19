@@ -27,6 +27,10 @@
         selectedIndices: new Set(),
         selectionAnchorIndex: null,
         sortField: 'upload_order',
+        // Modo depuración / mock (sin IA)
+        debugMode: !!(window.aiscanDebugMode),
+        mockFixtures: Array.isArray(window.aiscanMockFixtures) ? window.aiscanMockFixtures.slice() : [],
+        mockFixture: window.aiscanMockFixture || '',
     };
 
     const PARTY_SUPPLIER = 'supplier';
@@ -330,6 +334,76 @@
                 state.useHistory = historyCheckbox.checked;
             });
         }
+
+        bindMockDebugControls();
+    }
+
+    /**
+     * Controles de modo depuración (proveedor mock + fixture).
+     * Solo visibles cuando AiScanSettings.debug_mode está activo.
+     */
+    function bindMockDebugControls() {
+        const panel = document.getElementById('aiscan-mock-panel');
+        if (!panel || !state.debugMode) {
+            return;
+        }
+        panel.classList.remove('d-none');
+
+        const fixtureSelect = document.getElementById('aiscan-mock-fixture-select');
+        const nextBtn = document.getElementById('aiscan-mock-next-fixture');
+        const providerSelect = document.getElementById('aiscan-provider-select');
+
+        if (fixtureSelect) {
+            if (state.mockFixtures.length && !state.mockFixture) {
+                state.mockFixture = state.mockFixtures[0];
+            }
+            fixtureSelect.innerHTML = state.mockFixtures.map(name =>
+                `<option value="${escapeAttr(name)}"${name === state.mockFixture ? ' selected' : ''}>${escapeHtml(name)}</option>`
+            ).join('');
+            fixtureSelect.addEventListener('change', () => {
+                state.mockFixture = fixtureSelect.value;
+            });
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (!state.mockFixtures.length) {
+                    return;
+                }
+                const idx = state.mockFixtures.indexOf(state.mockFixture);
+                const next = state.mockFixtures[(idx + 1) % state.mockFixtures.length];
+                state.mockFixture = next;
+                if (fixtureSelect) {
+                    fixtureSelect.value = next;
+                }
+                // Prefer mock provider when cycling fixtures
+                if (providerSelect) {
+                    const hasMock = Array.from(providerSelect.options).some(o => o.value === 'mock');
+                    if (hasMock) {
+                        providerSelect.value = 'mock';
+                        state.defaultProvider = 'mock';
+                    }
+                }
+                const label = document.getElementById('aiscan-mock-current-label');
+                if (label) {
+                    label.textContent = next;
+                }
+            });
+        }
+
+        if (providerSelect) {
+            providerSelect.addEventListener('change', () => {
+                const mockBox = document.getElementById('aiscan-mock-fixture-box');
+                if (mockBox) {
+                    mockBox.classList.toggle('d-none', providerSelect.value !== 'mock');
+                }
+            });
+            // Initial visibility
+            const mockBox = document.getElementById('aiscan-mock-fixture-box');
+            if (mockBox) {
+                mockBox.classList.toggle('d-none', providerSelect.value !== 'mock');
+            }
+        }
     }
 
     function normalizePartyType(value) {
@@ -527,14 +601,11 @@
             refreshUI();
 
             try {
-                const params = new URLSearchParams({
-                    action: 'analyze',
-                    tmp_file: doc.tmpFile,
-                    mime_type: doc.mimeType,
+                const params = buildAnalyzeParams(doc, {
                     import_mode: state.importMode,
                     use_history: state.useHistory ? '1' : '0',
                     supplier_id: '',
-                    provider: provider,
+                    provider,
                 });
 
                 const response = await fetch('AiScanInvoice?' + params.toString());
@@ -555,14 +626,11 @@
 
                 if (state.useHistory && doc.extractedData?.supplier?.matched_supplier_id && !doc._historyAnalyzed) {
                     doc._historyAnalyzed = true;
-                    const reParams = new URLSearchParams({
-                        action: 'analyze',
-                        tmp_file: doc.tmpFile,
-                        mime_type: doc.mimeType,
+                    const reParams = buildAnalyzeParams(doc, {
                         import_mode: state.importMode,
                         use_history: '1',
                         supplier_id: doc.extractedData.supplier.matched_supplier_id,
-                        provider: provider,
+                        provider,
                     });
                     const reResponse = await fetch('AiScanInvoice?' + reParams.toString());
                     const reData = await reResponse.json();
@@ -2683,7 +2751,8 @@
                 // choice updates Proveedor.acreedor when it differs.
                 applyPartyTypeToSupplier(doc.extractedData.supplier, resolveDocPartyType(doc));
             }
-            renderReviewPanel(doc);
+            // Issue #53: al elegir proveedor a mano, sugerir producto habitual
+            applySupplierProductSuggestion(doc, item.dataset.id).then(() => renderReviewPanel(doc));
         });
 
         const partyTypeSelect = document.getElementById('supplier_party_type');
@@ -2722,7 +2791,7 @@
                     doc.extractedData.supplier.tax_id = nameMatch ? nameMatch[2] : '';
                     doc.extractedData.supplier.name = doc.extractedData.supplier.matched_name;
                 }
-                renderReviewPanel(doc);
+                applySupplierProductSuggestion(doc, opt.value).then(() => renderReviewPanel(doc));
             });
         }
 
@@ -2730,6 +2799,44 @@
         const createBtn = document.getElementById('aiscan-create-supplier-btn');
         if (createBtn) {
             createBtn.addEventListener('click', createSupplierInline);
+        }
+    }
+
+    /**
+     * Issue #53: rellena líneas sin producto con el producto habitual del proveedor.
+     */
+    async function applySupplierProductSuggestion(doc, codproveedor) {
+        if (!doc?.extractedData || !codproveedor) {
+            return;
+        }
+        try {
+            const response = await fetch(
+                'AiScanInvoice?' + new URLSearchParams({
+                    action: 'suggest-supplier-products',
+                    codproveedor,
+                })
+            );
+            const data = await response.json();
+            if (!data.found || !data.referencia) {
+                return;
+            }
+            doc.extractedData._product_suggestion = data;
+            if (!Array.isArray(doc.extractedData.lines)) {
+                return;
+            }
+            doc.extractedData.lines = doc.extractedData.lines.map(line => {
+                const ref = String(line.referencia || line.sku || '').trim();
+                if (ref !== '' && line.referencia_source !== 'history') {
+                    return line;
+                }
+                return {
+                    ...line,
+                    referencia: data.referencia,
+                    referencia_source: 'history',
+                };
+            });
+        } catch (e) {
+            // silent
         }
     }
 
@@ -2954,14 +3061,11 @@
             }
 
             try {
-                const params = new URLSearchParams({
-                    action: 'analyze',
-                    tmp_file: doc.tmpFile,
-                    mime_type: doc.mimeType,
+                const params = buildAnalyzeParams(doc, {
                     import_mode: importMode,
                     use_history: state.useHistory ? '1' : '0',
                     supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
-                    provider: provider,
+                    provider,
                 });
 
                 const response = await fetch('AiScanInvoice?' + params.toString());
@@ -2999,14 +3103,11 @@
         renderCurrentDocument();
 
         try {
-            const params = new URLSearchParams({
-                action: 'analyze',
-                tmp_file: doc.tmpFile,
-                mime_type: doc.mimeType,
+            const params = buildAnalyzeParams(doc, {
                 import_mode: state.importMode,
                 use_history: state.useHistory ? '1' : '0',
                 supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
-                provider: provider,
+                provider,
             });
 
             const response = await fetch('AiScanInvoice?' + params.toString());
@@ -3024,6 +3125,20 @@
         }
 
         renderCurrentDocument();
+    }
+
+    function buildAnalyzeParams(doc, extra) {
+        const params = new URLSearchParams({
+            action: 'analyze',
+            tmp_file: doc.tmpFile || '',
+            mime_type: doc.mimeType || '',
+            ...extra,
+        });
+        const provider = extra.provider || state.defaultProvider;
+        if (provider === 'mock' && state.mockFixture) {
+            params.set('mock_fixture', state.mockFixture);
+        }
+        return params;
     }
 
     // ── Step 3: Import ─────────────────────────────────────────────────

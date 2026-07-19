@@ -15,6 +15,7 @@
                     <values title="aiscan-provider-mistral">mistral</values>
                     <values title="aiscan-provider-openai-compatible">openai-compatible</values>
                     <values title="aiscan-provider-browser-prompt">browser-prompt</values>
+                    <values title="aiscan-provider-mock">mock</values>
                 </widget>
             </column>
             <column name="max-upload-size-mb" numcolumns="2" order="120">
