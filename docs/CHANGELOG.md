@@ -10,6 +10,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Forma de pago duplicada (subida + revisión): solo se muestra en el panel de revisión (#57)
 - Contado / tarjeta (plazo 0 o `FormaPago.pagado`) dejan la factura y los recibos como **pagados**,
   con vencimiento en la fecha de la factura, aunque el seed de FacturaScripts tenga `pagado=false` (#57)
+- Badges de confianza: umbrales <50% rojo, 50–80% amarillo, ≥80% verde; si falta el CIF
+  (u otro campo vacío) se muestra **0% en rojo** aunque la IA devuelva 70% (#56)
+- Sin CIF/NIF del proveedor, el documento pasa a **necesita revisión** con aviso explícito (#56)
 
 ### Added
 

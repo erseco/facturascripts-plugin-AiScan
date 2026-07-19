@@ -315,7 +315,69 @@ class SchemaValidator
             }
         }
 
+        $this->sanitizeConfidence($data);
+
         return $data;
+    }
+
+    /**
+     * Ajusta confidence para no mostrar "70% verde" en campos vacíos (issue #56).
+     *
+     * Si el valor del campo no se extrajo, la confianza efectiva es 0 aunque
+     * el modelo de IA devuelva un porcentaje alto de forma errónea.
+     */
+    private function sanitizeConfidence(array &$data): void
+    {
+        $confidence = is_array($data['confidence'] ?? null) ? $data['confidence'] : [];
+        $supplier = is_array($data['supplier'] ?? null) ? $data['supplier'] : [];
+        $invoice = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
+
+        $fieldValueMap = [
+            'supplier_name' => $supplier['name'] ?? '',
+            'supplier_tax_id' => $supplier['tax_id'] ?? '',
+            'invoice_number' => $invoice['number'] ?? '',
+            'issue_date' => $invoice['issue_date'] ?? '',
+            'total' => $invoice['total'] ?? null,
+        ];
+
+        foreach ($fieldValueMap as $key => $value) {
+            if ($this->isMissingExtractedValue($value)) {
+                $confidence[$key] = 0.0;
+            } elseif (isset($confidence[$key])) {
+                $confidence[$key] = $this->clampConfidence($confidence[$key]);
+            }
+        }
+
+        $data['confidence'] = $confidence;
+    }
+
+    private function isMissingExtractedValue(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+        if (is_string($value)) {
+            return trim($value) === '';
+        }
+        // total numérico 0 es un valor válido (factura a 0 €)
+        return false;
+    }
+
+    private function clampConfidence(mixed $value): float
+    {
+        $n = is_numeric($value) ? (float) $value : 0.0;
+        if ($n < 0) {
+            return 0.0;
+        }
+        if ($n > 1) {
+            // Algunos modelos devuelven 0-100 en lugar de 0-1
+            if ($n <= 100) {
+                $n = $n / 100;
+            } else {
+                $n = 1.0;
+            }
+        }
+        return round($n, 4);
     }
 
     /**

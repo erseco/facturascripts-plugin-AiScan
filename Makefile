@@ -144,7 +144,7 @@ test: check-docker upd
 	@echo "Running unit tests..."
 	@echo ""
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Installing PHPUnit if needed..." && if [ ! -f vendor/bin/phpunit ]; then php84 /usr/local/bin/composer require --dev phpunit/phpunit --no-interaction; fi'
-	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Setting up test environment..." && mkdir -p Test/Plugins && cp -r Plugins/AiScan/Test/main/* Test/Plugins/ 2>/dev/null || true && cp Plugins/AiScan/Test/bootstrap.php Test/bootstrap.php 2>/dev/null || true && cp Plugins/AiScan/Test/install-plugins.php Test/install-plugins.php 2>/dev/null || true'
+	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Setting up test environment..." && mkdir -p Test/Plugins && rm -rf Test/Plugins/* && cp -r Plugins/AiScan/Test/main/* Test/Plugins/ 2>/dev/null || true && cp Plugins/AiScan/Test/bootstrap.php Test/bootstrap.php 2>/dev/null || true && cp Plugins/AiScan/Test/install-plugins.php Test/install-plugins.php 2>/dev/null || true'
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && test -f Test/Plugins/install-plugins.txt || (echo "❌ Error: No tests found in Test/main/" && exit 1)'
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Installing test plugins..." && php84 Test/install-plugins.php'
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && test -f phpunit-plugins.xml || echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?><phpunit bootstrap=\"Test/bootstrap.php\" colors=\"true\"><testsuites><testsuite name=\"PluginTests\"><directory>Test/Plugins</directory></testsuite></testsuites></phpunit>" > phpunit-plugins.xml'

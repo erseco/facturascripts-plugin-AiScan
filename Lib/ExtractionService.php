@@ -172,6 +172,12 @@ Output schema (single invoice):
   "warnings": []
 }
 
+Confidence rules (critical):
+- confidence values are 0.0–1.0 (not percentages).
+- If a field value is missing/null/empty (especially supplier.tax_id), set its
+  confidence to 0. NEVER report high confidence for an empty/missing value.
+- Low confidence (< 0.5) must be used when OCR is unclear or the field is uncertain.
+
 Field-specific rules:
 - supplier.name: the issuer of the invoice, not the buyer
 - supplier.tax_id: preserve original formatting if present

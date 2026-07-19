@@ -614,6 +614,8 @@
             doc._partyType || state.partyType
         );
         doc._partyType = resolveDocPartyType(doc);
+        // Issue #56: confianza 0 en campos vacíos (p. ej. CIF no detectado)
+        sanitizeExtractedConfidence(doc.extractedData);
 
         const warnings = filterOutDynamicWarnings(doc.extractedData);
         let needsReview = warnings.length > 0;
@@ -628,6 +630,19 @@
         if (batchDup && !warnings.includes(batchDup)) {
             warnings.push(batchDup);
             needsReview = true;
+        }
+
+        // CIF/NIF vacío: forzar revisión y aviso visible
+        const taxId = String(doc.extractedData?.supplier?.tax_id ?? '').trim();
+        if (!taxId) {
+            needsReview = true;
+            const missingTaxMsg = trans('aiscan-missing-supplier-tax-id');
+            if (missingTaxMsg && missingTaxMsg !== 'aiscan-missing-supplier-tax-id'
+                && !warnings.includes(missingTaxMsg)) {
+                warnings.push(missingTaxMsg);
+            } else if (!warnings.some(w => /cif|nif|tax.?id|fiscal/i.test(String(w)))) {
+                warnings.push(missingTaxMsg);
+            }
         }
 
         // In total mode, generate synthetic lines for validation
@@ -648,6 +663,32 @@
 
         doc.extractedData._validation_errors = warnings;
         doc.status = needsReview ? STATUS.NEEDS_REVIEW : STATUS.ANALYZED;
+    }
+
+    function sanitizeExtractedConfidence(data) {
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+        data.confidence = data.confidence && typeof data.confidence === 'object'
+            ? data.confidence
+            : {};
+        const supplier = data.supplier || {};
+        const invoice = data.invoice || {};
+        const pairs = [
+            ['supplier_name', supplier.name],
+            ['supplier_tax_id', supplier.tax_id],
+            ['invoice_number', invoice.number],
+            ['issue_date', invoice.issue_date],
+            ['total', invoice.total],
+        ];
+        pairs.forEach(([key, value]) => {
+            const resolved = resolveFieldConfidence(value, data.confidence[key]);
+            if (resolved !== null) {
+                data.confidence[key] = resolved;
+            } else if (value == null || (typeof value === 'string' && value.trim() === '')) {
+                data.confidence[key] = 0;
+            }
+        });
     }
 
     /**
@@ -1352,10 +1393,56 @@
         return section;
     }
 
+    /**
+     * Issue #56: umbrales visuales de confianza.
+     * < 50% rojo, 50–80% amarillo, ≥ 80% verde.
+     * Campo vacío → confianza efectiva 0 (rojo 0%), aunque la IA diga 70%.
+     */
+    function resolveFieldConfidence(value, confidence) {
+        if (value == null || (typeof value === 'string' && value.trim() === '')) {
+            return 0;
+        }
+        if (confidence == null || confidence === '') {
+            return null;
+        }
+        let n = Number(confidence);
+        if (!Number.isFinite(n)) {
+            return 0;
+        }
+        if (n > 1 && n <= 100) {
+            n = n / 100;
+        }
+        if (n < 0) {
+            return 0;
+        }
+        if (n > 1) {
+            return 1;
+        }
+        return n;
+    }
+
+    function confidenceBadgeClass(confidence) {
+        const n = Number(confidence);
+        if (!Number.isFinite(n) || n < 0.5) {
+            return 'text-bg-danger';
+        }
+        if (n < 0.8) {
+            return 'text-bg-warning';
+        }
+        return 'text-bg-success';
+    }
+
+    function buildConfidenceBadge(value, confidence) {
+        const resolved = resolveFieldConfidence(value, confidence);
+        if (resolved == null) {
+            return '';
+        }
+        const pct = Math.round(resolved * 100);
+        return ` <span class="badge ${confidenceBadgeClass(resolved)}" title="${escapeAttr(trans('confidence'))}">${pct}%</span>`;
+    }
+
     function buildInput(label, id, value, type, step, confidence) {
-        const badge = confidence != null
-            ? ` <span class="badge ${confidence >= 0.7 ? 'text-bg-success' : confidence >= 0.4 ? 'text-bg-warning' : 'text-bg-danger'}" title="${escapeAttr(trans('confidence'))}">${Math.round(confidence * 100)}%</span>`
-            : '';
+        const badge = buildConfidenceBadge(value, confidence);
         return `
             <div class="mb-2">
                 <label class="form-label small mb-1" for="${id}">${escapeHtml(label)}${badge}</label>
@@ -3329,11 +3416,13 @@
         globalThis.__aiscanWorkflowTestHooks = {
             applyPartyTypeToSupplier,
             applySelectionRange,
+            buildConfidenceBadge,
             buildPaymentMethodSelect,
             buildProductMatchBadge,
             calcAllLineTotals,
             checkTotalMismatch,
             collectFormData,
+            confidenceBadgeClass,
             finalizeAnalyzedDoc,
             getValidationWarnings,
             handleMultiInvoiceResponse,
@@ -3345,7 +3434,9 @@
             renderReviewPanel,
             resolveAutocompleteKeyAction,
             resolveDocPartyType,
+            resolveFieldConfidence,
             renderSidebar,
+            sanitizeExtractedConfidence,
             state,
         };
     }

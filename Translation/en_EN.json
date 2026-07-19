@@ -89,6 +89,7 @@
     "aiscan-queued-for-analysis": "This invoice is queued and waiting to be analyzed.",
     "aiscan-invoice": "Scan Invoice",
     "aiscan-missing-invoice-section": "Missing invoice section.",
+    "aiscan-missing-supplier-tax-id": "Supplier tax ID (CIF/NIF) was not detected. Review it before importing.",
     "aiscan-missing-required-invoice-field": "Missing required invoice field: %field%",
     "aiscan-taxes-must-be-array": "Taxes must be an array.",
     "aiscan-lines-must-be-array": "Lines must be an array.",
