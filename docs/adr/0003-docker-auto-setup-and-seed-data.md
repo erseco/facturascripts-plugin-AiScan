@@ -59,7 +59,9 @@ section so the browser playground and the Docker stack share the same billing-re
 
 - **install**: company in Santa Cruz de Tenerife, `codimpuesto=IGIC7`, `defaultplan=true`
   (imports the Spanish PGC so invoices can generate asientos).
-- **settings.default**: `codimpuesto=IGIC7`, `codpago=CONT`, `codserie=A`, EUR, NIF.
+- **settings.default**: `codimpuesto=IGIC7`, `codpago=CONT`, `codserie=A`, `codserierec=R`, EUR, NIF.
+  Docker also ensures an open ejercicio for today and assigns serie `A` to the admin user
+  (documents resolve `codejercicio` from the invoice date via `Ejercicio::loadFromDate`).
 - **seed**: Canarias suppliers, one demo customer, and products with IGIC (7% / 0%).
 
 ESP country data already ships IVA + IGIC + IPSI tax rows; the default is switched from

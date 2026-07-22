@@ -43,6 +43,7 @@ services:
       FS_COMPANY_CITY: "Santa Cruz de Tenerife"
       FS_COMPANY_PROVINCE: "Santa Cruz de Tenerife"
       FS_DEFAULT_TAX: IGIC7
+      FS_DEFAULT_SERIE: A
       FS_LOAD_ACCOUNTING_PLAN: "true"
       # Seed data: load suppliers and products from blueprint.json
       FS_SEED_FILE: /var/www/html/Plugins/AiScan/blueprint.json
