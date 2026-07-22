@@ -14,6 +14,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- Matching de proveedor por CIF/NIF (#70): se normalizan mayúsculas, espacios, puntos, guiones
+  y el prefijo `ES` antes de comparar, para que facturas recurrentes no fallen el emparejamiento
+  por diferencias de formato entre la extracción y `Proveedor.cifnif`
 - Producto habitual del proveedor (#53): limpia referencias inventadas por la IA, sugiere al
   elegir proveedor en la revisión, y si el histórico no tiene referencias enlazadas intenta
   emparejar por **descripción** de líneas anteriores
