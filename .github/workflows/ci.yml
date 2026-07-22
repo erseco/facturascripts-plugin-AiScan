@@ -68,6 +68,9 @@ jobs:
           echo "📋 Fixing permissions..."
           docker compose exec -T facturascripts chown -R nobody:nobody /var/www/html/Plugins/AiScan || true
 
+          echo "🔧 Deploy plugin + ensure tables (Dinamic models)..."
+          docker compose exec -T facturascripts php84 /var/www/html/Plugins/AiScan/docker/setup-aiscan.php || true
+
           echo "✅ Plugin files copied successfully"
 
       - name: Run code style check

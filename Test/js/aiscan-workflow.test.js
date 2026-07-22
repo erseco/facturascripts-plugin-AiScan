@@ -757,3 +757,47 @@ test('manual entry payload remains importable after user fills fields', () => {
     // Import gate treats needs_review/ready as non-failed
     assert.notEqual(doc.status, 'failed');
 });
+
+test('applyPinnedProductToLines rellena líneas vacías y respeta matches reales (#69)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        extractedData: {
+            lines: [
+                {descripcion: 'Sin producto', cantidad: 1, pvpunitario: 10},
+                {descripcion: 'Ya enlazado', cantidad: 1, pvpunitario: 20, referencia: 'REAL-1'},
+                {descripcion: 'Histórico', cantidad: 1, pvpunitario: 5, referencia: 'OLD', referencia_source: 'history'},
+            ],
+        },
+        _importMode: 'lines',
+    };
+
+    hooks.applyPinnedProductToLines(doc, 'PIN-99');
+
+    assert.equal(doc.extractedData.lines[0].referencia, 'PIN-99');
+    assert.equal(doc.extractedData.lines[0].referencia_source, 'pinned');
+    assert.equal(doc.extractedData.lines[1].referencia, 'REAL-1');
+    assert.equal(doc.extractedData.lines[2].referencia, 'PIN-99');
+    assert.equal(doc.extractedData.lines[2].referencia_source, 'pinned');
+});
+
+test('buildTotalLines incluye producto fijado de _product_suggestion (#69)', () => {
+    const {hooks} = loadTestHooks();
+    const lines = hooks.buildTotalLines({
+        invoice: {summary: 'Servicio', subtotal: 100, tax_amount: 21, total: 121},
+        taxes: [{base: 100, rate: 21, amount: 21}],
+        _product_suggestion: {referencia: 'SERV-1', source: 'pinned'},
+    });
+
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].referencia, 'SERV-1');
+    assert.equal(lines[0].referencia_source, 'pinned');
+    assert.equal(lines[0].pvpunitario, 100);
+});
+
+test('buildProductMatchBadge distingue pinned e history (#69)', () => {
+    const {hooks} = loadTestHooks();
+    const pinned = hooks.buildProductMatchBadge('PIN-1', 'pinned');
+    const history = hooks.buildProductMatchBadge('HIST-1', 'history');
+    assert.match(pinned, /fa-thumbtack/);
+    assert.match(history, /fa-clock-rotate-left/);
+});
