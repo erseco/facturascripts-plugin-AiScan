@@ -170,7 +170,7 @@ class PurchaseLineInventoryUpdater
 
     /**
      * @param array<string, mixed> $sourceLine
-     * @param array<int, string> $keys
+     * @param array<int, string>   $keys
      */
     private function getNumber(array $sourceLine, array $keys, float $fallback): float
     {
