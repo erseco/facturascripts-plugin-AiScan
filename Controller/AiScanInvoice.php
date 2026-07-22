@@ -377,14 +377,27 @@ class AiScanInvoice extends Controller
         $provider = $this->request()->get('provider', '');
         $mockFixture = $this->request()->get('mock_fixture', '');
         $service = new ExtractionService();
-        $extracted = $service->extractFromFile(
-            $tmpPath,
-            $mimeType,
-            $provider ?: null,
-            $importMode,
-            $historicalContext,
-            $mockFixture !== '' ? $mockFixture : null
-        );
+
+        try {
+            $extracted = $service->extractFromFile(
+                $tmpPath,
+                $mimeType,
+                $provider ?: null,
+                $importMode,
+                $historicalContext,
+                $mockFixture !== '' ? $mockFixture : null
+            );
+        } catch (\Throwable $e) {
+            // AI / provider failures must not block manual accounting: return a
+            // controlled payload with empty editable fields (#67).
+            Tools::log()->warning(
+                'AiScan scan_failed: ' . $e->getMessage()
+            );
+            $failed = ExtractionService::buildScanFailedResult($e);
+            $failed['data'] = $this->enrichExtractedData($failed['data']);
+            echo json_encode($failed);
+            return;
+        }
 
         // Multi-invoice: the AI returned several invoices from one document
         if (!empty($extracted['_multi_invoice'])) {
@@ -394,6 +407,7 @@ class AiScanInvoice extends Controller
             }
             echo json_encode([
                 'success' => true,
+                'scan_failed' => false,
                 '_multi_invoice' => true,
                 'invoices' => $invoices,
             ]);
@@ -402,7 +416,11 @@ class AiScanInvoice extends Controller
 
         $extracted = $this->enrichExtractedData($extracted);
 
-        echo json_encode(['success' => true, 'data' => $extracted]);
+        echo json_encode([
+            'success' => true,
+            'scan_failed' => false,
+            'data' => $extracted,
+        ]);
     }
 
     /**

@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+
+- **Entrada manual ante fallo de IA** (#67): si el escaneo falla (red, HTTP, JSON inválido,
+  sin API key) o el usuario elige «Entrada manual», el panel lateral se muestra vacío y
+  editable con un aviso no bloqueante. El guardado/importación funciona igual que con
+  datos escaneados.
+
 ### Fixed
 
 - Producto habitual del proveedor (#53): limpia referencias inventadas por la IA, sugiere al

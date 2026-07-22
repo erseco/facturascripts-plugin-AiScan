@@ -31,6 +31,8 @@
         debugMode: !!(window.aiscanDebugMode),
         mockFixtures: Array.isArray(window.aiscanMockFixtures) ? window.aiscanMockFixtures.slice() : [],
         mockFixture: window.aiscanMockFixture || '',
+        // Skip AI scan and open empty editable review panel (#67)
+        manualEntryOnly: false,
     };
 
     const PARTY_SUPPLIER = 'supplier';
@@ -567,15 +569,167 @@
             }
 
             buildProviderSelect();
+
+            // Force manual entry when no AI provider is available (#67).
+            const providers = state.availableProviders || [];
+            if (!providers.length) {
+                state.manualEntryOnly = true;
+                const manualCb = document.getElementById('aiscan-manual-entry');
+                if (manualCb) {
+                    manualCb.checked = true;
+                }
+            }
+
             showStep('review');
             state.currentIndex = 0;
             renderCurrentDocument();
-            analyzeAllPending();
+
+            if (state.manualEntryOnly) {
+                openAllAsManualEntry(trans('aiscan-scan-failed-no-provider'));
+            } else {
+                analyzeAllPending();
+            }
         } catch (error) {
             uploadBtn.disabled = false;
-            uploadBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up me-1"></i>${escapeHtml(trans('aiscan-upload-and-analyze'))}`;
+            updateUploadButtonLabel();
             alert(error.message);
         }
+    }
+
+    /**
+     * Open the review panel for every uploaded document with an empty editable
+     * payload (no AI call). Used when the user chooses manual entry or when
+     * no provider/API key is configured.
+     */
+    function openAllAsManualEntry(message) {
+        const msg = message || trans('aiscan-scan-failed-manual-entry');
+        state.documents.forEach(doc => {
+            if (!doc.tmpFile || doc.status === STATUS.FAILED) {
+                return;
+            }
+            applyManualEntryFallback(doc, {
+                message: msg,
+                scanFailureCode: 'manual_entry',
+            });
+        });
+        if (document.getElementById('aiscan-review') || document.getElementById('aiscan-preview-area')) {
+            renderCurrentDocument();
+        }
+    }
+
+    /**
+     * Empty extraction shell matching the server-side schema so the review
+     * form and import pipeline work without a prior successful scan.
+     */
+    function buildEmptyExtractedData(message) {
+        const warning = message || '';
+        return {
+            document_type: null,
+            supplier: {
+                name: null,
+                tax_id: null,
+                email: null,
+                phone: null,
+                website: null,
+                address: null,
+            },
+            customer: {
+                name: null,
+                tax_id: null,
+                address: null,
+            },
+            invoice: {
+                number: null,
+                issue_date: null,
+                due_date: null,
+                currency: null,
+                subtotal: null,
+                tax_amount: null,
+                withholding_amount: null,
+                total: null,
+                summary: null,
+                payment_terms: null,
+            },
+            taxes: [],
+            lines: [],
+            confidence: {
+                supplier_name: 0,
+                supplier_tax_id: 0,
+                invoice_number: 0,
+                issue_date: 0,
+                total: 0,
+                lines: 0,
+            },
+            warnings: warning ? [warning] : [],
+            _validation_errors: [],
+            _provider: null,
+            _scan_failed: true,
+        };
+    }
+
+    /**
+     * Apply controlled scan-failure / manual-entry payload: keep the document
+     * reviewable and importable instead of STATUS.FAILED.
+     */
+    function applyManualEntryFallback(doc, options) {
+        const opts = options || {};
+        const message = opts.message || trans('aiscan-scan-failed-manual-entry');
+        const data = opts.data && typeof opts.data === 'object'
+            ? opts.data
+            : buildEmptyExtractedData(message);
+
+        if (!Array.isArray(data.warnings)) {
+            data.warnings = [];
+        }
+        if (message && !data.warnings.includes(message)) {
+            data.warnings.unshift(message);
+        }
+        data._scan_failed = true;
+
+        doc.extractedData = data;
+        doc.scanFailed = true;
+        doc.scanFailedMessage = message;
+        doc.scanFailureCode = opts.scanFailureCode || data._scan_failure_code || 'unknown';
+        doc.error = null;
+        finalizeAnalyzedDoc(doc);
+        // Always require review when scan did not populate fields.
+        doc.status = STATUS.NEEDS_REVIEW;
+    }
+
+    /**
+     * Handle analyze API response: success, multi-invoice, or scan_failed.
+     * Returns true when the document was finalized (including manual fallback).
+     */
+    function applyAnalyzeResponse(doc, data) {
+        if (data && data.scan_failed) {
+            applyManualEntryFallback(doc, {
+                message: data.message || trans('aiscan-scan-failed-manual-entry'),
+                data: data.data,
+                scanFailureCode: data.scan_failure_code || 'unknown',
+            });
+            return true;
+        }
+
+        if (data && data.error) {
+            throw new Error(data.error);
+        }
+
+        if (data && data._multi_invoice && Array.isArray(data.invoices) && data.invoices.length > 1) {
+            handleMultiInvoiceResponse(doc, data.invoices);
+            return true;
+        }
+
+        if (!data || !data.data) {
+            throw new Error(trans('aiscan-scan-failed-invalid-response'));
+        }
+
+        doc.extractedData = data.data;
+        doc.scanFailed = false;
+        doc.scanFailedMessage = null;
+        doc.scanFailureCode = null;
+        doc.error = null;
+        finalizeAnalyzedDoc(doc);
+        return true;
     }
 
     async function analyzeAllPending() {
@@ -609,10 +763,37 @@
                 });
 
                 const response = await fetch('AiScanInvoice?' + params.toString());
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    applyManualEntryFallback(doc, {
+                        message: trans('aiscan-scan-failed-invalid-response'),
+                        scanFailureCode: 'invalid_json',
+                    });
+                    refreshUI();
+                    return;
+                }
 
-                if (data.error) {
-                    throw new Error(data.error);
+                // Controlled AI failure from backend (#67)
+                if (data && data.scan_failed) {
+                    applyManualEntryFallback(doc, {
+                        message: data.message || trans('aiscan-scan-failed-manual-entry'),
+                        data: data.data,
+                        scanFailureCode: data.scan_failure_code || 'unknown',
+                    });
+                    refreshUI();
+                    return;
+                }
+
+                if (data && data.error) {
+                    // Unexpected hard error without scan_failed flag: still open manual panel.
+                    applyManualEntryFallback(doc, {
+                        message: data.error || trans('aiscan-scan-failed-manual-entry'),
+                        scanFailureCode: 'unknown',
+                    });
+                    refreshUI();
+                    return;
                 }
 
                 // Multi-invoice: the AI found several invoices in one document
@@ -622,7 +803,20 @@
                     return;
                 }
 
+                if (!data || !data.data) {
+                    applyManualEntryFallback(doc, {
+                        message: trans('aiscan-scan-failed-invalid-response'),
+                        scanFailureCode: 'invalid_json',
+                    });
+                    refreshUI();
+                    return;
+                }
+
                 doc.extractedData = data.data;
+                doc.scanFailed = false;
+                doc.scanFailedMessage = null;
+                doc.scanFailureCode = null;
+                doc.error = null;
 
                 if (state.useHistory && doc.extractedData?.supplier?.matched_supplier_id && !doc._historyAnalyzed) {
                     doc._historyAnalyzed = true;
@@ -634,15 +828,23 @@
                     });
                     const reResponse = await fetch('AiScanInvoice?' + reParams.toString());
                     const reData = await reResponse.json();
-                    if (reData.success && reData.data) {
+                    if (reData && reData.scan_failed) {
+                        // Keep first extraction; history re-scan failure is non-blocking.
+                    } else if (reData && reData.success && reData.data) {
                         doc.extractedData = reData.data;
+                        doc.scanFailed = false;
                     }
                 }
 
                 finalizeAnalyzedDoc(doc);
             } catch (error) {
-                doc.status = STATUS.FAILED;
-                doc.error = error.message;
+                // Network/transport errors: open empty editable panel instead of FAILED.
+                applyManualEntryFallback(doc, {
+                    message: error && error.message
+                        ? error.message
+                        : trans('aiscan-scan-failed-network'),
+                    scanFailureCode: 'network_error',
+                });
             }
 
             refreshUI();
@@ -845,9 +1047,35 @@
                 alert(trans('aiscan-import-mode-required'));
                 return;
             }
+            persistCurrentFormState();
             showStep('import');
             buildImportSummary();
         });
+
+        const manualEntryCheckbox = document.getElementById('aiscan-manual-entry');
+        if (manualEntryCheckbox) {
+            manualEntryCheckbox.addEventListener('change', () => {
+                state.manualEntryOnly = !!manualEntryCheckbox.checked;
+                updateUploadButtonLabel();
+            });
+            state.manualEntryOnly = !!manualEntryCheckbox.checked;
+        }
+        updateUploadButtonLabel();
+    }
+
+    function updateUploadButtonLabel() {
+        const uploadBtn = document.getElementById('aiscan-upload-btn');
+        if (!uploadBtn || uploadBtn.querySelector('.fa-spinner')) {
+            // Keep spinner text while uploading; only update idle labels.
+            return;
+        }
+        const label = state.manualEntryOnly
+            ? trans('aiscan-upload-manual-entry')
+            : trans('aiscan-upload-and-analyze');
+        const icon = state.manualEntryOnly
+            ? 'fa-keyboard'
+            : 'fa-cloud-arrow-up';
+        uploadBtn.innerHTML = `<i class="fa-solid ${icon} me-1"></i>${escapeHtml(label)}`;
     }
 
     // ── Sidebar ────────────────────────────────────────────────────────
@@ -1214,8 +1442,11 @@
         const jsonBtn = doc.extractedData
             ? ` <button class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1 aiscan-debug-json-btn" type="button" title="JSON"><i class="fa-solid fa-code"></i></button>`
             : '';
-        if (doc.error) {
+        if (doc.error && !doc.extractedData) {
             statusEl.innerHTML = `<div class="alert alert-danger py-1 px-2 small mb-0">${escapeHtml(doc.error)}${jsonBtn}</div>`;
+        } else if (doc.scanFailed && doc.extractedData) {
+            const msg = doc.scanFailedMessage || trans('aiscan-scan-failed-manual-entry');
+            statusEl.innerHTML = `<div class="alert alert-warning py-1 px-2 small mb-0 d-flex align-items-center justify-content-between"><span><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(msg)}</span>${jsonBtn}</div>`;
         } else if (doc.status === STATUS.ANALYZING) {
             statusEl.innerHTML = `<div class="alert alert-info py-1 px-2 small mb-0"><i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-analysis-started', {'%provider%': state.defaultProvider}))}</div>`;
         } else if (doc.status === STATUS.ANALYZED || doc.status === STATUS.READY || doc.status === STATUS.NEEDS_REVIEW) {
@@ -1259,7 +1490,17 @@
             } else if (doc.status === STATUS.PENDING) {
                 review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-clock fa-2x text-secondary mb-2"></i><p class="text-muted">${escapeHtml(trans('aiscan-queued-for-analysis'))}</p></div>`;
             } else if (doc.status === STATUS.FAILED) {
-                review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-times-circle fa-2x text-danger mb-2"></i><p class="text-danger">${escapeHtml(doc.error || trans('aiscan-status-failed'))}</p></div>`;
+                // Upload failure without a usable file — still offer manual shell if we have tmpFile.
+                if (doc.tmpFile) {
+                    applyManualEntryFallback(doc, {
+                        message: doc.error || trans('aiscan-scan-failed-manual-entry'),
+                    });
+                    // Fall through by re-entering with extractedData set.
+                    renderReviewPanel(doc);
+                    return;
+                }
+                review.innerHTML = `<div class="text-center p-4"><i class="fa-solid fa-times-circle fa-2x text-danger mb-2"></i><p class="text-danger">${escapeHtml(doc.error || trans('aiscan-status-failed'))}</p>
+                    <p class="text-muted small mt-2">${escapeHtml(trans('aiscan-scan-failed-manual-entry'))}</p></div>`;
             } else {
                 review.innerHTML = `<p class="text-muted mb-0">${escapeHtml(trans('aiscan-initial-review-message'))}</p>`;
             }
@@ -1275,14 +1516,29 @@
 
         review.innerHTML = '';
 
+        // Non-blocking banner when automatic scan failed or manual entry was chosen (#67)
+        if (doc.scanFailed || data._scan_failed) {
+            const msg = doc.scanFailedMessage
+                || (Array.isArray(data.warnings) && data.warnings[0])
+                || trans('aiscan-scan-failed-manual-entry');
+            review.insertAdjacentHTML('beforeend', `
+                <div class="alert alert-warning py-2" id="aiscan-scan-failed-banner" role="status">
+                    <strong class="small"><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(trans('aiscan-manual-entry-title'))}</strong>
+                    <p class="mb-0 small">${escapeHtml(msg)}</p>
+                </div>
+            `);
+        }
+
         review.insertAdjacentHTML('beforeend', `
             <div id="aiscan-validation-warnings" class="${validationErrors.length > 0 ? 'alert alert-danger py-2' : 'd-none'}">
                 ${renderValidationWarningsHtml(validationErrors)}
             </div>
         `);
 
-        const aiWarnings = Array.isArray(data.warnings) ? data.warnings.filter(w => w) : [];
-        if (aiWarnings.length > 0) {
+        const aiWarnings = Array.isArray(data.warnings)
+            ? data.warnings.filter(w => w && !(doc.scanFailed && w === doc.scanFailedMessage))
+            : [];
+        if (aiWarnings.length > 0 && !doc.scanFailed) {
             review.insertAdjacentHTML('beforeend', `
                 <div class="alert alert-info py-2">
                     <strong class="small"><i class="fa-solid fa-circle-info me-1"></i>${escapeHtml(trans('aiscan-ai-notes'))}</strong>
@@ -3070,16 +3326,14 @@
 
                 const response = await fetch('AiScanInvoice?' + params.toString());
                 const data = await response.json();
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                doc.extractedData = data.data;
-                doc.status = STATUS.ANALYZED;
+                applyAnalyzeResponse(doc, data);
             } catch (error) {
-                doc.status = STATUS.NEEDS_REVIEW;
-                doc.error = error.message;
+                applyManualEntryFallback(doc, {
+                    message: error && error.message
+                        ? error.message
+                        : trans('aiscan-scan-failed-network'),
+                    scanFailureCode: 'network_error',
+                });
             }
 
             renderSidebar();
@@ -3112,16 +3366,14 @@
 
             const response = await fetch('AiScanInvoice?' + params.toString());
             const data = await response.json();
-
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            doc.extractedData = data.data;
-            doc.status = STATUS.ANALYZED;
+            applyAnalyzeResponse(doc, data);
         } catch (error) {
-            doc.status = STATUS.NEEDS_REVIEW;
-            doc.error = error.message;
+            applyManualEntryFallback(doc, {
+                message: error && error.message
+                    ? error.message
+                    : trans('aiscan-scan-failed-network'),
+                scanFailureCode: 'network_error',
+            });
         }
 
         renderCurrentDocument();
@@ -3529,9 +3781,12 @@
 
     if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
         globalThis.__aiscanWorkflowTestHooks = {
+            applyAnalyzeResponse,
+            applyManualEntryFallback,
             applyPartyTypeToSupplier,
             applySelectionRange,
             buildConfidenceBadge,
+            buildEmptyExtractedData,
             buildPaymentMethodSelect,
             buildProductMatchBadge,
             calcAllLineTotals,
@@ -3544,6 +3799,7 @@
             buildImportSummary,
             isCreditorPartyType,
             normalizePartyType,
+            openAllAsManualEntry,
             PARTY_CREDITOR,
             PARTY_SUPPLIER,
             renderReviewPanel,
@@ -3552,6 +3808,7 @@
             resolveFieldConfidence,
             renderSidebar,
             sanitizeExtractedConfidence,
+            STATUS,
             state,
         };
     }

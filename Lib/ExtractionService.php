@@ -589,6 +589,172 @@ PROMPT;
         return $data;
     }
 
+    /**
+     * Empty extraction payload used for manual entry when AI scan is unavailable.
+     * Matches the standard extraction schema so the review UI and import path work unchanged.
+     *
+     * @return array<string, mixed>
+     */
+    public static function emptyExtractionPayload(string $warningMessage = ''): array
+    {
+        $payload = [
+            'document_type' => null,
+            'supplier' => [
+                'name' => null,
+                'tax_id' => null,
+                'email' => null,
+                'phone' => null,
+                'website' => null,
+                'address' => null,
+            ],
+            'customer' => [
+                'name' => null,
+                'tax_id' => null,
+                'address' => null,
+            ],
+            'invoice' => [
+                'number' => null,
+                'issue_date' => null,
+                'due_date' => null,
+                'currency' => null,
+                'subtotal' => null,
+                'tax_amount' => null,
+                'withholding_amount' => null,
+                'total' => null,
+                'summary' => null,
+                'payment_terms' => null,
+            ],
+            'taxes' => [],
+            'lines' => [],
+            'confidence' => [
+                'supplier_name' => 0,
+                'supplier_tax_id' => 0,
+                'invoice_number' => 0,
+                'issue_date' => 0,
+                'total' => 0,
+                'lines' => 0,
+            ],
+            'warnings' => [],
+            '_validation_errors' => [],
+            '_provider' => null,
+            '_scan_failed' => true,
+        ];
+
+        if ($warningMessage !== '') {
+            $payload['warnings'][] = $warningMessage;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Classify an AI extraction failure for controlled frontend responses.
+     *
+     * @return array{code: string, message_key: string, detail: string}
+     */
+    public static function classifyExtractionFailure(\Throwable $e): array
+    {
+        $detail = $e->getMessage();
+        $lower = strtolower($detail);
+
+        if (
+            str_contains($lower, 'no ai provider')
+            || str_contains($lower, 'is not available')
+            || str_contains($lower, 'not configured')
+            || str_contains($lower, 'api key')
+            || str_contains($lower, 'please configure a provider')
+        ) {
+            return [
+                'code' => 'missing_api_key',
+                'message_key' => 'aiscan-scan-failed-no-provider',
+                'detail' => $detail,
+            ];
+        }
+
+        if (
+            str_contains($lower, 'invalid json')
+            || str_contains($lower, 'json response')
+            || str_contains($lower, 'syntax error')
+            || str_contains($lower, 'unexpected token')
+        ) {
+            return [
+                'code' => 'invalid_json',
+                'message_key' => 'aiscan-scan-failed-invalid-response',
+                'detail' => $detail,
+            ];
+        }
+
+        if (
+            str_contains($lower, 'curl')
+            || str_contains($lower, 'timed out')
+            || str_contains($lower, 'timeout')
+            || str_contains($lower, 'request failed')
+            || str_contains($lower, 'could not resolve')
+            || str_contains($lower, 'connection')
+            || str_contains($lower, 'network')
+            || str_contains($lower, 'failed to connect')
+        ) {
+            return [
+                'code' => 'network_error',
+                'message_key' => 'aiscan-scan-failed-network',
+                'detail' => $detail,
+            ];
+        }
+
+        if (
+            preg_match('/http\s*[1-5]\d{2}/i', $detail) === 1
+            || str_contains($lower, 'api error')
+            || str_contains($lower, 'quota')
+            || str_contains($lower, 'rate limit')
+        ) {
+            return [
+                'code' => 'http_error',
+                'message_key' => 'aiscan-scan-failed-provider-error',
+                'detail' => $detail,
+            ];
+        }
+
+        return [
+            'code' => 'unknown',
+            'message_key' => 'aiscan-scan-failed-manual-entry',
+            'detail' => $detail,
+        ];
+    }
+
+    /**
+     * Build a controlled scan-failure result for the analyze endpoint.
+     * Never throws; always returns a payload the review UI can render and edit.
+     *
+     * @return array{
+     *     success: bool,
+     *     scan_failed: bool,
+     *     scan_failure_code: string,
+     *     message: string,
+     *     data: array<string, mixed>
+     * }
+     */
+    public static function buildScanFailedResult(\Throwable $e): array
+    {
+        $classification = self::classifyExtractionFailure($e);
+        $message = Tools::lang()->trans($classification['message_key']);
+        if ($message === $classification['message_key'] || $message === '') {
+            // Fallback when translation is missing (e.g. minimal test bootstrap).
+            $message = 'Automatic scan is unavailable. You can enter the invoice data manually.';
+        }
+
+        $data = self::emptyExtractionPayload($message);
+        $data['_scan_failure_code'] = $classification['code'];
+        $data['_scan_failure_detail'] = $classification['detail'];
+
+        return [
+            'success' => true,
+            'scan_failed' => true,
+            'scan_failure_code' => $classification['code'],
+            'message' => $message,
+            'data' => $data,
+        ];
+    }
+
     private static function repairTruncatedJson(string $json): string
     {
         // Remove trailing incomplete string value

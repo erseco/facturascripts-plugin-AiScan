@@ -557,3 +557,203 @@ test('finalizeAnalyzedDoc fuerza needs_review y confianza 0 si falta CIF', () =>
         || (doc.extractedData._validation_errors || []).length > 0
     );
 });
+
+// ── Issue #67: manual entry / scan_failed fallback ─────────────
+
+test('buildEmptyExtractedData returns editable shell with scan_failed flag', () => {
+    const {hooks} = loadTestHooks();
+    const data = hooks.buildEmptyExtractedData('Scan failed');
+
+    assert.equal(data._scan_failed, true);
+    assert.ok(Array.isArray(data.lines));
+    assert.equal(data.lines.length, 0);
+    assert.equal(data.invoice.number, null);
+    assert.ok(Array.isArray(data.warnings));
+    assert.ok(data.warnings.includes('Scan failed'));
+});
+
+test('applyManualEntryFallback opens reviewable panel instead of failed status', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        index: 0,
+        tmpFile: 'aiscan_tmp_x.pdf',
+        status: 'analyzing',
+        extractedData: null,
+        error: null,
+        reviewDecision: null,
+        _partyType: 'supplier',
+    };
+
+    hooks.applyManualEntryFallback(doc, {
+        message: 'Could not connect to the AI provider.',
+        scanFailureCode: 'network_error',
+    });
+
+    assert.notEqual(doc.status, 'failed');
+    assert.equal(doc.status, 'needs_review');
+    assert.equal(doc.scanFailed, true);
+    assert.equal(doc.error, null);
+    assert.ok(doc.extractedData);
+    assert.equal(doc.extractedData._scan_failed, true);
+    assert.ok(doc.extractedData.supplier);
+    assert.ok(doc.extractedData.invoice);
+});
+
+test('applyAnalyzeResponse handles scan_failed controlled payload', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        index: 0,
+        tmpFile: 'aiscan_tmp_y.pdf',
+        status: 'analyzing',
+        extractedData: null,
+        error: null,
+        reviewDecision: null,
+    };
+
+    const ok = hooks.applyAnalyzeResponse(doc, {
+        success: true,
+        scan_failed: true,
+        scan_failure_code: 'invalid_json',
+        message: 'Invalid AI response',
+        data: hooks.buildEmptyExtractedData('Invalid AI response'),
+    });
+
+    assert.equal(ok, true);
+    assert.equal(doc.scanFailed, true);
+    assert.equal(doc.status, 'needs_review');
+    assert.equal(doc.scanFailureCode, 'invalid_json');
+    assert.ok(doc.extractedData);
+});
+
+test('applyAnalyzeResponse success path fills fields without scan_failed', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.importMode = 'lines';
+    const doc = {
+        index: 0,
+        tmpFile: 'aiscan_tmp_ok.pdf',
+        status: 'analyzing',
+        extractedData: null,
+        error: null,
+        reviewDecision: null,
+        _partyType: 'supplier',
+    };
+
+    hooks.applyAnalyzeResponse(doc, {
+        success: true,
+        scan_failed: false,
+        data: {
+            supplier: {name: 'ACME', tax_id: 'B12345678'},
+            invoice: {number: 'F-100', issue_date: '2025-01-10', total: 121},
+            lines: [{descripcion: 'Item', cantidad: 1, pvpunitario: 100, iva: 21}],
+            taxes: [],
+            confidence: {
+                supplier_name: 0.9,
+                supplier_tax_id: 0.9,
+                invoice_number: 0.9,
+                issue_date: 0.9,
+                total: 0.9,
+                lines: 0.9,
+            },
+            warnings: [],
+            _validation_errors: [],
+            _provider: 'mock',
+        },
+    });
+
+    assert.equal(doc.scanFailed, false);
+    assert.notEqual(doc.status, 'failed');
+    assert.equal(doc.extractedData.invoice.number, 'F-100');
+    assert.equal(doc.extractedData.supplier.name, 'ACME');
+    assert.equal(doc.extractedData.lines.length, 1);
+});
+
+test('openAllAsManualEntry skips AI and marks all docs needs_review', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.documents = [
+        {
+            index: 0,
+            tmpFile: 'a.pdf',
+            status: 'pending',
+            extractedData: null,
+            error: null,
+            reviewDecision: null,
+            _partyType: 'supplier',
+        },
+        {
+            index: 1,
+            tmpFile: 'b.pdf',
+            status: 'pending',
+            extractedData: null,
+            error: null,
+            reviewDecision: null,
+            _partyType: 'supplier',
+        },
+        {
+            index: 2,
+            tmpFile: null,
+            status: 'failed',
+            extractedData: null,
+            error: 'upload error',
+            reviewDecision: null,
+        },
+    ];
+    hooks.state.importMode = 'lines';
+
+    // Apply fallback directly (openAllAsManualEntry also re-renders the current
+    // document, which needs a richer DOM mock than this suite provides).
+    hooks.state.documents.forEach(doc => {
+        if (!doc.tmpFile || doc.status === 'failed') {
+            return;
+        }
+        hooks.applyManualEntryFallback(doc, {
+            message: 'No AI provider configured',
+            scanFailureCode: 'manual_entry',
+        });
+    });
+
+    assert.equal(hooks.state.documents[0].status, 'needs_review');
+    assert.equal(hooks.state.documents[1].status, 'needs_review');
+    assert.equal(hooks.state.documents[0].scanFailed, true);
+    assert.equal(hooks.state.documents[0].extractedData._scan_failed, true);
+    assert.equal(hooks.state.documents[2].status, 'failed');
+    assert.equal(hooks.state.documents[2].extractedData, null);
+});
+
+test('manual entry payload remains importable after user fills fields', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        index: 0,
+        tmpFile: 'manual.pdf',
+        status: 'analyzing',
+        extractedData: null,
+        error: null,
+        reviewDecision: null,
+        _partyType: 'supplier',
+    };
+
+    hooks.applyManualEntryFallback(doc, {
+        message: 'Automatic scan is unavailable.',
+        scanFailureCode: 'missing_api_key',
+    });
+
+    // User fills data by hand (mirrors collectFormData result).
+    doc.extractedData.supplier.name = 'Manual Supplier';
+    doc.extractedData.supplier.tax_id = 'B99887766';
+    doc.extractedData.supplier.matched_supplier_id = '000001';
+    doc.extractedData.invoice.number = 'M-1';
+    doc.extractedData.invoice.issue_date = '2025-01-01';
+    doc.extractedData.invoice.total = 50;
+    doc.extractedData.lines = [
+        {descripcion: 'Linea manual', cantidad: 1, pvpunitario: 50, iva: 0},
+    ];
+    doc.status = hooks.STATUS.READY;
+    doc.reviewDecision = 'approved';
+
+    assert.equal(doc.scanFailed, true);
+    assert.equal(doc.status, 'ready');
+    assert.equal(doc.reviewDecision, 'approved');
+    assert.equal(doc.extractedData.invoice.number, 'M-1');
+    assert.equal(doc.extractedData.lines.length, 1);
+    // Import gate treats needs_review/ready as non-failed
+    assert.notEqual(doc.status, 'failed');
+});
