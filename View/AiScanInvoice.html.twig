@@ -106,6 +106,16 @@
                                     </select>
                                     <div class="form-text">{{ i18n.trans('aiscan-party-type-help') }}</div>
                                 </div>
+                                {# Entrada manual sin escaneo IA (#67): panel lateral siempre usable. #}
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aiscan-manual-entry" value="1"{% if availableProviders is empty %} checked{% endif %}>
+                                        <label class="form-check-label" for="aiscan-manual-entry">
+                                            <i class="fa-solid fa-keyboard me-1"></i>{{ i18n.trans('aiscan-manual-entry') }}
+                                        </label>
+                                        <div class="form-text">{{ i18n.trans('aiscan-manual-entry-help') }}</div>
+                                    </div>
+                                </div>
                                 {# Forma de pago solo en el panel de revisión (#57): evitar selector duplicado en subida. #}
                                 <button type="button" class="btn btn-primary w-100" id="aiscan-upload-btn" disabled>
                                     <i class="fa-solid fa-cloud-arrow-up me-1"></i>{{ i18n.trans('aiscan-upload-and-analyze') }}
@@ -379,6 +389,15 @@
         'aiscan-update-stock-purchase-data': '{{ i18n.trans('aiscan-update-stock-purchase-data')|e('js') }}',
         'aiscan-undecided-remaining': '{{ i18n.trans('aiscan-undecided-remaining')|e('js') }}',
         'aiscan-upload-and-analyze': '{{ i18n.trans('aiscan-upload-and-analyze')|e('js') }}',
+        'aiscan-upload-manual-entry': '{{ i18n.trans('aiscan-upload-manual-entry')|e('js') }}',
+        'aiscan-manual-entry': '{{ i18n.trans('aiscan-manual-entry')|e('js') }}',
+        'aiscan-manual-entry-help': '{{ i18n.trans('aiscan-manual-entry-help')|e('js') }}',
+        'aiscan-manual-entry-title': '{{ i18n.trans('aiscan-manual-entry-title')|e('js') }}',
+        'aiscan-scan-failed-manual-entry': '{{ i18n.trans('aiscan-scan-failed-manual-entry')|e('js') }}',
+        'aiscan-scan-failed-no-provider': '{{ i18n.trans('aiscan-scan-failed-no-provider')|e('js') }}',
+        'aiscan-scan-failed-network': '{{ i18n.trans('aiscan-scan-failed-network')|e('js') }}',
+        'aiscan-scan-failed-invalid-response': '{{ i18n.trans('aiscan-scan-failed-invalid-response')|e('js') }}',
+        'aiscan-scan-failed-provider-error': '{{ i18n.trans('aiscan-scan-failed-provider-error')|e('js') }}',
         'aiscan-uploading-file': '{{ i18n.trans('aiscan-uploading-file')|e('js') }}',
         'aiscan-validation-warnings': '{{ i18n.trans('aiscan-validation-warnings')|e('js') }}',
         'aiscan-view-invoice': '{{ i18n.trans('aiscan-view-invoice')|e('js') }}',
