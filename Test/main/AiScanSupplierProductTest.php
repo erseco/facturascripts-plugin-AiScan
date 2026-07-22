@@ -38,6 +38,16 @@ final class AiScanSupplierProductTest extends TestCase
     /** @var string[] */
     private array $codproveedoresToClear = [];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (!class_exists(Proveedor::class)) {
+            $this->markTestSkipped('FacturaScripts Dinamic\Model\Proveedor no disponible en este entorno.');
+        }
+        // Asegurar que la tabla del modelo existe (CI Docker copia el plugin sin deploy).
+        new AiScanSupplierProduct();
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->codproveedoresToClear as $cod) {
