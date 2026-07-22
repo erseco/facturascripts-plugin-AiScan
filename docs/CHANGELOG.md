@@ -12,8 +12,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   editable con un aviso no bloqueante. El guardado/importación funciona igual que con
   datos escaneados.
 
+### Added
+
+- **Memoria de alias de proveedor** (#71): si el usuario corrige el proveedor en la revisión,
+  se guarda una huella (CIF normalizado / nombre / IBAN / email → `codproveedor`) y en imports
+  posteriores se reutiliza **antes** del matching difuso. Solo se escribe en elecciones
+  explícitas (búsqueda, desambiguación, crear proveedor); nunca en auto-match.
+
 ### Fixed
 
+- Matching de proveedor por CIF/NIF: normalización de formato (mayúsculas, puntos, guiones,
+  prefijo `ES`) al comparar, compartida con las huellas de alias (#70 / #71)
 - Producto habitual del proveedor (#53): limpia referencias inventadas por la IA, sugiere al
   elegir proveedor en la revisión, y si el histórico no tiene referencias enlazadas intenta
   emparejar por **descripción** de líneas anteriores

@@ -3006,6 +3006,8 @@
                 // not the historical type of the matched record. On import, that
                 // choice updates Proveedor.acreedor when it differs.
                 applyPartyTypeToSupplier(doc.extractedData.supplier, resolveDocPartyType(doc));
+                // Issue #71: aprender alias solo en elección explícita del usuario.
+                rememberSupplierAlias(doc.extractedData.supplier, item.dataset.id);
             }
             // Issue #53: al elegir proveedor a mano, sugerir producto habitual
             applySupplierProductSuggestion(doc, item.dataset.id).then(() => renderReviewPanel(doc));
@@ -3046,6 +3048,8 @@
                     doc.extractedData.supplier.match_status = 'selected';
                     doc.extractedData.supplier.tax_id = nameMatch ? nameMatch[2] : '';
                     doc.extractedData.supplier.name = doc.extractedData.supplier.matched_name;
+                    // Issue #71: desambiguación = elección explícita
+                    rememberSupplierAlias(doc.extractedData.supplier, opt.value);
                 }
                 applySupplierProductSuggestion(doc, opt.value).then(() => renderReviewPanel(doc));
             });
@@ -3055,6 +3059,31 @@
         const createBtn = document.getElementById('aiscan-create-supplier-btn');
         if (createBtn) {
             createBtn.addEventListener('click', createSupplierInline);
+        }
+    }
+
+    /**
+     * Issue #71: persiste el alias (fingerprint → codproveedor) solo cuando el
+     * usuario elige o crea el proveedor a mano. Nunca se llama tras un auto-match.
+     */
+    async function rememberSupplierAlias(supplier, codproveedor) {
+        if (!codproveedor || !supplier) {
+            return;
+        }
+        try {
+            await fetch('AiScanInvoice?action=remember-supplier-alias', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    codproveedor,
+                    tax_id: supplier.tax_id || '',
+                    name: supplier.name || '',
+                    email: supplier.email || '',
+                    iban: supplier.iban || '',
+                }),
+            });
+        } catch (e) {
+            // silent — el alias es best-effort
         }
     }
 
@@ -3152,6 +3181,8 @@
                     data.supplier.party_type || partyType
                 );
                 doc._partyType = normalizePartyType(data.supplier.party_type || partyType);
+                // Issue #71: crear proveedor también es elección explícita
+                rememberSupplierAlias(doc.extractedData.supplier, data.supplier.id);
             }
 
             // Re-render to show collapsed matched state
