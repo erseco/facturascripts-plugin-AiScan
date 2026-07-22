@@ -54,7 +54,22 @@ environment:
 
 ### blueprint.json
 
-Extended with an `install` section (for the playground) and a `seed` section containing 5 Spanish suppliers and 10 products (services, materials, hardware) for realistic testing.
+Extended with an `install` section (for the playground), a `settings` section and a `seed`
+section so the browser playground and the Docker stack share the same billing-ready demo:
+
+- **install**: company in Santa Cruz de Tenerife, `codimpuesto=IGIC7`, `defaultplan=true`
+  (imports the Spanish PGC so invoices can generate asientos).
+- **settings.default**: `codimpuesto=IGIC7`, `codpago=CONT`, `codserie=A`, EUR, NIF.
+- **seed**: Canarias suppliers, one demo customer, and products with IGIC (7% / 0%).
+
+ESP country data already ships IVA + IGIC + IPSI tax rows; the default is switched from
+mainland `IVA21` to `IGIC7` so extracted Canary invoices map and post correctly.
+
+### docker/setup-aiscan.php
+
+In addition to enabling the plugin and wiring API keys, applies company address / IGIC
+defaults from env vars (`FS_DEFAULT_TAX`, `FS_COMPANY_*`) and imports the accounting plan
+when missing (`AccountingPlanImport` over `defaultPlan.csv`).
 
 ## Consequences
 

@@ -3,7 +3,7 @@
   "meta": {
     "title": "AiScan Playground Demo",
     "author": "erseco",
-    "description": "Ejecuta AiScan en FacturaScripts Playground con el plugin cargado desde este repositorio."
+    "description": "Ejecuta AiScan en FacturaScripts Playground listo para facturar en Canarias (IGIC, plan contable PGC, proveedores y productos demo)."
   },
   "debug": {
     "enabled": true
@@ -12,7 +12,7 @@
   "siteOptions": {
     "title": "AiScan Playground Demo",
     "locale": "es_ES",
-    "timezone": "Europe/Madrid"
+    "timezone": "Atlantic/Canary"
   },
   "login": {
     "username": "admin",
@@ -26,10 +26,49 @@
     "empresa": "Pepita Gómez - Autónoma",
     "cifnif": "125478938W",
     "tipoidfiscal": "NIF",
+    "direccion": "Calle Castillo 15",
+    "codpostal": "38003",
+    "ciudad": "Santa Cruz de Tenerife",
+    "provincia": "Santa Cruz de Tenerife",
     "regimeniva": "General",
-    "defaultplan": true
+    "codimpuesto": "IGIC7",
+    "defaultplan": true,
+    "costpricepolicy": "",
+    "ventasinstock": false,
+    "updatesupplierprices": true
+  },
+  "settings": {
+    "default": {
+      "codpais": "ESP",
+      "coddivisa": "EUR",
+      "codimpuesto": "IGIC7",
+      "codpago": "CONT",
+      "codserie": "A",
+      "tipoidfiscal": "NIF",
+      "regimeniva": "General",
+      "updatesupplierprices": true,
+      "ventasinstock": false
+    }
   },
   "seed": {
+    "customers": [
+      {
+        "codcliente": "C-DEMO-01",
+        "nombre": "Cliente Demo Canarias",
+        "razonsocial": "Cliente Demo Canarias S.L.",
+        "cifnif": "B38099887",
+        "tipoidfiscal": "CIF",
+        "regimeniva": "General",
+        "email": "cliente@example.com",
+        "telefono1": "+34922222111",
+        "direccion": "Av. de Anaga 1",
+        "codpostal": "38001",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
+        "_unique": "codcliente"
+      }
+    ],
     "suppliers": [
       {
         "nombre": "Clínica Dental Sonrisa",
@@ -37,6 +76,11 @@
         "cifnif": "B38456789",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle Méndez Núñez 8",
+        "codpostal": "38002",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -45,6 +89,11 @@
         "cifnif": "B38901234",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle Imeldo Serís 22",
+        "codpostal": "38003",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -53,6 +102,11 @@
         "cifnif": "B38012345",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Av. Tres de Mayo 40",
+        "codpostal": "38005",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -61,6 +115,11 @@
         "cifnif": "B38033344",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Camino Real 12",
+        "codpostal": "38509",
+        "ciudad": "Güímar",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -69,6 +128,11 @@
         "cifnif": "B38778899",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle Bethencourt Alfonso 5",
+        "codpostal": "38002",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -77,6 +141,11 @@
         "cifnif": "B38111222",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle Robayna 3",
+        "codpostal": "38004",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -85,6 +154,11 @@
         "cifnif": "E76234567",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Mirador de la Concepción s/n",
+        "codpostal": "38205",
+        "ciudad": "La Laguna",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -93,6 +167,11 @@
         "cifnif": "A38345678",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Polígono Costa Sur, nave 4",
+        "codpostal": "38110",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -101,6 +180,11 @@
         "cifnif": "B38556677",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle El Pilar 18",
+        "codpostal": "38002",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -109,6 +193,11 @@
         "cifnif": "A38789012",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Plaza Weyler 2",
+        "codpostal": "38003",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -117,6 +206,11 @@
         "cifnif": "B38112233",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle San Francisco 9",
+        "codpostal": "38001",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -125,6 +219,11 @@
         "cifnif": "P3800000B",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Plaza de España s/n",
+        "codpostal": "38003",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -133,6 +232,11 @@
         "cifnif": "B38334455",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle del Castillo 30",
+        "codpostal": "38003",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -141,6 +245,11 @@
         "cifnif": "S3511001I",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Av. José Manuel Guimerá 10",
+        "codpostal": "38071",
+        "ciudad": "Santa Cruz de Tenerife",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -149,6 +258,11 @@
         "cifnif": "B38889900",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Playa de Las Américas s/n",
+        "codpostal": "38660",
+        "ciudad": "Arona",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -157,6 +271,11 @@
         "cifnif": "B76567890",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Calle Cruz Verde 7",
+        "codpostal": "35001",
+        "ciudad": "Las Palmas de Gran Canaria",
+        "provincia": "Las Palmas",
+        "codpais": "ESP",
         "_unique": "cifnif"
       },
       {
@@ -165,6 +284,11 @@
         "cifnif": "A38333444",
         "tipoidfiscal": "CIF",
         "regimeniva": "General",
+        "direccion": "Parque Científico Tecnológico",
+        "codpostal": "38204",
+        "ciudad": "La Laguna",
+        "provincia": "Santa Cruz de Tenerife",
+        "codpais": "ESP",
         "_unique": "cifnif"
       }
     ],
@@ -172,79 +296,152 @@
       {
         "referencia": "SERV-DEV",
         "descripcion": "Desarrollo de software",
-        "precio": 75.00,
+        "precio": 75.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-DISENO",
         "descripcion": "Diseño gráfico y web",
-        "precio": 60.00,
+        "precio": 60.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-RRSS",
         "descripcion": "Gestión de redes sociales",
-        "precio": 350.00,
+        "precio": 350.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-PUBLI",
         "descripcion": "Publicidad digital",
-        "precio": 500.00,
+        "precio": 500.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-CONSUL",
         "descripcion": "Consultoría y formación",
-        "precio": 80.00,
+        "precio": 80.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-HOSTING",
         "descripcion": "Hosting, dominios y SSL",
         "precio": 9.99,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-TESTING",
         "descripcion": "Testing y auditoría",
-        "precio": 65.00,
+        "precio": 65.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-MANTEN",
         "descripcion": "Mantenimiento web",
-        "precio": 200.00,
+        "precio": 200.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-FOTO",
         "descripcion": "Fotografía y vídeo profesional",
-        "precio": 120.00,
+        "precio": 120.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-RENDER",
         "descripcion": "Renders 3D y tours virtuales",
-        "precio": 450.00,
+        "precio": 450.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-PLANOS",
         "descripcion": "Planos y documentación técnica",
-        "precio": 180.00,
+        "precio": 180.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "SERV-MIGRA",
         "descripcion": "Migración de datos y servidores",
-        "precio": 90.00,
+        "precio": 90.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       },
       {
         "referencia": "GASTOS-GEN",
         "descripcion": "Gastos generales",
-        "precio": 0.00,
+        "precio": 0.0,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": false,
+        "nostock": true,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "MAT-OFICINA",
+        "descripcion": "Material de oficina",
+        "precio": 12.5,
+        "codimpuesto": "IGIC7",
+        "secompra": true,
+        "sevende": true,
+        "nostock": false,
+        "stockfis": 25,
+        "_unique": "referencia"
+      },
+      {
+        "referencia": "EXENTO-0",
+        "descripcion": "Concepto exento / IGIC 0%",
+        "precio": 100.0,
+        "codimpuesto": "IGIC0",
+        "secompra": true,
+        "sevende": true,
+        "nostock": true,
         "_unique": "referencia"
       }
     ]

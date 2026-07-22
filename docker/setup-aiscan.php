@@ -3,7 +3,10 @@
 /**
  * AiScan Docker auto-setup script.
  *
- * Configures AiScan plugin settings (API keys) from environment variables.
+ * Configures AiScan plugin settings (API keys) from environment variables
+ * and aligns the company/tax defaults with the playground blueprint so the
+ * local stack can post purchase invoices with IGIC and accounting entries.
+ *
  * Wizard completion and seed data loading are handled by the base container
  * (setup-facturascripts.php and seed-facturascripts.php via FS_SEED_FILE).
  *
@@ -26,6 +29,7 @@ require_once $configFile;
 
 use FacturaScripts\Core\Kernel;
 use FacturaScripts\Core\Plugins;
+use FacturaScripts\Core\Tools;
 
 Kernel::init();
 Plugins::deploy(true, true);
@@ -58,10 +62,133 @@ foreach ($aiscanModels as $name) {
 }
 echo "[AiScan] Plugin tables ensured.\n";
 
+// Align company + defaults for Canary Islands billing (IGIC / PGC).
+configureBillingDefaults();
+
 // Configure API keys from environment variables
 configureApiKeys();
 
 echo "[AiScan] Setup completed.\n";
+
+/**
+ * Ensure the instance can create and post invoices with IGIC and asientos.
+ *
+ * Reads optional overrides from the same install-oriented env vars used by
+ * alpine-facturascripts, falling back to the Canarias demo used in blueprint.json.
+ */
+function configureBillingDefaults(): void
+{
+    $codpais = getenv('FS_CODPAIS') ?: 'ESP';
+    $companyName = getenv('FS_COMPANY_NAME') ?: 'Pepita Gómez - Autónoma';
+    $companyCif = getenv('FS_COMPANY_CIF') ?: '125478938W';
+    $regimenIva = getenv('FS_COMPANY_REGIMENIVA') ?: 'General';
+    $defaultTax = getenv('FS_DEFAULT_TAX') ?: 'IGIC7';
+    $companyAddress = getenv('FS_COMPANY_ADDRESS') ?: 'Calle Castillo 15';
+    $companyPostal = getenv('FS_COMPANY_POSTAL') ?: '38003';
+    $companyCity = getenv('FS_COMPANY_CITY') ?: 'Santa Cruz de Tenerife';
+    $companyProvince = getenv('FS_COMPANY_PROVINCE') ?: 'Santa Cruz de Tenerife';
+
+    // Ensure country tax CSV rows (IVA + IGIC + IPSI) exist.
+    $taxModel = new \FacturaScripts\Dinamic\Model\Impuesto();
+    if ($taxModel->count() === 0) {
+        echo "[AiScan] WARNING: no taxes found after setup.\n";
+    }
+
+    if (!$taxModel->loadFromCode($defaultTax)) {
+        echo "[AiScan] WARNING: default tax {$defaultTax} not found; keeping current default.\n";
+        $defaultTax = (string) Tools::settings('default', 'codimpuesto', 'IVA21');
+    }
+
+    $empresa = new \FacturaScripts\Dinamic\Model\Empresa();
+    $empresaReady = $empresa->loadFromCode(1);
+    if ($empresaReady) {
+        $empresa->nombre = $companyName;
+        $empresa->nombrecorto = Tools::textBreak($companyName, 32);
+        $empresa->cifnif = $companyCif;
+        $empresa->tipoidfiscal = getenv('FS_COMPANY_TIPOIDFISCAL') ?: 'NIF';
+        $empresa->codpais = $codpais;
+        $empresa->regimeniva = $regimenIva;
+        $empresa->direccion = $companyAddress;
+        $empresa->codpostal = $companyPostal;
+        $empresa->ciudad = $companyCity;
+        $empresa->provincia = $companyProvince;
+        if ($empresa->save()) {
+            echo "[AiScan] Company configured: {$empresa->nombre} ({$empresa->cifnif}).\n";
+        } else {
+            echo "[AiScan] WARNING: could not save company defaults.\n";
+        }
+    }
+
+    $codalmacen = (string) Tools::settings('default', 'codalmacen', '');
+    if ($codalmacen === '') {
+        $almacen = new \FacturaScripts\Dinamic\Model\Almacen();
+        foreach ($almacen->all([], [], 0, 1) as $first) {
+            $codalmacen = (string) $first->codalmacen;
+            $first->codpais = $codpais;
+            $first->direccion = $companyAddress;
+            $first->codpostal = $companyPostal;
+            $first->ciudad = $companyCity;
+            $first->provincia = $companyProvince;
+            $first->save();
+            break;
+        }
+    }
+
+    Tools::settingsSet('default', 'codpais', $codpais);
+    Tools::settingsSet('default', 'coddivisa', 'EUR');
+    Tools::settingsSet('default', 'codimpuesto', $defaultTax);
+    Tools::settingsSet('default', 'codpago', Tools::settings('default', 'codpago', 'CONT') ?: 'CONT');
+    Tools::settingsSet('default', 'codserie', Tools::settings('default', 'codserie', 'A') ?: 'A');
+    Tools::settingsSet('default', 'tipoidfiscal', 'NIF');
+    Tools::settingsSet('default', 'regimeniva', $regimenIva);
+    Tools::settingsSet('default', 'updatesupplierprices', true);
+    Tools::settingsSet('default', 'ventasinstock', false);
+    if ($codalmacen !== '') {
+        Tools::settingsSet('default', 'codalmacen', $codalmacen);
+    }
+    if ($empresaReady) {
+        Tools::settingsSet('default', 'idempresa', $empresa->idempresa);
+    }
+    Tools::settingsSave();
+    echo "[AiScan] Default tax: {$defaultTax}; warehouse: " . ($codalmacen ?: '(none)') . ".\n";
+
+    ensureAccountingPlan($codpais);
+}
+
+/**
+ * Import the country default accounting plan when no accounts exist yet.
+ * Required so posted invoices can generate asientos with IGIC subcuentas.
+ */
+function ensureAccountingPlan(string $codpais): void
+{
+    $cuenta = new \FacturaScripts\Dinamic\Model\Cuenta();
+    if ($cuenta->count() > 0) {
+        echo "[AiScan] Accounting plan already present ({$cuenta->count()} accounts).\n";
+        return;
+    }
+
+    $planFile = FS_FOLDER . '/Dinamic/Data/Codpais/' . $codpais . '/defaultPlan.csv';
+    if (!is_file($planFile)) {
+        echo "[AiScan] WARNING: accounting plan file missing: {$planFile}\n";
+        return;
+    }
+
+    $ejercicio = new \FacturaScripts\Dinamic\Model\Ejercicio();
+    $ejercicios = $ejercicio->all([], [], 0, 1);
+    if (empty($ejercicios)) {
+        echo "[AiScan] WARNING: no exercise found; cannot import accounting plan.\n";
+        return;
+    }
+
+    $importClass = '\\FacturaScripts\\Dinamic\\Lib\\Accounting\\AccountingPlanImport';
+    if (!class_exists($importClass)) {
+        echo "[AiScan] WARNING: AccountingPlanImport not available.\n";
+        return;
+    }
+
+    (new $importClass())->importCSV($planFile, $ejercicios[0]->codejercicio);
+    echo "[AiScan] Accounting plan imported for exercise {$ejercicios[0]->codejercicio}.\n";
+}
 
 function configureApiKeys(): void
 {

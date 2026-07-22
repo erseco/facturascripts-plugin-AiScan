@@ -32,11 +32,18 @@ services:
       FS_INITIAL_PASS: admin
       FS_LANG: es_ES
       FS_TIMEZONE: Europe/Madrid
-      # Company setup (auto-completes Wizard)
+      # Company setup (auto-completes Wizard) — Canarias / IGIC demo (matches blueprint.json)
       FS_CODPAIS: ESP
-      FS_COMPANY_NAME: "Empresa Demo AiScan"
-      FS_COMPANY_CIF: "B12345678"
+      FS_COMPANY_NAME: "Pepita Gómez - Autónoma"
+      FS_COMPANY_CIF: "125478938W"
       FS_COMPANY_REGIMENIVA: General
+      FS_COMPANY_TIPOIDFISCAL: NIF
+      FS_COMPANY_ADDRESS: "Calle Castillo 15"
+      FS_COMPANY_POSTAL: "38003"
+      FS_COMPANY_CITY: "Santa Cruz de Tenerife"
+      FS_COMPANY_PROVINCE: "Santa Cruz de Tenerife"
+      FS_DEFAULT_TAX: IGIC7
+      FS_LOAD_ACCOUNTING_PLAN: "true"
       # Seed data: load suppliers and products from blueprint.json
       FS_SEED_FILE: /var/www/html/Plugins/AiScan/blueprint.json
       # Debug mode (set to false in production)
