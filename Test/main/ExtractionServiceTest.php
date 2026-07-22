@@ -116,4 +116,121 @@ final class ExtractionServiceTest extends TestCase
         $this->assertStringContainsString('COCA COLA O CRISTAL', $prompt);
         $this->assertStringContainsString('NOT separate lines', $prompt);
     }
+
+    // ── Manual entry / scan failure fallback (#67) ──────────
+
+    public function testEmptyExtractionPayloadHasExpectedSchema(): void
+    {
+        $payload = ExtractionService::emptyExtractionPayload('Manual entry');
+
+        $this->assertTrue($payload['_scan_failed']);
+        $this->assertIsArray($payload['supplier']);
+        $this->assertIsArray($payload['invoice']);
+        $this->assertIsArray($payload['lines']);
+        $this->assertIsArray($payload['taxes']);
+        $this->assertIsArray($payload['confidence']);
+        $this->assertSame([], $payload['lines']);
+        $this->assertContains('Manual entry', $payload['warnings']);
+        $this->assertArrayHasKey('number', $payload['invoice']);
+        $this->assertArrayHasKey('tax_id', $payload['supplier']);
+        $this->assertSame(0, $payload['confidence']['supplier_tax_id']);
+    }
+
+    public function testClassifyExtractionFailureDetectsMissingApiKey(): void
+    {
+        $result = ExtractionService::classifyExtractionFailure(
+            new \RuntimeException('No AI provider configured. Please configure a provider in AiScan settings.')
+        );
+        $this->assertSame('missing_api_key', $result['code']);
+        $this->assertSame('aiscan-scan-failed-no-provider', $result['message_key']);
+    }
+
+    public function testClassifyExtractionFailureDetectsUnavailableProvider(): void
+    {
+        $result = ExtractionService::classifyExtractionFailure(
+            new \RuntimeException('Provider "gemini" is not available.')
+        );
+        $this->assertSame('missing_api_key', $result['code']);
+    }
+
+    public function testClassifyExtractionFailureDetectsNetworkError(): void
+    {
+        $result = ExtractionService::classifyExtractionFailure(
+            new \RuntimeException('Gemini request failed: Connection timed out after 120000 ms')
+        );
+        $this->assertSame('network_error', $result['code']);
+        $this->assertSame('aiscan-scan-failed-network', $result['message_key']);
+    }
+
+    public function testClassifyExtractionFailureDetectsInvalidJson(): void
+    {
+        $result = ExtractionService::classifyExtractionFailure(
+            new \RuntimeException('Invalid JSON response from AI provider: Syntax error')
+        );
+        $this->assertSame('invalid_json', $result['code']);
+        $this->assertSame('aiscan-scan-failed-invalid-response', $result['message_key']);
+    }
+
+    public function testClassifyExtractionFailureDetectsHttpError(): void
+    {
+        $result = ExtractionService::classifyExtractionFailure(
+            new \RuntimeException('Gemini API error (HTTP 429): quota exceeded')
+        );
+        $this->assertSame('http_error', $result['code']);
+        $this->assertSame('aiscan-scan-failed-provider-error', $result['message_key']);
+    }
+
+    public function testBuildScanFailedResultIsControlledAndIncludesFlag(): void
+    {
+        $result = ExtractionService::buildScanFailedResult(
+            new \RuntimeException('Gemini request failed: Could not resolve host')
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['scan_failed']);
+        $this->assertSame('network_error', $result['scan_failure_code']);
+        $this->assertNotEmpty($result['message']);
+        $this->assertIsArray($result['data']);
+        $this->assertTrue($result['data']['_scan_failed']);
+        $this->assertArrayNotHasKey('error', $result);
+        // Empty editable shell — no invented invoice fields
+        $this->assertNull($result['data']['invoice']['number']);
+        $this->assertSame([], $result['data']['lines']);
+    }
+
+    public function testBuildScanFailedResultForInvalidJson(): void
+    {
+        $result = ExtractionService::buildScanFailedResult(
+            new \RuntimeException('Invalid JSON response from AI provider: Syntax error')
+        );
+
+        $this->assertTrue($result['scan_failed']);
+        $this->assertSame('invalid_json', $result['scan_failure_code']);
+        $this->assertTrue($result['data']['_scan_failed']);
+    }
+
+    public function testExtractFromFileDoesNotCallAiWhenFileMissing(): void
+    {
+        $service = new ExtractionService();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('File not found');
+        $service->extractFromFile('/nonexistent/missing-key.pdf', 'application/pdf');
+    }
+
+    public function testGetProviderThrowsWhenNoProviderAvailable(): void
+    {
+        $service = new ExtractionService();
+        // Force a non-existent provider name so isAvailable() path is exercised
+        // without depending on host API keys.
+        try {
+            $service->getProvider('__no_such_provider__');
+            $this->fail('Expected RuntimeException when provider is not available');
+        } catch (\RuntimeException $e) {
+            $classification = ExtractionService::classifyExtractionFailure($e);
+            $this->assertSame('missing_api_key', $classification['code']);
+            $failed = ExtractionService::buildScanFailedResult($e);
+            $this->assertTrue($failed['scan_failed']);
+            $this->assertTrue($failed['data']['_scan_failed']);
+        }
+    }
 }
