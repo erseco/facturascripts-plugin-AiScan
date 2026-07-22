@@ -100,6 +100,8 @@ final class SupplierMatcherTest extends TestCase
 
     /**
      * @testdox normalizeTaxId unifica mayúsculas, espacios, puntos, guiones y prefijo ES (#70)
+     *
+     * @dataProvider taxIdNormalizationProvider
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('taxIdNormalizationProvider')]
     public function testNormalizeTaxIdFormats(string $input, string $expected): void
@@ -131,6 +133,8 @@ final class SupplierMatcherTest extends TestCase
 
     /**
      * @testdox Matching por CIF tolera formatos distintos al almacenado (#70)
+     *
+     * @dataProvider taxIdMatchVariantsProvider
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('taxIdMatchVariantsProvider')]
     public function testFindMatchByNormalizedTaxId(string $storedFormat, string $extractedFormat): void
