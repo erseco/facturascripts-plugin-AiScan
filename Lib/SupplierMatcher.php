@@ -31,6 +31,10 @@ class SupplierMatcher
         '/\s*\b(S\.?R\.?L\.?|S\.?L\.?U\.?|S\.?A\.?U\.?'
         . '|S\.?L\.?L\.?|S\.?L\.?|S\.?A\.?|S\.?C\.?)\.?\s*/i';
 
+    /**
+     * Max candidates to scan when comparing normalized tax IDs in PHP.
+     * Keeps the fallback bounded for large supplier tables.
+     */
     private const TAX_ID_SCAN_LIMIT = 500;
 
     public function findMatch(array $supplierData): array
@@ -99,8 +103,10 @@ class SupplierMatcher
     }
 
     /**
-     * Normaliza un CIF/NIF/VAT para comparación y huellas de alias.
-     * Compartido con #70 y #71.
+     * Normaliza un CIF/NIF/VAT para comparación y huellas de alias:
+     * mayúsculas, sin espacios/puntos/guiones/barras, sin prefijo de país ES.
+     *
+     * Compartido con matching de proveedor (#70) y memoria de alias (#71).
      */
     public static function normalizeTaxId(?string $taxId): string
     {
@@ -118,6 +124,7 @@ class SupplierMatcher
             return '';
         }
 
+        // Prefijo ISO de España solo si va seguido de un identificador fiscal.
         if (str_starts_with($value, 'ES') && strlen($value) > 2) {
             $value = substr($value, 2);
         }
@@ -126,6 +133,9 @@ class SupplierMatcher
     }
 
     /**
+     * Busca proveedores por CIF/NIF con igualdad exacta y, si falla, por
+     * valor normalizado (comparación en PHP sobre un conjunto acotado).
+     *
      * @return Proveedor[]
      */
     private function findByTaxId(string $taxId): array
@@ -137,6 +147,8 @@ class SupplierMatcher
 
         $normalized = self::normalizeTaxId($taxId);
         $byCode = [];
+
+        // 1) Igualdad exacta y variantes habituales (rápido, usa índice).
         $variants = array_unique(array_filter([
             $taxId,
             $normalized,
@@ -150,6 +162,10 @@ class SupplierMatcher
             }
         }
 
+        // 2) Ampliar con un conjunto acotado y comparar normalizado en PHP.
+        //    El valor en BD puede llevar puntos/guiones (B-35.123.456), así que un
+        //    LIKE sobre el CIF ya normalizado (B35123456) no lo encuentra: se busca
+        //    por la primera letra/dígito del identificador y se filtra en PHP.
         if ($normalized !== '') {
             $first = substr($normalized, 0, 1);
             $candidates = $supplier->all(
