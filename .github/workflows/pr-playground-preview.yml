@@ -24,12 +24,14 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            const zlib = require('zlib');
             const marker = '<!-- facturascripts-playground-preview -->';
             const playgroundUrl = 'https://erseco.github.io/facturascripts-playground/';
             const imageUrl = 'https://raw.githubusercontent.com/erseco/facturascripts-playground/main/ogimage.png';
             const { owner, repo } = context.repo;
             const pullRequest = context.payload.pull_request;
-            const branchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${pullRequest.head.ref}.zip`;
+            const branchRef = pullRequest.head.ref;
+            const branchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${branchRef}.zip`;
             const fs = require('fs');
             const mainBranchZipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
             const blueprint = JSON.parse(fs.readFileSync('blueprint.json', 'utf8'));
@@ -44,15 +46,42 @@ jobs:
             blueprint.plugins = [...blueprint.plugins];
             blueprint.plugins[pluginIndex] = branchZipUrl;
 
-            function toBase64Url(value) {
-              return Buffer.from(value, 'utf8')
+            // Compact JSON + gzip + base64url (same wire format as the Playground
+            // shell / action-facturascripts-playground-pr-preview). Plain base64 of
+            // the full AiScan seed is ~12 KB and hits HTTP 414 on static hosts.
+            function toBase64Url(buf) {
+              return Buffer.from(buf)
                 .toString('base64')
                 .replace(/\+/g, '-')
                 .replace(/\//g, '_')
                 .replace(/=+$/g, '');
             }
 
-            const previewUrl = `${playgroundUrl}?blueprint-data=${toBase64Url(JSON.stringify(blueprint))}`;
+            function encodeBlueprintParam(payload) {
+              const utf8 = Buffer.from(JSON.stringify(payload), 'utf8');
+              try {
+                const gzipped = zlib.gzipSync(utf8, { level: 9 });
+                if (gzipped.length < utf8.length) {
+                  return toBase64Url(gzipped);
+                }
+              } catch (_) {
+                // fall through
+              }
+              return toBase64Url(utf8);
+            }
+
+            const encoded = encodeBlueprintParam(blueprint);
+            const previewUrl = `${playgroundUrl}?blueprint=${encoded}`;
+            const maxSafe = 8000;
+            if (previewUrl.length > maxSafe) {
+              core.warning(
+                `Preview URL is ${previewUrl.length} chars (> ${maxSafe}); ` +
+                  'may still hit HTTP 414. Prefer trimming blueprint.json seed data.'
+              );
+            } else {
+              core.info(`Preview URL length: ${previewUrl.length} chars (gzipped)`);
+            }
+
             const body = [
               marker,
               '## FacturaScripts Playground Preview',
@@ -62,7 +91,7 @@ jobs:
               '</a><br>',
               `<small><a href="${previewUrl}">Try this PR in your browser</a></small>`,
               '',
-              `This preview is generated automatically for the \`${pullRequest.head.ref}\` branch and loads the plugin directly from the PR branch ZIP in FacturaScripts Playground.`
+              `This preview is generated automatically for the \`${branchRef}\` branch and loads the plugin directly from the PR branch ZIP in FacturaScripts Playground.`
             ].join('\n');
 
             const comments = await github.paginate(github.rest.issues.listComments, {
