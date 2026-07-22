@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 
+- **Playground / Docker listos para facturar con IGIC**: `blueprint.json` configura empresa
+  canaria, impuesto por defecto `IGIC7`, plan contable (`defaultplan`), formas de pago/serie
+  y productos con IGIC; `docker/setup-aiscan.php` alinea empresa, defaults, **serie A**,
+  **ejercicio abierto del año en curso** y plan contable en el stack local para poder crear
+  asientos al importar facturas de compra.
 - **Entrada manual ante fallo de IA** (#67): si el escaneo falla (red, HTTP, JSON inválido,
   sin API key) o el usuario elige «Entrada manual», el panel lateral se muestra vacío y
   editable con un aviso no bloqueante. El guardado/importación funciona igual que con
