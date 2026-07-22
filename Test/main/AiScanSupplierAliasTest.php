@@ -36,6 +36,16 @@ final class AiScanSupplierAliasTest extends TestCase
     /** @var string[] */
     private array $fingerprintsToClear = [];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (!class_exists(Proveedor::class)) {
+            $this->markTestSkipped('FacturaScripts Dinamic\Model\Proveedor no disponible en este entorno.');
+        }
+        // Materializa la tabla en CI Docker (plugin copiado sin deploy previo).
+        new AiScanSupplierAlias();
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->fingerprintsToClear as $fp) {
