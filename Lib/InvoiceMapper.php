@@ -143,7 +143,11 @@ class InvoiceMapper
             }
 
             $taxes = $extractedData['taxes'] ?? [];
-            $invoiceLines = $importMode === 'total' && empty($lines)
+            // Issue #69: en modo total siempre se usa la línea agregada con el
+            // producto por defecto del proveedor. Antes se caía a buildLinesMode
+            // cuando la IA/UI mandaba líneas (casi siempre), y el pin no se aplicaba
+            // de forma predecible en total mode.
+            $invoiceLines = $importMode === 'total'
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
@@ -266,11 +270,15 @@ class InvoiceMapper
         array $taxes,
         ?Proveedor $supplier
     ): array {
+        // Preferir el pin del proveedor; si no hay, el histórico (#53 / #69).
         $reference = null;
         if ($supplier) {
             $defaultProduct = AiScanSupplierProduct::getForSupplier($supplier->codproveedor);
-            if ($defaultProduct) {
+            if ($defaultProduct && !empty($defaultProduct->referencia)) {
                 $reference = $defaultProduct->referencia;
+            } else {
+                $suggestion = $this->historicalContext->getSuggestedProduct($supplier->codproveedor);
+                $reference = $suggestion['referencia'] ?? null;
             }
         }
 

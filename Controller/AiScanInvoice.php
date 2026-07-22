@@ -479,10 +479,6 @@ class AiScanInvoice extends Controller
      */
     private function suggestSupplierProducts(array &$extracted): void
     {
-        if (empty($extracted['lines']) || !is_array($extracted['lines'])) {
-            return;
-        }
-
         $codproveedor = (string) ($extracted['supplier']['matched_supplier_id'] ?? '');
         if ($codproveedor === '') {
             return;
@@ -495,7 +491,13 @@ class AiScanInvoice extends Controller
             return;
         }
 
+        // Issue #69: exponer la sugerencia aunque no haya líneas (modo total),
+        // para que la UI y buildTotalLines puedan aplicar el producto fijado.
         $extracted['_product_suggestion'] = $suggestion;
+
+        if (empty($extracted['lines']) || !is_array($extracted['lines'])) {
+            return;
+        }
 
         $variant = new \FacturaScripts\Dinamic\Model\Variante();
         foreach ($extracted['lines'] as &$line) {

@@ -28,6 +28,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 - Matching de proveedor por CIF/NIF: normalización de formato (mayúsculas, puntos, guiones,
   prefijo `ES`) al comparar, compartida con las huellas de alias (#70 / #71)
+- Producto por defecto del proveedor (#69): se recuerda y aplica en facturas siguientes
+  (incluido modo total), se rellena al cargar/guardar el pin en la UI y se expone
+  `_product_suggestion` aunque no haya líneas extraídas
 - Producto habitual del proveedor (#53): limpia referencias inventadas por la IA, sugiere al
   elegir proveedor en la revisión, y si el histórico no tiene referencias enlazadas intenta
   emparejar por **descripción** de líneas anteriores

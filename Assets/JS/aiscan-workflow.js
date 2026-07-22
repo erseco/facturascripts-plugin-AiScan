@@ -1863,15 +1863,83 @@
                 const refInput = document.getElementById('default_product_ref');
                 if (refInput) {
                     refInput.value = data.referencia;
+                    refInput.dataset.codproveedor = codproveedor;
                 }
                 const statusEl = document.getElementById('aiscan-default-product-status');
                 if (statusEl) {
                     statusEl.textContent = data.description || data.referencia;
                 }
+                // Issue #69: reaplicar el pin a las líneas del documento actual
+                // (incluido modo total con líneas sintéticas).
+                const doc = currentDoc();
+                if (doc?.extractedData) {
+                    doc.extractedData._product_suggestion = {
+                        referencia: data.referencia,
+                        description: data.description || '',
+                        source: 'pinned',
+                    };
+                    applyPinnedProductToLines(doc, data.referencia);
+                    refreshLineProductBadges(doc);
+                }
             }
         } catch (e) {
             // silent
         }
+    }
+
+    /**
+     * Issue #69: escribe la referencia fijada en líneas sin producto (o con
+     * sugerencia histórica previa), sin pisar un match real del usuario/IA.
+     */
+    function applyPinnedProductToLines(doc, referencia) {
+        if (!doc?.extractedData || !referencia) {
+            return;
+        }
+        if (!Array.isArray(doc.extractedData.lines)) {
+            doc.extractedData.lines = [];
+        }
+        // En modo total sin líneas, generar sintéticas y enlazar el producto.
+        const mode = doc._importMode || state.importMode;
+        if (mode === 'total' && doc.extractedData.lines.length === 0) {
+            doc.extractedData.lines = buildTotalLines(doc.extractedData);
+        }
+        doc.extractedData.lines = doc.extractedData.lines.map(line => {
+            const ref = String(line.referencia || line.sku || '').trim();
+            if (ref !== '' && line.referencia_source !== 'history' && line.referencia_source !== 'pinned') {
+                return line;
+            }
+            return {
+                ...line,
+                referencia: referencia,
+                referencia_source: 'pinned',
+            };
+        });
+    }
+
+    function refreshLineProductBadges(doc) {
+        // Si el panel de revisión está montado, re-sincronizar hidden inputs de
+        // referencia sin re-renderizar todo el formulario (evita perder foco).
+        const rows = document.querySelectorAll('#aiscan-lines-body .aiscan-line-row');
+        if (!rows.length || !Array.isArray(doc?.extractedData?.lines)) {
+            return;
+        }
+        rows.forEach((row, index) => {
+            const line = doc.extractedData.lines[index];
+            if (!line) {
+                return;
+            }
+            const refInput = row.querySelector('[data-field="referencia"]');
+            if (refInput && line.referencia) {
+                refInput.value = line.referencia;
+            }
+            const badge = row.querySelector('.aiscan-ref-badge');
+            if (badge) {
+                badge.innerHTML = buildProductMatchBadge(
+                    line.referencia || '',
+                    line.referencia_source || ''
+                );
+            }
+        });
     }
 
     function bindProductSearch() {
@@ -1926,24 +1994,51 @@
 
     async function saveDefaultProduct() {
         const refInput = document.getElementById('default_product_ref');
-        const codproveedor = refInput?.dataset.codproveedor;
+        // Fallback: si el data-attr se perdió al re-render, usar el proveedor del doc.
+        const doc = currentDoc();
+        const codproveedor = refInput?.dataset.codproveedor
+            || doc?.extractedData?.supplier?.matched_supplier_id
+            || '';
         const referencia = refInput?.value?.trim();
 
         if (!codproveedor || !referencia) {
+            const statusEl = document.getElementById('aiscan-default-product-status');
+            if (statusEl) {
+                statusEl.textContent = trans('aiscan-supplier-not-found-on-save') || 'Proveedor no resuelto';
+                statusEl.className = 'small text-danger ms-2';
+            }
             return;
+        }
+
+        if (refInput) {
+            refInput.dataset.codproveedor = codproveedor;
         }
 
         try {
             const response = await fetch('AiScanInvoice?action=set-supplier-default-product', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({codproveedor, referencia}),
+                body: JSON.stringify({
+                    codproveedor,
+                    referencia,
+                    description: document.getElementById('aiscan-product-search')?.value?.trim() || '',
+                }),
             });
             const data = await response.json();
             const statusEl = document.getElementById('aiscan-default-product-status');
             if (statusEl) {
                 statusEl.textContent = data.success ? trans('aiscan-saved') : (data.error || 'Error');
                 statusEl.className = data.success ? 'small text-success ms-2' : 'small text-danger ms-2';
+            }
+            // Issue #69: al guardar el pin, aplicarlo ya a las líneas del review.
+            if (data.success && doc?.extractedData) {
+                doc.extractedData._product_suggestion = {
+                    referencia,
+                    description: '',
+                    source: 'pinned',
+                };
+                applyPinnedProductToLines(doc, referencia);
+                refreshLineProductBadges(doc);
             }
         } catch (e) {
             // silent
@@ -2518,8 +2613,12 @@
         if (!reference) {
             return `<span class="badge text-bg-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-no-product'))}"><i class="fa-solid fa-unlink"></i></span>`;
         }
-        if (source === 'history') {
-            return `<span class="badge text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans('aiscan-product-suggested-history') + ': ' + reference)}"><i class="fa-solid fa-clock-rotate-left"></i></span>`;
+        if (source === 'history' || source === 'pinned') {
+            const titleKey = source === 'pinned'
+                ? 'aiscan-product-suggested-pinned'
+                : 'aiscan-product-suggested-history';
+            const icon = source === 'pinned' ? 'fa-thumbtack' : 'fa-clock-rotate-left';
+            return `<span class="badge text-bg-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(trans(titleKey) + ': ' + reference)}"><i class="fa-solid ${icon}"></i></span>`;
         }
         return `<span class="badge text-bg-success" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeAttr(reference)}"><i class="fa-solid fa-link"></i></span>`;
     }
@@ -2737,6 +2836,11 @@
         const irpfRate = subtotal > 0 && withholding > 0
             ? Math.round((withholding / subtotal) * 10000) / 100
             : 0;
+        // Issue #69: si hay producto fijado/sugerido, enlazarlo en líneas sintéticas.
+        const pinnedRef = data._product_suggestion?.referencia || '';
+        const pinFields = pinnedRef
+            ? {referencia: pinnedRef, referencia_source: data._product_suggestion?.source || 'pinned'}
+            : {};
 
         if (taxes.length > 0) {
             return taxes.map(t => ({
@@ -2746,6 +2850,7 @@
                 dtopor: 0,
                 iva: parseFloat(t.rate) || 0,
                 irpf: irpfRate,
+                ...pinFields,
             }));
         }
 
@@ -2761,6 +2866,7 @@
             dtopor: 0,
             iva: taxRate,
             irpf: irpfRate,
+            ...pinFields,
         }];
     }
 
@@ -3109,15 +3215,16 @@
             if (!Array.isArray(doc.extractedData.lines)) {
                 return;
             }
+            const source = data.source || 'history';
             doc.extractedData.lines = doc.extractedData.lines.map(line => {
                 const ref = String(line.referencia || line.sku || '').trim();
-                if (ref !== '' && line.referencia_source !== 'history') {
+                if (ref !== '' && line.referencia_source !== 'history' && line.referencia_source !== 'pinned') {
                     return line;
                 }
                 return {
                     ...line,
                     referencia: data.referencia,
-                    referencia_source: 'history',
+                    referencia_source: source === 'pinned' ? 'pinned' : 'history',
                 };
             });
         } catch (e) {
@@ -3815,11 +3922,13 @@
             applyAnalyzeResponse,
             applyManualEntryFallback,
             applyPartyTypeToSupplier,
+            applyPinnedProductToLines,
             applySelectionRange,
             buildConfidenceBadge,
             buildEmptyExtractedData,
             buildPaymentMethodSelect,
             buildProductMatchBadge,
+            buildTotalLines,
             calcAllLineTotals,
             checkTotalMismatch,
             collectFormData,
