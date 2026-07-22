@@ -22,6 +22,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Proveedor;
+use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierAlias;
 
 class SupplierMatcher
 {
@@ -42,9 +43,25 @@ class SupplierMatcher
             'match_status' => 'not_found',
             'supplier' => null,
             'candidates' => [],
+            'match_source' => null,
         ];
 
-        if (empty($supplierData['name']) && empty($supplierData['tax_id'])) {
+        if (
+            empty($supplierData['name'])
+            && empty($supplierData['tax_id'])
+            && empty($supplierData['iban'])
+            && empty($supplierData['email'])
+        ) {
+            return $result;
+        }
+
+        // Issue #71: memoria de alias aprendida por corrección del usuario.
+        // Solo lectura; nunca se escribe aquí (los auto-match no envenenan la tabla).
+        $aliasSupplier = AiScanSupplierAlias::resolveSupplier($supplierData);
+        if ($aliasSupplier instanceof Proveedor) {
+            $result['match_status'] = 'matched';
+            $result['supplier'] = $aliasSupplier;
+            $result['match_source'] = 'alias';
             return $result;
         }
 
@@ -53,11 +70,13 @@ class SupplierMatcher
             if (count($taxMatches) === 1) {
                 $result['match_status'] = 'matched';
                 $result['supplier'] = $taxMatches[0];
+                $result['match_source'] = 'tax_id';
                 return $result;
             }
             if (count($taxMatches) > 1) {
                 $result['match_status'] = 'ambiguous';
                 $result['candidates'] = $taxMatches;
+                $result['match_source'] = 'tax_id';
                 return $result;
             }
         }
@@ -70,10 +89,12 @@ class SupplierMatcher
             if (count($candidates) === 1) {
                 $result['match_status'] = 'matched';
                 $result['supplier'] = $candidates[0];
+                $result['match_source'] = 'name';
                 return $result;
             } elseif (count($candidates) > 1) {
                 $result['match_status'] = 'ambiguous';
                 $result['candidates'] = $candidates;
+                $result['match_source'] = 'name';
                 return $result;
             }
         }
@@ -82,10 +103,10 @@ class SupplierMatcher
     }
 
     /**
-     * Normaliza un CIF/NIF/VAT para comparación:
+     * Normaliza un CIF/NIF/VAT para comparación y huellas de alias:
      * mayúsculas, sin espacios/puntos/guiones/barras, sin prefijo de país ES.
      *
-     * Issue #70: la IA y FacturaScripts no siempre guardan el mismo formato.
+     * Compartido con matching de proveedor (#70) y memoria de alias (#71).
      */
     public static function normalizeTaxId(?string $taxId): string
     {
