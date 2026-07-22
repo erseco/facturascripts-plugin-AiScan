@@ -699,10 +699,20 @@ class AiScanInvoice extends Controller
 
         $codproveedor = trim((string) ($data['codproveedor'] ?? ''));
         $referencia = trim((string) ($data['referencia'] ?? ''));
+        $clear = !empty($data['clear']) || $referencia === '';
 
-        if (empty($codproveedor) || empty($referencia)) {
+        if ($codproveedor === '') {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing codproveedor or referencia']);
+            echo json_encode(['error' => 'Missing codproveedor']);
+            return;
+        }
+
+        // Issue #76: referencia vacía o clear=true elimina el producto predeterminado.
+        if ($clear) {
+            echo json_encode([
+                'success' => AiScanSupplierProduct::clearForSupplier($codproveedor),
+                'cleared' => true,
+            ]);
             return;
         }
 

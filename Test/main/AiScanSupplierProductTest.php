@@ -154,6 +154,32 @@ final class AiScanSupplierProductTest extends TestCase
         $this->assertNull(AiScanSupplierProduct::getForSupplier('NOEXISTE99'));
     }
 
+    /**
+     * @testdox clearForSupplier elimina el pin y es idempotente (#76)
+     */
+    public function testClearForSupplierRemovesPin(): void
+    {
+        $supplier = $this->createSupplier();
+        $ref = $this->anyProductReference();
+        if ($ref === null) {
+            $this->markTestSkipped('No hay productos en la BD de prueba.');
+        }
+
+        $this->codproveedoresToClear[] = $supplier->codproveedor;
+        $this->assertTrue(AiScanSupplierProduct::setForSupplier($supplier->codproveedor, $ref, 'A borrar'));
+        $this->assertNotNull(AiScanSupplierProduct::getForSupplier($supplier->codproveedor));
+
+        $this->assertTrue(
+            AiScanSupplierProduct::clearForSupplier($supplier->codproveedor),
+            'clearForSupplier debe borrar la fila'
+        );
+        $this->assertNull(AiScanSupplierProduct::getForSupplier($supplier->codproveedor));
+
+        // Idempotente: sin fila sigue siendo éxito
+        $this->assertTrue(AiScanSupplierProduct::clearForSupplier($supplier->codproveedor));
+        $this->assertTrue(AiScanSupplierProduct::clearForSupplier('NOEXISTE99'));
+    }
+
     private function createSupplier(): Proveedor
     {
         $supplier = new Proveedor();
