@@ -33,6 +33,7 @@ use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportLine;
+use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierAlias;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
 
 class AiScanInvoice extends Controller
@@ -126,6 +127,9 @@ class AiScanInvoice extends Controller
                     break;
                 case 'set-supplier-default-product':
                     $this->handleSetSupplierDefaultProduct();
+                    break;
+                case 'remember-supplier-alias':
+                    $this->handleRememberSupplierAlias();
                     break;
                 case 'get-historical-context':
                     $this->handleGetHistoricalContext();
@@ -435,6 +439,9 @@ class AiScanInvoice extends Controller
             if ($matchResult['supplier']) {
                 $extracted['supplier']['matched_supplier_id'] = $matchResult['supplier']->codproveedor;
                 $extracted['supplier']['matched_name'] = $matchResult['supplier']->nombre;
+                if (!empty($matchResult['match_source'])) {
+                    $extracted['supplier']['match_source'] = $matchResult['match_source'];
+                }
             }
             if (!empty($matchResult['candidates'])) {
                 $extracted['supplier']['candidates'] = array_map(
@@ -706,6 +713,62 @@ class AiScanInvoice extends Controller
         );
 
         echo json_encode(['success' => $saved]);
+    }
+
+    /**
+     * Issue #71: guarda un alias aprendido solo ante elección explícita del usuario
+     * (búsqueda manual, desambiguación o creación de proveedor).
+     */
+    private function handleRememberSupplierAlias(): void
+    {
+        $body = file_get_contents('php://input');
+        $data = json_decode($body, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            http_response_code(400);
+            echo json_encode(['error' => Tools::lang()->trans('aiscan-invalid-json-payload')]);
+            return;
+        }
+
+        $codproveedor = trim((string) ($data['codproveedor'] ?? ''));
+        if ($codproveedor === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing codproveedor']);
+            return;
+        }
+
+        // Verificar que el proveedor existe (no guardar alias huérfano).
+        $supplier = new \FacturaScripts\Dinamic\Model\Proveedor();
+        if (!$supplier->loadFromCode($codproveedor)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Supplier not found', 'success' => false]);
+            return;
+        }
+
+        $supplierData = [
+            'tax_id' => (string) ($data['tax_id'] ?? ''),
+            'name' => (string) ($data['name'] ?? ''),
+            'iban' => (string) ($data['iban'] ?? ''),
+            'email' => (string) ($data['email'] ?? ''),
+        ];
+
+        $fp = AiScanSupplierAlias::computeFingerprint($supplierData);
+        if ($fp === null) {
+            echo json_encode(['success' => false, 'error' => 'No fingerprint']);
+            return;
+        }
+
+        $saved = AiScanSupplierAlias::setForFingerprint(
+            $fp['fingerprint'],
+            $fp['type'],
+            $codproveedor
+        );
+
+        echo json_encode([
+            'success' => $saved,
+            'fingerprint' => $fp['fingerprint'],
+            'fingerprint_type' => $fp['type'],
+        ]);
     }
 
     private function handleGetHistoricalContext(): void

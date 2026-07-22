@@ -52,7 +52,7 @@ if (!in_array('AiScan', Plugins::enabled())) {
 // (FS creates tables on first model instantiation via DbUpdater)
 $aiscanModels = [
     'AiScanImportBatch', 'AiScanImportDocument', 'AiScanImportLine',
-    'AiScanLog', 'AiScanSupplierProduct',
+    'AiScanLog', 'AiScanSupplierProduct', 'AiScanSupplierAlias',
 ];
 foreach ($aiscanModels as $name) {
     $cls = '\\FacturaScripts\\Dinamic\\Model\\' . $name;
