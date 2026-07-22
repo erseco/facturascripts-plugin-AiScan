@@ -121,6 +121,7 @@
     "aiscan-plugin-disabled": "AiScan plugin is disabled.",
     "aiscan-proceed-to-import": "Proceed to import",
     "aiscan-product-suggested-history": "Suggested from supplier history",
+    "aiscan-product-suggested-pinned": "Supplier default product",
     "aiscan-provider": "Provider",
     "aiscan-provider-browser-prompt": "Browser Prompt API (experimental)",
     "aiscan-provider-gemini": "Google Gemini",
