@@ -84,4 +84,18 @@ class AiScanSupplierProduct extends ModelClass
         $model->description = $description;
         return $model->save();
     }
+
+    /**
+     * Issue #76: elimina el producto predeterminado del proveedor (si existe).
+     * Si no hay fila, se considera un éxito (idempotente).
+     */
+    public static function clearForSupplier(string $codproveedor): bool
+    {
+        $existing = self::getForSupplier($codproveedor);
+        if ($existing === null) {
+            return true;
+        }
+
+        return $existing->delete();
+    }
 }

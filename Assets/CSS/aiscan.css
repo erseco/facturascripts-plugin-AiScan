@@ -192,3 +192,23 @@
 #aiscan-doc-status-badges .badge:hover {
     opacity: 0.8;
 }
+
+/* Issue #76: selector único de producto predeterminado */
+.aiscan-default-product-picker .aiscan-default-product-results {
+    position: relative;
+    z-index: 5;
+}
+
+.aiscan-default-product-picker .list-group-item.active {
+    z-index: 1;
+}
+
+@media (max-width: 575.98px) {
+    .aiscan-default-product-picker .input-group {
+        flex-wrap: nowrap;
+    }
+
+    .aiscan-default-product-picker .form-control {
+        min-width: 0;
+    }
+}

@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Fixed
+
+- **Producto predeterminado del proveedor** (#76): un único control de búsqueda y
+  selección (sin campo «Referencia» ni botón de guardado separados), se guarda al
+  elegir el producto, se puede limpiar con ×, teclado usable (↑/↓/Enter/Esc) y
+  textos traducidos vía `window.aiscanI18n` (ya no se muestran claves internas).
+
 ### Added
 
 - **Playground / Docker listos para facturar con IGIC**: `blueprint.json` configura empresa
