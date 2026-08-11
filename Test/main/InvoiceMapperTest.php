@@ -61,6 +61,36 @@ final class InvoiceMapperTest extends TestCase
         $this->assertContains(Tools::lang()->trans('aiscan-missing-supplier-tax-id'), $result['errors']);
     }
 
+    public function testMapToInvoicePartialUpdateChecksExistingInvoiceBeforeImportGate(): void
+    {
+        if (!class_exists('FacturaScripts\\Dinamic\\Model\\FacturaProveedor')) {
+            $this->markTestSkipped('FacturaScripts Dinamic models are not available in this environment.');
+        }
+
+        $invoiceId = 999999999;
+        $result = $this->mapper->mapToInvoice([
+            'invoice' => [
+                'total' => 43.30,
+            ],
+            'supplier' => [],
+            'lines' => [],
+        ], $invoiceId, 'lines', false);
+
+        $this->assertFalse($result['success']);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-invoice-not-found', [
+                '%invoiceId%' => (string) $invoiceId,
+            ]),
+            $result['errors']
+        );
+        $this->assertNotContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('number'),
+            ]),
+            $result['errors']
+        );
+    }
+
     // ── buildNotes() ────────────────────────────────────────
 
     public function testBuildNotesWithAllFields(): void
