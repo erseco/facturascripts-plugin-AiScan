@@ -190,6 +190,22 @@
         return getBlockingImportErrors(data).length === 0;
     }
 
+    /**
+     * If a previously approved doc loses vital fields, revoke READY (#78).
+     * @returns {boolean} true when status/decision changed
+     */
+    function revokeReadyIfBlocked(doc, data) {
+        if (!doc || doc.status !== STATUS.READY) {
+            return false;
+        }
+        if (canMarkDocReady(data || doc.extractedData)) {
+            return false;
+        }
+        doc.status = STATUS.NEEDS_REVIEW;
+        doc.reviewDecision = null;
+        return true;
+    }
+
     function renderValidationWarningsHtml(validationErrors) {
         if (validationErrors.length === 0) {
             return '';
@@ -225,15 +241,23 @@
     function updateMarkReadyButton(dataOverride) {
         const btn = document.getElementById('aiscan-mark-ready-btn');
         const hint = document.getElementById('aiscan-mark-ready-hint');
-        if (!btn) {
-            return;
-        }
-
         const doc = currentDoc();
         const data = dataOverride
             || (doc?.extractedData ? collectFormData(doc.extractedData) : null);
         const blocking = getBlockingImportErrors(data);
         const canReady = blocking.length === 0;
+
+        if (doc && data) {
+            // Keep extractedData in sync with the form before status checks.
+            doc.extractedData = data;
+            if (revokeReadyIfBlocked(doc, data)) {
+                renderSidebar();
+            }
+        }
+
+        if (!btn) {
+            return;
+        }
 
         btn.disabled = !canReady;
         btn.title = canReady
@@ -1145,6 +1169,22 @@
                 return;
             }
             persistCurrentFormState();
+
+            // Issue #78: revoke READY docs that lost vital fields after approval.
+            let revoked = false;
+            state.documents.forEach(doc => {
+                if (revokeReadyIfBlocked(doc, doc.extractedData)) {
+                    revoked = true;
+                }
+            });
+            if (revoked) {
+                renderSidebar();
+                renderCurrentDocument();
+                updateImportButton();
+                alert(trans('aiscan-cannot-mark-ready'));
+                return;
+            }
+
             showStep('import');
             buildImportSummary();
         });
@@ -4069,6 +4109,11 @@
         importBtn.disabled = true;
         importBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-importing'))}`;
 
+        // Last-chance client gate (#78): demote READY docs missing vital fields.
+        state.documents.forEach(doc => {
+            revokeReadyIfBlocked(doc, doc.extractedData);
+        });
+
         const documents = state.documents.map(doc => {
             const extracted = doc.extractedData ? JSON.parse(JSON.stringify(doc.extractedData)) : null;
             if (extracted && extracted.invoice && !extracted.invoice.codpago) {
@@ -4080,6 +4125,7 @@
                     resolveDocPartyType(doc)
                 );
             }
+            // Only send READY (or discarded/failed) statuses; demoted docs stay needs_review.
             return {
                 status: doc.status,
                 extracted_data: extracted,
@@ -4322,6 +4368,7 @@
             calcAllLineTotals,
             canMarkDocReady,
             checkTotalMismatch,
+            revokeReadyIfBlocked,
             collectFormData,
             confidenceBadgeClass,
             finalizeAnalyzedDoc,

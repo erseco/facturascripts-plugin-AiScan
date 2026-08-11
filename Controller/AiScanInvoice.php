@@ -965,6 +965,30 @@ class AiScanInvoice extends Controller
                 continue;
             }
 
+            // Issue #78: only import documents the user marked as ready.
+            // needs_review / pending / analyzing must not sneak through the batch.
+            if ($status !== 'ready') {
+                $this->persistHistoryDocument(
+                    $historyBatch->id,
+                    $doc,
+                    $invoice,
+                    $supplier,
+                    'failed',
+                    null,
+                    null,
+                    Tools::lang()->trans('aiscan-cannot-mark-ready'),
+                    $lines
+                );
+                $failed++;
+                $results[] = [
+                    'index' => $index,
+                    'status' => 'error',
+                    'error' => Tools::lang()->trans('aiscan-cannot-mark-ready'),
+                    'original_name' => $doc['original_name'] ?? '',
+                ];
+                continue;
+            }
+
             if (empty($extracted)) {
                 $this->persistHistoryDocument(
                     $historyBatch->id,

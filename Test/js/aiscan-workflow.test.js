@@ -802,6 +802,28 @@ test('getBlockingImportErrors requires name and tax id for new supplier (#78)', 
     assert.equal(hooks.canMarkDocReady(ready), true);
 });
 
+test('revokeReadyIfBlocked demotes READY when vital fields cleared (#78)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        status: hooks.STATUS.READY,
+        reviewDecision: 'approved',
+        extractedData: {
+            invoice: {number: '', issue_date: '2025-01-01'},
+            supplier: {name: 'ACME', tax_id: 'B12345678'},
+        },
+    };
+
+    assert.equal(hooks.revokeReadyIfBlocked(doc, doc.extractedData), true);
+    assert.equal(doc.status, hooks.STATUS.NEEDS_REVIEW);
+    assert.equal(doc.reviewDecision, null);
+
+    doc.status = hooks.STATUS.READY;
+    doc.reviewDecision = 'approved';
+    doc.extractedData.invoice.number = 'F-1';
+    assert.equal(hooks.revokeReadyIfBlocked(doc, doc.extractedData), false);
+    assert.equal(doc.status, hooks.STATUS.READY);
+});
+
 test('finalizeAnalyzedDoc flags missing supplier name as needs_review (#78)', () => {
     const {hooks} = loadTestHooks();
     const doc = {
