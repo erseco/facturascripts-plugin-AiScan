@@ -288,7 +288,8 @@ test('getValidationWarnings drops stale total mismatch warnings after totals are
     const {hooks} = loadTestHooks();
 
     const warnings = hooks.getValidationWarnings({
-        invoice: {total: 21.30},
+        invoice: {number: 'F-1', issue_date: '2025-01-01', total: 21.30},
+        supplier: {matched_supplier_id: '000001'},
         lines: [
             {cantidad: 1, pvpunitario: 10, iva: 0, irpf: 0},
             {cantidad: 1, pvpunitario: 11.3, iva: 0, irpf: 0},
@@ -304,7 +305,8 @@ test('getValidationWarnings recalculates the current total mismatch warning', ()
     const {hooks} = loadTestHooks();
 
     const warnings = hooks.getValidationWarnings({
-        invoice: {total: 21.30},
+        invoice: {number: 'F-1', issue_date: '2025-01-01', total: 21.30},
+        supplier: {matched_supplier_id: '000001'},
         lines: [
             {cantidad: 1, pvpunitario: 10, iva: 0, irpf: 0},
             {cantidad: 1, pvpunitario: 15, iva: 0, irpf: 0},
@@ -756,6 +758,92 @@ test('manual entry payload remains importable after user fills fields', () => {
     assert.equal(doc.extractedData.lines.length, 1);
     // Import gate treats needs_review/ready as non-failed
     assert.notEqual(doc.status, 'failed');
+    assert.equal(hooks.canMarkDocReady(doc.extractedData), true);
+});
+
+test('getBlockingImportErrors blocks when supplier and invoice identity missing (#78)', () => {
+    const {hooks} = loadTestHooks();
+    const errors = hooks.getBlockingImportErrors({
+        invoice: {total: 43.3},
+        supplier: {},
+        lines: [],
+    });
+
+    assert.ok(errors.length >= 3);
+    assert.equal(hooks.canMarkDocReady({
+        invoice: {total: 43.3},
+        supplier: {},
+    }), false);
+});
+
+test('getBlockingImportErrors allows matched supplier without tax id (#78)', () => {
+    const {hooks} = loadTestHooks();
+    const data = {
+        invoice: {number: 'F-1', issue_date: '2025-01-01', total: 10},
+        supplier: {matched_supplier_id: '000001', name: '', tax_id: ''},
+    };
+    assert.equal(hooks.getBlockingImportErrors(data).length, 0);
+    assert.equal(hooks.canMarkDocReady(data), true);
+});
+
+test('getBlockingImportErrors requires name and tax id for new supplier (#78)', () => {
+    const {hooks} = loadTestHooks();
+    const missingTax = hooks.getBlockingImportErrors({
+        invoice: {number: 'F-1', issue_date: '2025-01-01'},
+        supplier: {name: 'Nuevo SL', tax_id: '', create_if_missing: true},
+    });
+    assert.ok(missingTax.some(msg => /tax|cif|nif|fiscal/i.test(msg) || msg.includes('aiscan-missing-supplier-tax-id')));
+
+    const ready = {
+        invoice: {number: 'F-1', issue_date: '2025-01-01'},
+        supplier: {name: 'Nuevo SL', tax_id: 'B12345678'},
+    };
+    assert.equal(hooks.getBlockingImportErrors(ready).length, 0);
+    assert.equal(hooks.canMarkDocReady(ready), true);
+});
+
+test('revokeReadyIfBlocked demotes READY when vital fields cleared (#78)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        status: hooks.STATUS.READY,
+        reviewDecision: 'approved',
+        extractedData: {
+            invoice: {number: '', issue_date: '2025-01-01'},
+            supplier: {name: 'ACME', tax_id: 'B12345678'},
+        },
+    };
+
+    assert.equal(hooks.revokeReadyIfBlocked(doc, doc.extractedData), true);
+    assert.equal(doc.status, hooks.STATUS.NEEDS_REVIEW);
+    assert.equal(doc.reviewDecision, null);
+
+    doc.status = hooks.STATUS.READY;
+    doc.reviewDecision = 'approved';
+    doc.extractedData.invoice.number = 'F-1';
+    assert.equal(hooks.revokeReadyIfBlocked(doc, doc.extractedData), false);
+    assert.equal(doc.status, hooks.STATUS.READY);
+});
+
+test('finalizeAnalyzedDoc flags missing supplier name as needs_review (#78)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {
+        index: 0,
+        status: 'analyzing',
+        extractedData: {
+            invoice: {number: 'X', issue_date: '2025-01-01', total: 10},
+            supplier: {name: '', tax_id: ''},
+            lines: [{descripcion: 'A', cantidad: 1, pvpunitario: 10, iva: 0}],
+            confidence: {},
+            warnings: [],
+            _validation_errors: [],
+        },
+        reviewDecision: null,
+    };
+
+    hooks.finalizeAnalyzedDoc(doc);
+    assert.equal(doc.status, hooks.STATUS.NEEDS_REVIEW);
+    assert.ok(Array.isArray(doc.extractedData._validation_errors));
+    assert.ok(doc.extractedData._validation_errors.length > 0);
 });
 
 test('applyPinnedProductToLines rellena líneas vacías y respeta matches reales (#69)', () => {

@@ -77,6 +77,83 @@ final class SchemaValidatorTest extends TestCase
         $this->assertEmpty($errors);
     }
 
+    // ── getImportBlockingErrors() — issue #78 ────────────────
+
+    public function testImportBlockingErrorsWhenVitalFieldsMissing(): void
+    {
+        $errors = $this->validator->getImportBlockingErrors([
+            'invoice' => [],
+            'supplier' => [],
+        ]);
+
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('number'),
+            ]),
+            $errors
+        );
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('date'),
+            ]),
+            $errors
+        );
+        $this->assertContains(Tools::lang()->trans('aiscan-supplier-name-required'), $errors);
+        $this->assertContains(Tools::lang()->trans('aiscan-missing-supplier-tax-id'), $errors);
+    }
+
+    public function testImportBlockingErrorsAcceptMatchedSupplierWithoutTaxId(): void
+    {
+        $errors = $this->validator->getImportBlockingErrors([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2025-01-01',
+            ],
+            'supplier' => [
+                'matched_supplier_id' => '000001',
+                'name' => '',
+                'tax_id' => '',
+            ],
+        ]);
+
+        $this->assertEmpty($errors);
+    }
+
+    public function testImportBlockingErrorsRequireNameAndTaxIdWhenCreatingSupplier(): void
+    {
+        $errors = $this->validator->getImportBlockingErrors([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2025-01-01',
+            ],
+            'supplier' => [
+                'name' => 'Nuevo Proveedor SL',
+                'tax_id' => '',
+                'create_if_missing' => true,
+            ],
+        ]);
+
+        $this->assertContains(Tools::lang()->trans('aiscan-missing-supplier-tax-id'), $errors);
+        $this->assertNotContains(Tools::lang()->trans('aiscan-supplier-name-required'), $errors);
+    }
+
+    public function testImportBlockingErrorsEmptyWhenReadyToImport(): void
+    {
+        $errors = $this->validator->getImportBlockingErrors([
+            'invoice' => [
+                'number' => 'INV-001',
+                'issue_date' => '2025-01-01',
+                'total' => 43.30,
+            ],
+            'supplier' => [
+                'name' => 'Proveedor Demo',
+                'tax_id' => 'B12345678',
+            ],
+        ]);
+
+        $this->assertEmpty($errors);
+    }
+
     public function testValidateDetectsTaxMismatch(): void
     {
         $errors = $this->validator->validate([

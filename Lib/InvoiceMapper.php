@@ -52,6 +52,17 @@ class InvoiceMapper
         $result = ['success' => false, 'invoice_id' => null, 'errors' => [], 'warnings' => []];
 
         try {
+            // Issue #78: require complete identity data only for new imports.
+            // Existing invoices may be updated with a partial payload and keep
+            // their current supplier, invoice number and date.
+            if ($invoiceId === null) {
+                $blocking = (new SchemaValidator())->getImportBlockingErrors($extractedData);
+                if ($blocking !== []) {
+                    $result['errors'] = $blocking;
+                    return $result;
+                }
+            }
+
             if ($invoiceId) {
                 $invoice = new FacturaProveedor();
                 if (!$invoice->loadFromCode($invoiceId)) {

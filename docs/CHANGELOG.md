@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- **No importar sin datos vitales** (#78): si faltan número, fecha, nombre del
+  proveedor o CIF/NIF (y no hay proveedor emparejado), se desactiva «Marcar como
+  lista para importar», se bloquea la aprobación en lote y el servidor rechaza la
+  importación. Se muestra un aviso recomendando completar los campos o
+  re-analizar (con otro proveedor de IA si conviene).
 - **Producto predeterminado del proveedor** (#76): un único control de búsqueda y
   selección (sin campo «Referencia» ni botón de guardado separados), se guarda al
   elegir el producto, se puede limpiar con ×, teclado usable (↑/↓/Enter/Esc) y
