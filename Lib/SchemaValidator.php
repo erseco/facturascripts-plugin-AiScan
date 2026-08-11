@@ -162,6 +162,50 @@ class SchemaValidator
         return $errors;
     }
 
+    /**
+     * Vital fields that must be present before marking ready / importing (#78).
+     *
+     * Unlike validate(), this ignores arithmetic mismatches and focuses on
+     * identity data required to create a purchase invoice safely:
+     * invoice number, issue date, and a resolvable supplier (matched id, or
+     * both name and tax id when creating a new one).
+     *
+     * @return list<string>
+     */
+    public function getImportBlockingErrors(array $data): array
+    {
+        $errors = [];
+        $invoice = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
+        $supplier = is_array($data['supplier'] ?? null) ? $data['supplier'] : [];
+
+        if (trim((string) ($invoice['number'] ?? '')) === '') {
+            $errors[] = Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => $this->translateInvoiceField('number'),
+            ]);
+        }
+
+        if (trim((string) ($invoice['issue_date'] ?? '')) === '') {
+            $errors[] = Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => $this->translateInvoiceField('issue_date'),
+            ]);
+        }
+
+        $matchedId = trim((string) ($supplier['matched_supplier_id'] ?? ''));
+        if ($matchedId !== '') {
+            return $errors;
+        }
+
+        if (trim((string) ($supplier['name'] ?? '')) === '') {
+            $errors[] = Tools::lang()->trans('aiscan-supplier-name-required');
+        }
+
+        if (trim((string) ($supplier['tax_id'] ?? '')) === '') {
+            $errors[] = Tools::lang()->trans('aiscan-missing-supplier-tax-id');
+        }
+
+        return $errors;
+    }
+
     private function translateInvoiceField(string $field): string
     {
         $translationKeys = [

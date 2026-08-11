@@ -134,7 +134,60 @@
         if (totalMismatch) {
             warnings.push(totalMismatch.message);
         }
+
+        // Issue #78: always surface blocking identity errors in the warnings list.
+        getBlockingImportErrors(data).forEach(msg => {
+            if (msg && !warnings.includes(msg)) {
+                warnings.push(msg);
+            }
+        });
+
         return warnings;
+    }
+
+    /**
+     * Vital fields required before marking ready / importing (#78).
+     * Mirrors SchemaValidator::getImportBlockingErrors().
+     */
+    function getBlockingImportErrors(data) {
+        const errors = [];
+        if (!data || typeof data !== 'object') {
+            return errors;
+        }
+
+        const invoice = data.invoice || {};
+        const supplier = data.supplier || {};
+        const number = String(invoice.number ?? '').trim();
+        const issueDate = String(invoice.issue_date ?? '').trim();
+        const matchedId = String(supplier.matched_supplier_id ?? '').trim();
+        const name = String(supplier.name ?? '').trim();
+        const taxId = String(supplier.tax_id ?? '').trim();
+
+        if (!number) {
+            errors.push(trans('aiscan-missing-required-invoice-field', {
+                '%field%': trans('number'),
+            }));
+        }
+        if (!issueDate) {
+            errors.push(trans('aiscan-missing-required-invoice-field', {
+                '%field%': trans('date'),
+            }));
+        }
+
+        if (!matchedId) {
+            if (!name) {
+                errors.push(trans('aiscan-supplier-name-required'));
+            }
+            if (!taxId) {
+                errors.push(trans('aiscan-missing-supplier-tax-id'));
+            }
+        }
+
+        return errors;
+    }
+
+    function canMarkDocReady(data) {
+        return getBlockingImportErrors(data).length === 0;
     }
 
     function renderValidationWarningsHtml(validationErrors) {
@@ -152,6 +205,7 @@
         const container = document.getElementById('aiscan-validation-warnings');
         const doc = currentDoc();
         if (!container || !doc?.extractedData) {
+            updateMarkReadyButton();
             return;
         }
 
@@ -160,11 +214,46 @@
         if (validationErrors.length === 0) {
             container.className = 'd-none';
             container.innerHTML = '';
+        } else {
+            container.className = 'alert alert-danger py-2';
+            container.innerHTML = renderValidationWarningsHtml(validationErrors);
+        }
+
+        updateMarkReadyButton(data);
+    }
+
+    function updateMarkReadyButton(dataOverride) {
+        const btn = document.getElementById('aiscan-mark-ready-btn');
+        const hint = document.getElementById('aiscan-mark-ready-hint');
+        if (!btn) {
             return;
         }
 
-        container.className = 'alert alert-danger py-2';
-        container.innerHTML = renderValidationWarningsHtml(validationErrors);
+        const doc = currentDoc();
+        const data = dataOverride
+            || (doc?.extractedData ? collectFormData(doc.extractedData) : null);
+        const blocking = getBlockingImportErrors(data);
+        const canReady = blocking.length === 0;
+
+        btn.disabled = !canReady;
+        btn.title = canReady
+            ? ''
+            : (trans('aiscan-cannot-mark-ready') || blocking.join(' '));
+
+        if (hint) {
+            if (canReady) {
+                hint.classList.add('d-none');
+                hint.innerHTML = '';
+            } else {
+                hint.classList.remove('d-none');
+                const list = blocking.map(e => `<li>${escapeHtml(e)}</li>`).join('');
+                hint.innerHTML = `
+                    <strong class="small"><i class="fa-solid fa-ban me-1"></i>${escapeHtml(trans('aiscan-cannot-mark-ready'))}</strong>
+                    <ul class="mb-1 small">${list}</ul>
+                    <p class="mb-0 small text-muted">${escapeHtml(trans('aiscan-rescan-hint'))}</p>
+                `;
+            }
+        }
     }
 
     function checkInBatchDuplicate(doc) {
@@ -902,16 +991,24 @@
             needsReview = true;
         }
 
-        // CIF/NIF vacío: forzar revisión y aviso visible
-        const taxId = String(doc.extractedData?.supplier?.tax_id ?? '').trim();
-        if (!taxId) {
-            needsReview = true;
-            const missingTaxMsg = trans('aiscan-missing-supplier-tax-id');
-            if (missingTaxMsg && missingTaxMsg !== 'aiscan-missing-supplier-tax-id'
-                && !warnings.includes(missingTaxMsg)) {
-                warnings.push(missingTaxMsg);
-            } else if (!warnings.some(w => /cif|nif|tax.?id|fiscal/i.test(String(w)))) {
-                warnings.push(missingTaxMsg);
+        // CIF/NIF o nombre de proveedor vacío (sin match): forzar revisión (#56 / #78)
+        const matchedId = String(doc.extractedData?.supplier?.matched_supplier_id ?? '').trim();
+        if (!matchedId) {
+            const taxId = String(doc.extractedData?.supplier?.tax_id ?? '').trim();
+            if (!taxId) {
+                needsReview = true;
+                const missingTaxMsg = trans('aiscan-missing-supplier-tax-id');
+                if (missingTaxMsg && !warnings.includes(missingTaxMsg)) {
+                    warnings.push(missingTaxMsg);
+                }
+            }
+            const supplierName = String(doc.extractedData?.supplier?.name ?? '').trim();
+            if (!supplierName) {
+                needsReview = true;
+                const missingNameMsg = trans('aiscan-supplier-name-required');
+                if (missingNameMsg && !warnings.includes(missingNameMsg)) {
+                    warnings.push(missingNameMsg);
+                }
             }
         }
 
@@ -1279,7 +1376,10 @@
 
             switch (action) {
                 case 'approve':
-                    if (doc.status === STATUS.ANALYZED || doc.status === STATUS.NEEDS_REVIEW) {
+                    if (
+                        (doc.status === STATUS.ANALYZED || doc.status === STATUS.NEEDS_REVIEW)
+                        && canMarkDocReady(doc.extractedData)
+                    ) {
                         doc.reviewDecision = 'approved';
                         doc.status = STATUS.READY;
                     }
@@ -1673,6 +1773,7 @@
         `));
 
         review.insertAdjacentHTML('beforeend', `
+            <div id="aiscan-mark-ready-hint" class="alert alert-warning py-2 d-none" role="status"></div>
             <div class="d-flex justify-content-end gap-2 mt-3 mb-2">
                 <button type="button" class="btn btn-success" id="aiscan-mark-ready-btn">
                     <i class="fa-solid fa-check me-1"></i>${escapeHtml(trans('aiscan-mark-ready'))}
@@ -1682,7 +1783,25 @@
 
         document.getElementById('aiscan-mark-ready-btn')?.addEventListener('click', markCurrentReady);
         bindSupplierSearch();
+        bindReviewFormGate();
+        updateMarkReadyButton(data);
+    }
 
+    /**
+     * Keep mark-ready disabled until vital fields are filled (#78).
+     */
+    function bindReviewFormGate() {
+        const review = document.getElementById('aiscan-review');
+        if (!review || review.dataset.markReadyGateBound === '1') {
+            return;
+        }
+        review.dataset.markReadyGateBound = '1';
+        review.addEventListener('input', () => {
+            updateValidationWarnings();
+        });
+        review.addEventListener('change', () => {
+            updateValidationWarnings();
+        });
     }
 
     let collapseCounter = 0;
@@ -3659,6 +3778,12 @@
             return;
         }
 
+        const blocking = getBlockingImportErrors(doc.extractedData);
+        if (blocking.length > 0) {
+            updateMarkReadyButton(doc.extractedData);
+            return;
+        }
+
         if (!doc.extractedData.supplier?.matched_supplier_id) {
             const selectedSupplier = document.getElementById('supplier_match_select');
             if (!selectedSupplier) {
@@ -4195,10 +4320,12 @@
             buildProductMatchBadge,
             buildTotalLines,
             calcAllLineTotals,
+            canMarkDocReady,
             checkTotalMismatch,
             collectFormData,
             confidenceBadgeClass,
             finalizeAnalyzedDoc,
+            getBlockingImportErrors,
             getValidationWarnings,
             handleMultiInvoiceResponse,
             buildImportSummary,

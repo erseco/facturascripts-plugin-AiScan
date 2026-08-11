@@ -52,6 +52,13 @@ class InvoiceMapper
         $result = ['success' => false, 'invoice_id' => null, 'errors' => [], 'warnings' => []];
 
         try {
+            // Issue #78: refuse import when vital identity fields are missing.
+            $blocking = (new SchemaValidator())->getImportBlockingErrors($extractedData);
+            if ($blocking !== []) {
+                $result['errors'] = $blocking;
+                return $result;
+            }
+
             if ($invoiceId) {
                 $invoice = new FacturaProveedor();
                 if (!$invoice->loadFromCode($invoiceId)) {

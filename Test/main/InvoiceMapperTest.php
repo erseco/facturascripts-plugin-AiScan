@@ -38,6 +38,29 @@ final class InvoiceMapperTest extends TestCase
         $this->assertInstanceOf(InvoiceMapper::class, $this->mapper);
     }
 
+    public function testMapToInvoiceBlocksWhenVitalFieldsMissing(): void
+    {
+        $result = $this->mapper->mapToInvoice([
+            'invoice' => [
+                'total' => 43.30,
+            ],
+            'supplier' => [],
+            'lines' => [],
+        ], null, 'lines', false);
+
+        $this->assertFalse($result['success']);
+        $this->assertNotEmpty($result['errors']);
+        $this->assertNull($result['invoice_id']);
+        $this->assertContains(
+            Tools::lang()->trans('aiscan-missing-required-invoice-field', [
+                '%field%' => Tools::lang()->trans('number'),
+            ]),
+            $result['errors']
+        );
+        $this->assertContains(Tools::lang()->trans('aiscan-supplier-name-required'), $result['errors']);
+        $this->assertContains(Tools::lang()->trans('aiscan-missing-supplier-tax-id'), $result['errors']);
+    }
+
     // ── buildNotes() ────────────────────────────────────────
 
     public function testBuildNotesWithAllFields(): void
