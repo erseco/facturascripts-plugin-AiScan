@@ -24,11 +24,11 @@ Cada documento se procesa de forma independiente y el resultado se presenta en u
 - **Asistente multi-documento**: navega entre los documentos subidos revisando y corrigiendo cada uno
 - **Extracción asistida por IA**: soporta OpenAI, Google Gemini, Mistral y endpoints compatibles con OpenAI
 - **IA local en Google Chrome**: también puede usar la `Browser Prompt API` de Chrome para ejecutar el análisis en local, sin enviar la factura a servicios externos
-- **Detalle de líneas editable**: modal de edición para cada línea con búsqueda de productos, impuestos, retenciones y descuentos
+- **Detalle de líneas editable**: modal de edición para cada línea con búsqueda de productos, impuestos, retenciones y descuento en % o en importe (se calcula el otro valor)
 - **Detección de proveedores y productos**: empareja automáticamente proveedores por NIF/CIF o nombre, y busca productos existentes por SKU o descripción
 - **Actualización opcional de stock y compra**: al importar puedes activar que las líneas actualicen existencias y datos de compra de productos ya vinculados
 - **Validación y normalización**: revisa el esquema devuelto por la IA antes de mapearlo a la factura
-- **Adjunta el original**: guarda el PDF o imagen subida como archivo adjunto de la factura
+- **Adjunta el original**: guarda el PDF o imagen subida como archivo adjunto de la factura; opcionalmente convierte fotos a PDF de una página antes de escanear y adjuntar
 - **Prompt base + instrucciones adicionales**: el prompt de extracción se mantiene actualizado con cada versión del plugin; el usuario puede añadir instrucciones propias que se concatenan al prompt base
 - **Compatibilidad**: FacturaScripts 2025 y PHP 8.1 o superior
 

@@ -7,6 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- **Cantidad 0 en líneas de prepago/abono** (#82): al importar, `cantidad = 0`
+  (p. ej. línea de «ya pagado» de Leroy Merlin) se conservaba como 1 porque
+  `empty(0)` en PHP es verdadero y el mapper forzaba `max(1, cantidad)`.
+  Solo se usa 1 si la cantidad falta; 0 y precios negativos se importan tal cual.
 - **No importar sin datos vitales** (#78): si faltan número, fecha, nombre del
   proveedor o CIF/NIF (y no hay proveedor emparejado), se desactiva «Marcar como
   lista para importar», se bloquea la aprobación en lote y el servidor rechaza la
@@ -19,6 +23,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 
+- **Convertir imagen a PDF** (#80): casilla opcional en la subida. La foto se
+  envuelve en un PDF de una página (sin recorte de sombras) para escanearla y
+  adjuntarla a la factura como PDF.
+- **Descuento por importe o por %** (#81): en los tres puntos de cada línea se
+  puede escribir el descuento en euros o en porcentaje; el otro valor se
+  calcula solo. La IA puede devolver `dtoimporte` cuando el ticket descuenta
+  dinero (p. ej. Leroy Merlin) y se convierte a `dtopor` para FacturaScripts.
 - **Playground / Docker listos para facturar con IGIC**: `blueprint.json` configura empresa
   canaria, impuesto por defecto `IGIC7`, plan contable (`defaultplan`), formas de pago/serie
   y productos con IGIC; `docker/setup-aiscan.php` alinea empresa, defaults, **serie A**,

@@ -26,6 +26,7 @@ use FacturaScripts\Dinamic\Lib\AssetManager;
 use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
+use FacturaScripts\Plugins\AiScan\Lib\ImageToPdfConverter;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\MockFixtureResolver;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
@@ -288,13 +289,52 @@ class AiScanInvoice extends Controller
             throw new \RuntimeException(Tools::lang()->trans('aiscan-failed-to-store-uploaded-file'));
         }
 
+        $originalName = basename((string) $file['name']);
+        $size = (int) $file['size'];
+        if ($this->shouldConvertUploadToPdf()) {
+            $converted = $this->convertStoredUploadToPdf($tmpPath, $mimeType, $originalName);
+            $tmpPath = $converted['path'];
+            $tmpFilename = basename($converted['path']);
+            $mimeType = $converted['mime'];
+            $originalName = $converted['original_name'];
+            $size = is_file($tmpPath) ? (int) filesize($tmpPath) : $size;
+        }
+
         return [
             'client_index' => $clientIndex,
             'mime_type' => $mimeType,
-            'original_name' => basename((string) $file['name']),
-            'size' => (int) $file['size'],
+            'original_name' => $originalName,
+            'size' => $size,
             'tmp_file' => $tmpFilename,
         ];
+    }
+
+    private function shouldConvertUploadToPdf(): bool
+    {
+        $flag = $this->request()->get('convert_to_pdf', '0');
+        return $flag === '1' || $flag === 1 || $flag === true || $flag === 'true';
+    }
+
+    /**
+     * @return array{path: string, mime: string, original_name: string}
+     */
+    private function convertStoredUploadToPdf(string $tmpPath, string $mimeType, string $originalName): array
+    {
+        $converter = new ImageToPdfConverter();
+        if (!$converter->isConvertibleImage($mimeType)) {
+            return [
+                'path' => $tmpPath,
+                'mime' => $mimeType,
+                'original_name' => $originalName,
+            ];
+        }
+
+        $converted = $converter->convert($tmpPath, $mimeType, $originalName);
+        if ($converted['path'] !== $tmpPath && is_file($tmpPath)) {
+            unlink($tmpPath);
+        }
+
+        return $converted;
     }
 
     private function resolveMimeType(string $tmpName, string $extension): string

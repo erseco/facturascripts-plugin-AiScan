@@ -116,6 +116,15 @@
                                         <div class="form-text">{{ i18n.trans('aiscan-manual-entry-help') }}</div>
                                     </div>
                                 </div>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aiscan-convert-to-pdf" value="1">
+                                        <label class="form-check-label" for="aiscan-convert-to-pdf">
+                                            <i class="fa-solid fa-file-pdf me-1"></i>{{ i18n.trans('aiscan-convert-image-to-pdf') }}
+                                        </label>
+                                        <div class="form-text">{{ i18n.trans('aiscan-convert-image-to-pdf-help') }}</div>
+                                    </div>
+                                </div>
                                 {# Forma de pago solo en el panel de revisión (#57): evitar selector duplicado en subida. #}
                                 <button type="button" class="btn btn-primary w-100" id="aiscan-upload-btn" disabled>
                                     <i class="fa-solid fa-cloud-arrow-up me-1"></i>{{ i18n.trans('aiscan-upload-and-analyze') }}
@@ -418,6 +427,9 @@
         'date': '{{ i18n.trans('date')|e('js') }}',
         'description': '{{ i18n.trans('description')|e('js') }}',
         'discount': '{{ i18n.trans('discount')|e('js') }}',
+        'aiscan-discount-percent': '{{ i18n.trans('aiscan-discount-percent')|e('js') }}',
+        'aiscan-discount-amount': '{{ i18n.trans('aiscan-discount-amount')|e('js') }}',
+        'aiscan-discount-amount-help': '{{ i18n.trans('aiscan-discount-amount-help')|e('js') }}',
         'email': '{{ i18n.trans('email')|e('js') }}',
         'expiration': '{{ i18n.trans('expiration')|e('js') }}',
         'irpf': '{{ i18n.trans('irpf')|e('js') }}',

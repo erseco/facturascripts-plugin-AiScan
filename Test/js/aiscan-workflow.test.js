@@ -882,6 +882,26 @@ test('buildTotalLines incluye producto fijado de _product_suggestion (#69)', () 
     assert.equal(lines[0].pvpunitario, 100);
 });
 
+test('discountPercentFromAmount convierte euros de línea a % (#81)', () => {
+    const {hooks} = loadTestHooks();
+    const percent = hooks.discountPercentFromAmount(20, 4.99, 5.40);
+    assert.ok(Math.abs(percent - 5.410821643) < 0.0001);
+    const net = 20 * 4.99 * (1 - percent / 100);
+    assert.ok(Math.abs(net - (20 * 4.99 - 5.40)) < 0.01);
+});
+
+test('discountAmountFromPercent convierte % a euros de línea (#81)', () => {
+    const {hooks} = loadTestHooks();
+    const amount = hooks.discountAmountFromPercent(2, 10, 10);
+    assert.equal(amount, 2);
+});
+
+test('discountPercentFromAmount con base 0 no divide entre cero (#81)', () => {
+    const {hooks} = loadTestHooks();
+    assert.equal(hooks.discountPercentFromAmount(0, 10, 4.30), 0);
+    assert.equal(hooks.discountAmountFromPercent(0, 10, 6.5), 0);
+});
+
 test('buildProductMatchBadge distingue pinned e history (#69)', () => {
     const {hooks} = loadTestHooks();
     const pinned = hooks.buildProductMatchBadge('PIN-1', 'pinned');
