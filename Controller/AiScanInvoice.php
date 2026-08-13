@@ -329,12 +329,25 @@ class AiScanInvoice extends Controller
             ];
         }
 
-        $converted = $converter->convert($tmpPath, $mimeType, $originalName);
-        if ($converted['path'] !== $tmpPath && is_file($tmpPath)) {
-            unlink($tmpPath);
+        try {
+            $converted = $converter->convert($tmpPath, $mimeType, $originalName);
+        } catch (\Throwable $exception) {
+            $this->deleteUploadedTemp($tmpPath);
+            throw $exception;
+        }
+
+        if ($converted['path'] !== $tmpPath) {
+            $this->deleteUploadedTemp($tmpPath);
         }
 
         return $converted;
+    }
+
+    private function deleteUploadedTemp(string $path): void
+    {
+        if ($path !== '' && is_file($path)) {
+            unlink($path);
+        }
     }
 
     private function resolveMimeType(string $tmpName, string $extension): string

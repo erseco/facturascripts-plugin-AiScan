@@ -85,6 +85,44 @@ final class ImageToPdfConverterTest extends TestCase
         $this->tempFiles[] = $result['path'];
     }
 
+    /**
+     * Mobile photos often store pixels sideways and set EXIF Orientation=6.
+     * The PDF must use the display size (rotated), not the raw JPEG size.
+     */
+    public function testConvertJpegAppliesExifOrientationSix(): void
+    {
+        $source = $this->createJpeg(40, 80);
+        $oriented = $this->tempFile('oriented.jpg');
+        file_put_contents($oriented, $this->jpegWithExifOrientation(
+            (string) file_get_contents($source),
+            6
+        ));
+
+        $result = (new ImageToPdfConverter())->convert($oriented, 'image/jpeg');
+        $this->tempFiles[] = $result['path'];
+        $pdf = (string) file_get_contents($result['path']);
+
+        $this->assertMatchesRegularExpression('/\/Width 80\b/', $pdf);
+        $this->assertMatchesRegularExpression('/\/Height 40\b/', $pdf);
+        $this->assertDoesNotMatchRegularExpression('/\/Width 40\b/', $pdf);
+    }
+
+    public function testConvertCorruptImageDoesNotLeavePartialPdf(): void
+    {
+        $source = $this->tempFile('broken.jpg');
+        file_put_contents($source, 'this is not a jpeg');
+        $expectedPdf = dirname($source) . '/' . pathinfo($source, PATHINFO_FILENAME) . '.pdf';
+
+        try {
+            (new ImageToPdfConverter())->convert($source, 'image/jpeg');
+            $this->fail('Expected convert() to reject a corrupt JPEG');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('image', strtolower($exception->getMessage()));
+        }
+
+        $this->assertFileDoesNotExist($expectedPdf);
+    }
+
     private function createJpeg(int $width, int $height): string
     {
         $path = $this->tempFile('source.jpg');
@@ -94,6 +132,23 @@ final class ImageToPdfConverterTest extends TestCase
         imagejpeg($image, $path, 90);
 
         return $path;
+    }
+
+    /**
+     * Insert a minimal little-endian EXIF APP1 with IFD0 Orientation.
+     */
+    private function jpegWithExifOrientation(string $jpeg, int $orientation): string
+    {
+        $this->assertSame("\xFF\xD8", substr($jpeg, 0, 2), 'Fixture must start with a JPEG SOI');
+
+        $tiff = 'II' . pack('v', 42) . pack('V', 8)
+            . pack('v', 1)
+            . pack('v', 0x0112) . pack('v', 3) . pack('V', 1) . pack('V', $orientation)
+            . pack('V', 0);
+        $exif = "Exif\0\0" . $tiff;
+        $app1 = "\xFF\xE1" . pack('n', strlen($exif) + 2) . $exif;
+
+        return "\xFF\xD8" . $app1 . substr($jpeg, 2);
     }
 
     private function tempFile(string $name): string

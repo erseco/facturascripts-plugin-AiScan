@@ -644,6 +644,37 @@ final class SchemaValidatorTest extends TestCase
         $this->assertSame(0.0, $data['lines'][0]['cantidad']);
     }
 
+    public function testNormalizeKeepsNegativePriceLineWithoutDescription(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => '',
+                    'quantity' => 1,
+                    'unit_price' => -94.37,
+                ],
+            ],
+        ]);
+
+        $this->assertCount(1, $data['lines']);
+        $this->assertEqualsWithDelta(-94.37, $data['lines'][0]['pvpunitario'], 0.01);
+    }
+
+    public function testNormalizeStillDropsBlankZeroPriceLines(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => '',
+                    'quantity' => 1,
+                    'unit_price' => 0,
+                ],
+            ],
+        ]);
+
+        $this->assertCount(0, $data['lines']);
+    }
+
     public function testNormalizeDefaultsMissingQuantityToOne(): void
     {
         $data = $this->validator->normalize([

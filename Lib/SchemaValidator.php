@@ -232,7 +232,7 @@ class SchemaValidator
         $data['lines'] = array_values(array_filter($data['lines'], function ($line) {
             $desc = trim((string) ($line['descripcion'] ?? $line['description'] ?? ''));
             $price = (float) ($line['pvpunitario'] ?? $line['unit_price'] ?? 0);
-            return $desc !== '' || $price > 0;
+            return $desc !== '' || abs($price) > 0.0000001;
         }));
         $data['warnings'] = array_values(array_unique(
             is_array($data['warnings'] ?? null) ? $data['warnings'] : []

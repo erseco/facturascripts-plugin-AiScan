@@ -66,8 +66,15 @@ class ImageToPdfConverter
 
         $pdf = $this->buildPdf($jpeg, (int) $size[0], (int) $size[1]);
         $dest = $this->destinationPath($path);
-        if (false === file_put_contents($dest, $pdf)) {
-            throw new RuntimeException('Could not write PDF: ' . $dest);
+        try {
+            if (false === file_put_contents($dest, $pdf)) {
+                throw new RuntimeException('Could not write PDF: ' . $dest);
+            }
+        } catch (\Throwable $exception) {
+            if (is_file($dest)) {
+                unlink($dest);
+            }
+            throw $exception;
         }
 
         return [
@@ -103,21 +110,17 @@ class ImageToPdfConverter
 
     private function toJpeg(string $path, string $mime): string
     {
-        if (in_array($mime, ['image/jpeg', 'image/jpg'], true)) {
-            $raw = file_get_contents($path);
-            if ($raw === false) {
-                throw new RuntimeException('Could not read image: ' . $path);
-            }
-            return $raw;
-        }
-
-        if (!function_exists('imagecreatefromstring')) {
-            throw new RuntimeException('GD is required to convert images to PDF.');
-        }
-
         $raw = file_get_contents($path);
         if ($raw === false) {
             throw new RuntimeException('Could not read image: ' . $path);
+        }
+
+        $isJpeg = in_array($mime, ['image/jpeg', 'image/jpg'], true);
+        if (!function_exists('imagecreatefromstring')) {
+            if ($isJpeg) {
+                return $raw;
+            }
+            throw new RuntimeException('GD is required to convert images to PDF.');
         }
 
         $image = imagecreatefromstring($raw);
@@ -129,6 +132,10 @@ class ImageToPdfConverter
             imagepalettetotruecolor($image);
         }
 
+        if ($isJpeg) {
+            $image = $this->applyExifOrientation($image, $raw);
+        }
+
         ob_start();
         imagejpeg($image, null, 90);
         $jpeg = (string) ob_get_clean();
@@ -137,6 +144,135 @@ class ImageToPdfConverter
         }
 
         return $jpeg;
+    }
+
+    /**
+     * @param \GdImage|resource $image
+     *
+     * @return \GdImage|resource
+     */
+    private function applyExifOrientation($image, string $jpeg)
+    {
+        $orientation = $this->readJpegOrientation($jpeg);
+        switch ($orientation) {
+            case 2:
+                imageflip($image, IMG_FLIP_HORIZONTAL);
+                return $image;
+            case 3:
+                return $this->rotateImage($image, 180);
+            case 4:
+                imageflip($image, IMG_FLIP_VERTICAL);
+                return $image;
+            case 5:
+                imageflip($image, IMG_FLIP_VERTICAL);
+                return $this->rotateImage($image, 270);
+            case 6:
+                return $this->rotateImage($image, 270);
+            case 7:
+                imageflip($image, IMG_FLIP_VERTICAL);
+                return $this->rotateImage($image, 90);
+            case 8:
+                return $this->rotateImage($image, 90);
+            default:
+                return $image;
+        }
+    }
+
+    /**
+     * @param \GdImage|resource $image
+     *
+     * @return \GdImage|resource
+     */
+    private function rotateImage($image, int $degrees)
+    {
+        $rotated = imagerotate($image, $degrees, 0);
+        return $rotated !== false ? $rotated : $image;
+    }
+
+    /**
+     * Read EXIF Orientation from a JPEG APP1 segment without requiring ext-exif.
+     */
+    private function readJpegOrientation(string $jpeg): int
+    {
+        if (strlen($jpeg) < 4 || substr($jpeg, 0, 2) !== "\xFF\xD8") {
+            return 1;
+        }
+
+        $offset = 2;
+        $length = strlen($jpeg);
+        while ($offset + 4 <= $length) {
+            if ($jpeg[$offset] !== "\xFF") {
+                break;
+            }
+            $marker = ord($jpeg[$offset + 1]);
+            if ($marker === 0xDA || $marker === 0xD9) {
+                break;
+            }
+            $segmentLength = unpack('n', substr($jpeg, $offset + 2, 2));
+            if ($segmentLength === false || $segmentLength[1] < 2) {
+                break;
+            }
+            $size = $segmentLength[1];
+            if ($marker === 0xE1) {
+                $payload = substr($jpeg, $offset + 4, $size - 2);
+                $orientation = $this->orientationFromExifPayload($payload);
+                if ($orientation !== null) {
+                    return $orientation;
+                }
+            }
+            $offset += 2 + $size;
+        }
+
+        return 1;
+    }
+
+    private function orientationFromExifPayload(string $payload): ?int
+    {
+        if (!str_starts_with($payload, "Exif\0\0")) {
+            return null;
+        }
+
+        $tiff = substr($payload, 6);
+        if (strlen($tiff) < 8) {
+            return null;
+        }
+
+        $endian = substr($tiff, 0, 2);
+        $little = $endian === 'II';
+        if (!$little && $endian !== 'MM') {
+            return null;
+        }
+
+        $read16 = static function (string $data, int $pos) use ($little): int {
+            $unpacked = unpack($little ? 'v' : 'n', substr($data, $pos, 2));
+            return $unpacked === false ? 0 : (int) $unpacked[1];
+        };
+        $read32 = static function (string $data, int $pos) use ($little): int {
+            $unpacked = unpack($little ? 'V' : 'N', substr($data, $pos, 4));
+            return $unpacked === false ? 0 : (int) $unpacked[1];
+        };
+
+        $ifdOffset = $read32($tiff, 4);
+        if ($ifdOffset + 2 > strlen($tiff)) {
+            return null;
+        }
+
+        $count = $read16($tiff, $ifdOffset);
+        for ($i = 0; $i < $count; ++$i) {
+            $entry = $ifdOffset + 2 + ($i * 12);
+            if ($entry + 12 > strlen($tiff)) {
+                break;
+            }
+            if ($read16($tiff, $entry) !== 0x0112) {
+                continue;
+            }
+            $value = $read16($tiff, $entry + 8);
+            if ($value >= 1 && $value <= 8) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function buildPdf(string $jpeg, int $imgWidth, int $imgHeight): string

@@ -10,7 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Cantidad 0 en líneas de prepago/abono** (#82): al importar, `cantidad = 0`
   (p. ej. línea de «ya pagado» de Leroy Merlin) se conservaba como 1 porque
   `empty(0)` en PHP es verdadero y el mapper forzaba `max(1, cantidad)`.
-  Solo se usa 1 si la cantidad falta; 0 y precios negativos se importan tal cual.
+  Solo se usa 1 si la cantidad falta; 0 y precios negativos se importan tal cual
+  (también si la línea no tiene descripción).
 - **No importar sin datos vitales** (#78): si faltan número, fecha, nombre del
   proveedor o CIF/NIF (y no hay proveedor emparejado), se desactiva «Marcar como
   lista para importar», se bloquea la aprobación en lote y el servidor rechaza la
@@ -25,7 +26,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 - **Convertir imagen a PDF** (#80): casilla opcional en la subida. La foto se
   envuelve en un PDF de una página (sin recorte de sombras) para escanearla y
-  adjuntarla a la factura como PDF.
+  adjuntarla a la factura como PDF. Se aplica la orientación EXIF de los JPEG
+  (fotos de móvil) y, si la conversión falla, se borran el temporal y el PDF
+  parcial.
 - **Descuento por importe o por %** (#81): en los tres puntos de cada línea se
   puede escribir el descuento en euros o en porcentaje; el otro valor se
   calcula solo. La IA puede devolver `dtoimporte` cuando el ticket descuenta
