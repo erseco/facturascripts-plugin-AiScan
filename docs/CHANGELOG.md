@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- **Convertir imagen a PDF no cambiaba el nombre** (#80): tras marcar la
+  casilla, el análisis y el adjunto seguían mostrando `factura.jpeg` porque el
+  cliente no aplicaba el `original_name` del servidor. Ahora la revisión, el
+  resumen de importación y el archivo adjunto usan `factura.pdf`. También se
+  invalida la caché del JS al cambiar el fichero (la versión del plugin sigue
+  en 1.0).
 - **Cola de archivos en la subida** (#84): al elegir o soltar más ficheros se
   añaden a la lista en vez de sustituirla. Cada uno tiene un botón para
   quitarlo si se ha añadido por error. La cola se bloquea al pulsar

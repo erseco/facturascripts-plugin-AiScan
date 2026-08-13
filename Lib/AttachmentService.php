@@ -63,7 +63,11 @@ class AttachmentService
             return;
         }
 
-        $this->applyOriginalFileName($attachedFile, (string) ($uploadData['original_name'] ?? ''));
+        $displayName = $this->resolveAttachmentDisplayName(
+            (string) ($uploadData['original_name'] ?? ''),
+            $tmpFile
+        );
+        $this->applyOriginalFileName($attachedFile, $displayName);
 
         $relation = new AttachedFileRelation();
         $relation->idfile = $attachedFile->idfile;
@@ -76,6 +80,21 @@ class AttachmentService
         if (false === $relation->save()) {
             $attachedFile->delete();
         }
+    }
+
+    private function resolveAttachmentDisplayName(string $originalName, string $storedFile): string
+    {
+        $name = trim($originalName);
+        if ($name === '') {
+            return $name;
+        }
+
+        $storedExt = strtolower(pathinfo($storedFile, PATHINFO_EXTENSION));
+        if ($storedExt === 'pdf' && preg_match('/\.(jpe?g|png|webp)$/i', $name)) {
+            return (new ImageToPdfConverter())->pdfFileName($name);
+        }
+
+        return $name;
     }
 
     private function applyOriginalFileName(AttachedFile $attachedFile, string $originalName): void

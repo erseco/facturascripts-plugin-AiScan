@@ -614,6 +614,39 @@
         return state.documents;
     }
 
+    function applyUploadedFileMeta(doc, uploaded) {
+        if (!doc || !uploaded) {
+            return doc;
+        }
+        if (uploaded.tmp_file) {
+            doc.tmpFile = uploaded.tmp_file;
+        }
+        if (uploaded.mime_type) {
+            doc.mimeType = uploaded.mime_type;
+        }
+        if (uploaded.original_name) {
+            doc.originalName = uploaded.original_name;
+        }
+        if (uploaded.size != null && uploaded.size !== '') {
+            const size = Number(uploaded.size);
+            if (Number.isFinite(size)) {
+                doc.size = size;
+            }
+        }
+        return doc;
+    }
+
+    function previewAsPdf(doc) {
+        if (!doc) {
+            return false;
+        }
+        const originalType = doc.file && doc.file.type ? String(doc.file.type) : '';
+        if (originalType.indexOf('image/') === 0) {
+            return false;
+        }
+        return (doc.mimeType || '') === 'application/pdf';
+    }
+
     function createPendingDocument(file, index, partyType) {
         return {
             index,
@@ -816,8 +849,7 @@
                     const idx = start + uf.client_index;
                     const doc = docs[idx];
                     if (doc) {
-                        doc.tmpFile = uf.tmp_file;
-                        doc.mimeType = uf.mime_type || doc.mimeType;
+                        applyUploadedFileMeta(doc, uf);
                     }
                 });
 
@@ -1662,7 +1694,7 @@
         title.textContent = doc.originalName;
         area.innerHTML = '';
 
-        if (doc.mimeType === 'application/pdf' && doc.objectUrl) {
+        if (previewAsPdf(doc) && doc.objectUrl) {
             area.innerHTML = `<iframe src="${doc.objectUrl}#navpanes=0&toolbar=1&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
         } else if (doc.objectUrl) {
             area.style.position = 'relative';
@@ -4571,6 +4603,7 @@
     if (typeof globalThis !== 'undefined' && globalThis.__AISCAN_TEST__) {
         globalThis.__aiscanWorkflowTestHooks = {
             applyAnalyzeResponse,
+            applyUploadedFileMeta,
             applyManualEntryFallback,
             applyRemoveSelectedFile,
             applySelectedFiles,
@@ -4603,6 +4636,7 @@
             isCreditorPartyType,
             normalizePartyType,
             openAllAsManualEntry,
+            previewAsPdf,
             PARTY_CREDITOR,
             PARTY_SUPPLIER,
             renderReviewPanel,
