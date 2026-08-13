@@ -28,9 +28,9 @@
                                 </div>
                                 <input id="aiscan-file-input" type="file" class="d-none" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
                                 <div id="aiscan-file-list" class="d-none mt-3">
-                                    <div class="list-group list-group-flush border rounded" id="aiscan-file-list-body" style="max-height:200px;overflow-y:auto"></div>
+                                    <div class="list-group list-group-flush border rounded" id="aiscan-file-list-body" role="list" style="max-height:200px;overflow-y:auto"></div>
                                     <div class="text-center mt-2">
-                                        <span class="badge text-bg-primary" id="aiscan-file-count"></span>
+                                        <span class="badge text-bg-primary" id="aiscan-file-count" aria-live="polite"></span>
                                     </div>
                                 </div>
                             </div>
@@ -364,6 +364,8 @@
         'aiscan-document-and-image-drop': '{{ i18n.trans('aiscan-document-and-image-drop')|e('js') }}',
         'aiscan-drop-or-click': '{{ i18n.trans('aiscan-drop-or-click')|e('js') }}',
         'aiscan-files-selected': '{{ i18n.trans('aiscan-files-selected')|e('js') }}',
+        'aiscan-add-more-files': '{{ i18n.trans('aiscan-add-more-files')|e('js') }}',
+        'aiscan-remove-file': '{{ i18n.trans('aiscan-remove-file')|e('js') }}',
         'aiscan-import-all': '{{ i18n.trans('aiscan-import-all')|e('js') }}',
         'aiscan-import-complete': '{{ i18n.trans('aiscan-import-complete')|e('js') }}',
         'aiscan-import-count': '{{ i18n.trans('aiscan-import-count')|e('js') }}',

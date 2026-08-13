@@ -909,3 +909,129 @@ test('buildProductMatchBadge distingue pinned e history (#69)', () => {
     assert.match(pinned, /fa-thumbtack/);
     assert.match(history, /fa-clock-rotate-left/);
 });
+
+function fakeFile(name, size, lastModified = 1, type = 'application/pdf') {
+    return {name, size, lastModified, type};
+}
+
+test('mergeSelectedFiles acumula archivos de una segunda selección (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const first = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100), fakeFile('b.pdf', 200)], 'supplier');
+    const merged = hooks.mergeSelectedFiles(first, [fakeFile('c.jpg', 50, 2, 'image/jpeg')], 'supplier');
+
+    assert.equal(first.length, 2);
+    assert.equal(merged.length, 3);
+    assert.deepEqual(merged.map(doc => doc.originalName), ['a.pdf', 'b.pdf', 'c.jpg']);
+    assert.deepEqual(merged.map(doc => doc.index), [0, 1, 2]);
+    assert.equal(merged[2].mimeType, 'image/jpeg');
+    assert.equal(merged[2].status, hooks.STATUS.PENDING);
+    assert.equal(merged[2]._partyType, 'supplier');
+    assert.ok(merged[2].objectUrl);
+});
+
+test('mergeSelectedFiles conserva dos facturas con los mismos metadatos (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const first = hooks.mergeSelectedFiles([], [fakeFile('factura.pdf', 245632, 1786612345000)], 'supplier');
+    const merged = hooks.mergeSelectedFiles(first, [fakeFile('factura.pdf', 245632, 1786612345000)], 'supplier');
+
+    assert.equal(first.length, 1);
+    assert.equal(merged.length, 2);
+    assert.equal(merged[0].originalName, 'factura.pdf');
+    assert.equal(merged[1].originalName, 'factura.pdf');
+    assert.notEqual(merged[1], merged[0]);
+});
+
+test('mergeSelectedFiles ignora una selección vacía (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const first = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+    const empty = hooks.mergeSelectedFiles(first, [], 'supplier');
+
+    assert.equal(empty.length, 1);
+    assert.equal(empty[0], first[0]);
+});
+
+test('removeSelectedFile quita un archivo y reindexa el resto (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [
+        fakeFile('a.pdf', 100),
+        fakeFile('b.pdf', 200),
+        fakeFile('c.pdf', 300),
+    ], 'supplier');
+
+    const remaining = hooks.removeSelectedFile(docs, 1);
+
+    assert.equal(remaining.length, 2);
+    assert.deepEqual(remaining.map(doc => doc.originalName), ['a.pdf', 'c.pdf']);
+    assert.deepEqual(remaining.map(doc => doc.index), [0, 1]);
+});
+
+test('removeSelectedFile no altera la cola si el índice no existe (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+
+    assert.equal(hooks.removeSelectedFile(docs, -1).length, 1);
+    assert.equal(hooks.removeSelectedFile(docs, 3).length, 1);
+});
+
+test('buildSelectedFileListHtml incluye botón de quitar por archivo (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('factura-a.pdf', 1024), fakeFile('ticket.jpg', 2048, 2, 'image/jpeg')], 'supplier');
+    const html = hooks.buildSelectedFileListHtml(docs);
+
+    assert.match(html, /data-aiscan-remove-file="0"/);
+    assert.match(html, /data-aiscan-remove-file="1"/);
+    assert.match(html, /factura-a\.pdf/);
+    assert.match(html, /ticket\.jpg/);
+    assert.match(html, /aria-label=/);
+    assert.match(html, /fa-trash/);
+});
+
+test('applySelectedFiles no añade ficheros mientras la cola está bloqueada (#84)', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.documents = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+
+    hooks.setUploadQueueLocked(true);
+    const afterAdd = hooks.applySelectedFiles([fakeFile('b.pdf', 200)]);
+
+    assert.equal(hooks.isUploadQueueLocked(), true);
+    assert.equal(afterAdd.length, 1);
+    assert.equal(hooks.state.documents.length, 1);
+    assert.equal(hooks.state.documents[0].originalName, 'a.pdf');
+});
+
+test('applyRemoveSelectedFile no quita ficheros mientras la cola está bloqueada (#84)', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.documents = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100), fakeFile('b.pdf', 200)], 'supplier');
+
+    hooks.setUploadQueueLocked(true);
+    const afterRemove = hooks.applyRemoveSelectedFile(0);
+
+    assert.equal(afterRemove.length, 2);
+    assert.equal(hooks.state.documents.length, 2);
+    assert.deepEqual(hooks.state.documents.map(doc => doc.originalName), ['a.pdf', 'b.pdf']);
+});
+
+test('al desbloquear la cola se puede añadir y quitar de nuevo (#84)', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.documents = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+    hooks.setUploadQueueLocked(true);
+    hooks.applySelectedFiles([fakeFile('b.pdf', 200)]);
+
+    hooks.setUploadQueueLocked(false);
+    hooks.applySelectedFiles([fakeFile('b.pdf', 200)]);
+    assert.equal(hooks.state.documents.length, 2);
+
+    hooks.applyRemoveSelectedFile(0);
+    assert.equal(hooks.state.documents.length, 1);
+    assert.equal(hooks.state.documents[0].originalName, 'b.pdf');
+});
+
+test('buildSelectedFileListHtml desactiva la papelera si la cola está bloqueada (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+    hooks.setUploadQueueLocked(true);
+    const html = hooks.buildSelectedFileListHtml(docs);
+
+    assert.match(html, /disabled/);
+    assert.match(html, /aria-disabled="true"/);
+});

@@ -27,6 +27,7 @@
         selectedIndices: new Set(),
         selectionAnchorIndex: null,
         sortField: 'upload_order',
+        queueLocked: false,
         // Modo depuración / mock (sin IA)
         debugMode: !!(window.aiscanDebugMode),
         mockFixtures: Array.isArray(window.aiscanMockFixtures) ? window.aiscanMockFixtures.slice() : [],
@@ -397,9 +398,17 @@
             return;
         }
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('click', () => {
+            if (isUploadQueueLocked()) {
+                return;
+            }
+            fileInput.click();
+        });
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
+            if (isUploadQueueLocked()) {
+                return;
+            }
             dropZone.classList.add('aiscan-drag-over');
         });
         dropZone.addEventListener('dragleave', (e) => {
@@ -451,6 +460,25 @@
         }
 
         bindMockDebugControls();
+
+        dropZoneDefaultHtml = dropZone.innerHTML;
+
+        const fileListBody = document.getElementById('aiscan-file-list-body');
+        if (fileListBody) {
+            fileListBody.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-aiscan-remove-file]');
+                if (!btn) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                const index = parseInt(btn.getAttribute('data-aiscan-remove-file'), 10);
+                if (Number.isInteger(index)) {
+                    applyRemoveSelectedFile(index);
+                    renderSelectedFiles();
+                }
+            });
+        }
     }
 
     /**
@@ -556,13 +584,38 @@
 
 
 
-    function onFilesSelected(fileList) {
-        const files = Array.from(fileList);
-        if (files.length === 0) {
-            return;
-        }
+    let dropZoneDefaultHtml = '';
 
-        state.documents = files.map((file, index) => ({
+    function isUploadQueueLocked() {
+        return !!state.queueLocked;
+    }
+
+    function setUploadQueueLocked(locked) {
+        state.queueLocked = !!locked;
+    }
+
+    function applySelectedFiles(fileList) {
+        if (isUploadQueueLocked()) {
+            return state.documents;
+        }
+        const incoming = Array.from(fileList || []);
+        if (incoming.length === 0) {
+            return state.documents;
+        }
+        state.documents = mergeSelectedFiles(state.documents, incoming, state.partyType);
+        return state.documents;
+    }
+
+    function applyRemoveSelectedFile(index) {
+        if (isUploadQueueLocked()) {
+            return state.documents;
+        }
+        state.documents = removeSelectedFile(state.documents, index);
+        return state.documents;
+    }
+
+    function createPendingDocument(file, index, partyType) {
+        return {
             index,
             file,
             originalName: file.name,
@@ -574,41 +627,136 @@
             extractedData: null,
             error: null,
             reviewDecision: null,
-            _partyType: state.partyType,
-        }));
+            _partyType: partyType,
+        };
+    }
 
+    function mergeSelectedFiles(existingDocs, incomingFiles, partyType) {
+        const docs = Array.isArray(existingDocs) ? existingDocs.slice() : [];
+        Array.from(incomingFiles || []).forEach(file => {
+            if (!file) {
+                return;
+            }
+            docs.push(createPendingDocument(file, docs.length, partyType));
+        });
+        return docs;
+    }
+
+    function removeSelectedFile(docs, index) {
+        const next = Array.isArray(docs) ? docs.slice() : [];
+        if (!Number.isInteger(index) || index < 0 || index >= next.length) {
+            return next;
+        }
+        const [removed] = next.splice(index, 1);
+        if (removed?.objectUrl) {
+            URL.revokeObjectURL(removed.objectUrl);
+        }
+        next.forEach((doc, i) => {
+            doc.index = i;
+        });
+        return next;
+    }
+
+    function buildSelectedFileListHtml(docs) {
+        return (Array.isArray(docs) ? docs : []).map((doc, i) => {
+            const file = doc.file || {};
+            const name = doc.originalName || file.name || '';
+            const type = doc.mimeType || file.type || '';
+            const size = doc.size ?? file.size ?? 0;
+            const icon = type === 'application/pdf' ? 'fa-file-pdf text-danger' : 'fa-file-image text-primary';
+            const sizeMb = (size / 1024 / 1024).toFixed(2);
+            const removeLabel = trans('aiscan-remove-file', {'%name%': name});
+            const locked = isUploadQueueLocked();
+            const disabledAttr = locked ? ' disabled aria-disabled="true"' : '';
+            return `<div class="list-group-item py-1 px-2 d-flex align-items-center justify-content-between" role="listitem">
+                <div class="d-flex align-items-center min-width-0">
+                    <i class="fa-solid ${icon} me-2" aria-hidden="true"></i>
+                    <span class="text-truncate small">${escapeHtml(name)}</span>
+                </div>
+                <div class="d-flex align-items-center ms-2">
+                    <span class="text-muted small me-2" style="white-space:nowrap">${sizeMb} MB</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 aiscan-remove-file"
+                        data-aiscan-remove-file="${i}" aria-label="${escapeAttr(removeLabel)}" title="${escapeAttr(removeLabel)}"${disabledAttr}>
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderSelectedFiles() {
         const dropZone = document.getElementById('aiscan-drop-zone');
-        dropZone.innerHTML = `
-            <div>
-                <div class="fs-3 mb-2 text-success"><i class="fa-solid fa-check-circle"></i></div>
-                <div class="fw-semibold">${escapeHtml(trans('aiscan-files-selected', {'%count%': String(files.length)}))}</div>
-                <div class="small text-muted mt-2">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
-            </div>
-        `;
-
         const fileListEl = document.getElementById('aiscan-file-list');
         const fileListBody = document.getElementById('aiscan-file-list-body');
         const fileCount = document.getElementById('aiscan-file-count');
-        if (fileListEl && fileListBody) {
-            fileListEl.classList.remove('d-none');
-            if (fileCount) {
-                fileCount.textContent = trans('aiscan-files-selected', {'%count%': String(files.length)});
-            }
-            fileListBody.innerHTML = files.map((f, i) => {
-                const icon = f.type === 'application/pdf' ? 'fa-file-pdf text-danger' : 'fa-file-image text-primary';
-                const sizeMb = (f.size / 1024 / 1024).toFixed(2);
-                return `<div class="list-group-item py-1 px-2 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center min-width-0">
-                        <i class="fa-solid ${icon} me-2"></i>
-                        <span class="text-truncate small">${escapeHtml(f.name)}</span>
+        const uploadBtn = document.getElementById('aiscan-upload-btn');
+        const fileInput = document.getElementById('aiscan-file-input');
+        const count = state.documents.length;
+        const locked = isUploadQueueLocked();
+
+        if (dropZone) {
+            dropZone.classList.toggle('aiscan-queue-locked', locked);
+            dropZone.setAttribute('aria-disabled', locked ? 'true' : 'false');
+            if (count === 0) {
+                dropZone.innerHTML = dropZoneDefaultHtml;
+            } else {
+                const hint = locked ? trans('aiscan-uploading-file') : trans('aiscan-add-more-files');
+                dropZone.innerHTML = `
+                    <div>
+                        <div class="fs-3 mb-2 text-success"><i class="fa-solid fa-check-circle"></i></div>
+                        <div class="fw-semibold">${escapeHtml(trans('aiscan-files-selected', {'%count%': String(count)}))}</div>
+                        <div class="small text-muted mt-2">${escapeHtml(hint)}</div>
                     </div>
-                    <span class="text-muted small ms-2" style="white-space:nowrap">${sizeMb} MB</span>
-                </div>`;
-            }).join('');
+                `;
+            }
         }
 
-        document.getElementById('aiscan-upload-btn').disabled = false;
-        document.getElementById('aiscan-file-input').value = '';
+        if (fileListEl && fileListBody) {
+            if (count === 0) {
+                fileListEl.classList.add('d-none');
+                fileListBody.innerHTML = '';
+            } else {
+                fileListEl.classList.remove('d-none');
+                fileListBody.setAttribute(
+                    'aria-label',
+                    trans('aiscan-files-selected', {'%count%': String(count)})
+                );
+                fileListBody.innerHTML = buildSelectedFileListHtml(state.documents);
+            }
+        }
+        if (fileCount) {
+            fileCount.textContent = count
+                ? trans('aiscan-files-selected', {'%count%': String(count)})
+                : '';
+        }
+        if (fileInput) {
+            fileInput.disabled = locked;
+        }
+        if (uploadBtn && !locked) {
+            uploadBtn.disabled = count === 0;
+        }
+    }
+
+    function onFilesSelected(fileList) {
+        if (isUploadQueueLocked()) {
+            const lockedInput = document.getElementById('aiscan-file-input');
+            if (lockedInput) {
+                lockedInput.value = '';
+            }
+            return;
+        }
+        const incoming = Array.from(fileList || []);
+        if (incoming.length === 0) {
+            return;
+        }
+
+        applySelectedFiles(incoming);
+        renderSelectedFiles();
+
+        const fileInput = document.getElementById('aiscan-file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
     }
 
     async function startUploadAndAnalyze() {
@@ -621,6 +769,8 @@
         }
 
         const uploadBtn = document.getElementById('aiscan-upload-btn');
+        setUploadQueueLocked(true);
+        renderSelectedFiles();
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-uploading-file'))}`;
 
@@ -705,6 +855,8 @@
                 analyzeAllPending();
             }
         } catch (error) {
+            setUploadQueueLocked(false);
+            renderSelectedFiles();
             uploadBtn.disabled = false;
             updateUploadButtonLabel();
             alert(error.message);
@@ -4420,6 +4572,13 @@
         globalThis.__aiscanWorkflowTestHooks = {
             applyAnalyzeResponse,
             applyManualEntryFallback,
+            applyRemoveSelectedFile,
+            applySelectedFiles,
+            buildSelectedFileListHtml,
+            isUploadQueueLocked,
+            mergeSelectedFiles,
+            removeSelectedFile,
+            setUploadQueueLocked,
             applyPartyTypeToSupplier,
             applyPinnedProductToLines,
             applySelectionRange,
