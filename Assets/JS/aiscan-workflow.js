@@ -27,6 +27,7 @@
         selectedIndices: new Set(),
         selectionAnchorIndex: null,
         sortField: 'upload_order',
+        queueLocked: false,
         // Modo depuración / mock (sin IA)
         debugMode: !!(window.aiscanDebugMode),
         mockFixtures: Array.isArray(window.aiscanMockFixtures) ? window.aiscanMockFixtures.slice() : [],
@@ -397,9 +398,17 @@
             return;
         }
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('click', () => {
+            if (isUploadQueueLocked()) {
+                return;
+            }
+            fileInput.click();
+        });
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
+            if (isUploadQueueLocked()) {
+                return;
+            }
             dropZone.classList.add('aiscan-drag-over');
         });
         dropZone.addEventListener('dragleave', (e) => {
@@ -465,7 +474,7 @@
                 e.stopPropagation();
                 const index = parseInt(btn.getAttribute('data-aiscan-remove-file'), 10);
                 if (Number.isInteger(index)) {
-                    state.documents = removeSelectedFile(state.documents, index);
+                    applyRemoveSelectedFile(index);
                     renderSelectedFiles();
                 }
             });
@@ -577,11 +586,32 @@
 
     let dropZoneDefaultHtml = '';
 
-    function fileIdentity(file) {
-        if (!file) {
-            return '';
+    function isUploadQueueLocked() {
+        return !!state.queueLocked;
+    }
+
+    function setUploadQueueLocked(locked) {
+        state.queueLocked = !!locked;
+    }
+
+    function applySelectedFiles(fileList) {
+        if (isUploadQueueLocked()) {
+            return state.documents;
         }
-        return [file.name || '', file.size || 0, file.lastModified || 0, file.type || ''].join('\0');
+        const incoming = Array.from(fileList || []);
+        if (incoming.length === 0) {
+            return state.documents;
+        }
+        state.documents = mergeSelectedFiles(state.documents, incoming, state.partyType);
+        return state.documents;
+    }
+
+    function applyRemoveSelectedFile(index) {
+        if (isUploadQueueLocked()) {
+            return state.documents;
+        }
+        state.documents = removeSelectedFile(state.documents, index);
+        return state.documents;
     }
 
     function createPendingDocument(file, index, partyType) {
@@ -603,13 +633,10 @@
 
     function mergeSelectedFiles(existingDocs, incomingFiles, partyType) {
         const docs = Array.isArray(existingDocs) ? existingDocs.slice() : [];
-        const seen = new Set(docs.map(doc => fileIdentity(doc.file)));
         Array.from(incomingFiles || []).forEach(file => {
-            const key = fileIdentity(file);
-            if (!file || seen.has(key)) {
+            if (!file) {
                 return;
             }
-            seen.add(key);
             docs.push(createPendingDocument(file, docs.length, partyType));
         });
         return docs;
@@ -639,6 +666,8 @@
             const icon = type === 'application/pdf' ? 'fa-file-pdf text-danger' : 'fa-file-image text-primary';
             const sizeMb = (size / 1024 / 1024).toFixed(2);
             const removeLabel = trans('aiscan-remove-file', {'%name%': name});
+            const locked = isUploadQueueLocked();
+            const disabledAttr = locked ? ' disabled aria-disabled="true"' : '';
             return `<div class="list-group-item py-1 px-2 d-flex align-items-center justify-content-between" role="listitem">
                 <div class="d-flex align-items-center min-width-0">
                     <i class="fa-solid ${icon} me-2" aria-hidden="true"></i>
@@ -647,7 +676,7 @@
                 <div class="d-flex align-items-center ms-2">
                     <span class="text-muted small me-2" style="white-space:nowrap">${sizeMb} MB</span>
                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 aiscan-remove-file"
-                        data-aiscan-remove-file="${i}" aria-label="${escapeAttr(removeLabel)}" title="${escapeAttr(removeLabel)}">
+                        data-aiscan-remove-file="${i}" aria-label="${escapeAttr(removeLabel)}" title="${escapeAttr(removeLabel)}"${disabledAttr}>
                         <i class="fa-solid fa-trash" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -661,17 +690,22 @@
         const fileListBody = document.getElementById('aiscan-file-list-body');
         const fileCount = document.getElementById('aiscan-file-count');
         const uploadBtn = document.getElementById('aiscan-upload-btn');
+        const fileInput = document.getElementById('aiscan-file-input');
         const count = state.documents.length;
+        const locked = isUploadQueueLocked();
 
         if (dropZone) {
+            dropZone.classList.toggle('aiscan-queue-locked', locked);
+            dropZone.setAttribute('aria-disabled', locked ? 'true' : 'false');
             if (count === 0) {
                 dropZone.innerHTML = dropZoneDefaultHtml;
             } else {
+                const hint = locked ? trans('aiscan-uploading-file') : trans('aiscan-add-more-files');
                 dropZone.innerHTML = `
                     <div>
                         <div class="fs-3 mb-2 text-success"><i class="fa-solid fa-check-circle"></i></div>
                         <div class="fw-semibold">${escapeHtml(trans('aiscan-files-selected', {'%count%': String(count)}))}</div>
-                        <div class="small text-muted mt-2">${escapeHtml(trans('aiscan-add-more-files'))}</div>
+                        <div class="small text-muted mt-2">${escapeHtml(hint)}</div>
                     </div>
                 `;
             }
@@ -695,18 +729,28 @@
                 ? trans('aiscan-files-selected', {'%count%': String(count)})
                 : '';
         }
-        if (uploadBtn) {
+        if (fileInput) {
+            fileInput.disabled = locked;
+        }
+        if (uploadBtn && !locked) {
             uploadBtn.disabled = count === 0;
         }
     }
 
     function onFilesSelected(fileList) {
+        if (isUploadQueueLocked()) {
+            const lockedInput = document.getElementById('aiscan-file-input');
+            if (lockedInput) {
+                lockedInput.value = '';
+            }
+            return;
+        }
         const incoming = Array.from(fileList || []);
         if (incoming.length === 0) {
             return;
         }
 
-        state.documents = mergeSelectedFiles(state.documents, incoming, state.partyType);
+        applySelectedFiles(incoming);
         renderSelectedFiles();
 
         const fileInput = document.getElementById('aiscan-file-input');
@@ -725,6 +769,8 @@
         }
 
         const uploadBtn = document.getElementById('aiscan-upload-btn');
+        setUploadQueueLocked(true);
+        renderSelectedFiles();
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-uploading-file'))}`;
 
@@ -809,6 +855,8 @@
                 analyzeAllPending();
             }
         } catch (error) {
+            setUploadQueueLocked(false);
+            renderSelectedFiles();
             uploadBtn.disabled = false;
             updateUploadButtonLabel();
             alert(error.message);
@@ -4524,9 +4572,13 @@
         globalThis.__aiscanWorkflowTestHooks = {
             applyAnalyzeResponse,
             applyManualEntryFallback,
+            applyRemoveSelectedFile,
+            applySelectedFiles,
             buildSelectedFileListHtml,
+            isUploadQueueLocked,
             mergeSelectedFiles,
             removeSelectedFile,
+            setUploadQueueLocked,
             applyPartyTypeToSupplier,
             applyPinnedProductToLines,
             applySelectionRange,

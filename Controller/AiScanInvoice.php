@@ -159,10 +159,6 @@ class AiScanInvoice extends Controller
     {
         $route = Tools::config('route');
         $v = '?v=' . $this->getPluginVersion();
-        $jsPath = FS_FOLDER . '/Plugins/AiScan/Assets/JS/aiscan-workflow.js';
-        if (is_file($jsPath)) {
-            $v .= '-' . filemtime($jsPath);
-        }
         AssetManager::addCss($route . '/Plugins/AiScan/Assets/CSS/aiscan.css' . $v);
         AssetManager::addJs($route . '/Plugins/AiScan/Assets/JS/aiscan-workflow.js' . $v);
     }
