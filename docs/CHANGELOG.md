@@ -7,6 +7,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- **Cola de archivos en la subida** (#84): al elegir o soltar más ficheros se
+  añaden a la lista en vez de sustituirla. Cada uno tiene un botón para
+  quitarlo si se ha añadido por error. No se duplica el mismo fichero.
 - **Cantidad 0 en líneas de prepago/abono** (#82): al importar, `cantidad = 0`
   (p. ej. línea de «ya pagado» de Leroy Merlin) se conservaba como 1 porque
   `empty(0)` en PHP es verdadero y el mapper forzaba `max(1, cantidad)`.

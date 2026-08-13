@@ -909,3 +909,80 @@ test('buildProductMatchBadge distingue pinned e history (#69)', () => {
     assert.match(pinned, /fa-thumbtack/);
     assert.match(history, /fa-clock-rotate-left/);
 });
+
+function fakeFile(name, size, lastModified = 1, type = 'application/pdf') {
+    return {name, size, lastModified, type};
+}
+
+test('mergeSelectedFiles acumula archivos de una segunda selección (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const first = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100), fakeFile('b.pdf', 200)], 'supplier');
+    const merged = hooks.mergeSelectedFiles(first, [fakeFile('c.jpg', 50, 2, 'image/jpeg')], 'supplier');
+
+    assert.equal(first.length, 2);
+    assert.equal(merged.length, 3);
+    assert.deepEqual(merged.map(doc => doc.originalName), ['a.pdf', 'b.pdf', 'c.jpg']);
+    assert.deepEqual(merged.map(doc => doc.index), [0, 1, 2]);
+    assert.equal(merged[2].mimeType, 'image/jpeg');
+    assert.equal(merged[2].status, hooks.STATUS.PENDING);
+    assert.equal(merged[2]._partyType, 'supplier');
+    assert.ok(merged[2].objectUrl);
+});
+
+test('mergeSelectedFiles no sustituye la cola ni duplica el mismo fichero (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const first = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100, 10)], 'supplier');
+    const sameAgain = hooks.mergeSelectedFiles(first, [fakeFile('a.pdf', 100, 10)], 'supplier');
+    const otherFolder = hooks.mergeSelectedFiles(sameAgain, [fakeFile('a.pdf', 100, 99)], 'supplier');
+
+    assert.equal(sameAgain.length, 1);
+    assert.equal(sameAgain[0], first[0]);
+    assert.equal(otherFolder.length, 2);
+    assert.equal(otherFolder[1].originalName, 'a.pdf');
+    assert.equal(otherFolder[1].file.lastModified, 99);
+});
+
+test('mergeSelectedFiles ignora una selección vacía (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const first = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+    const empty = hooks.mergeSelectedFiles(first, [], 'supplier');
+
+    assert.equal(empty.length, 1);
+    assert.equal(empty[0], first[0]);
+});
+
+test('removeSelectedFile quita un archivo y reindexa el resto (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [
+        fakeFile('a.pdf', 100),
+        fakeFile('b.pdf', 200),
+        fakeFile('c.pdf', 300),
+    ], 'supplier');
+
+    const remaining = hooks.removeSelectedFile(docs, 1);
+
+    assert.equal(remaining.length, 2);
+    assert.deepEqual(remaining.map(doc => doc.originalName), ['a.pdf', 'c.pdf']);
+    assert.deepEqual(remaining.map(doc => doc.index), [0, 1]);
+});
+
+test('removeSelectedFile no altera la cola si el índice no existe (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('a.pdf', 100)], 'supplier');
+
+    assert.equal(hooks.removeSelectedFile(docs, -1).length, 1);
+    assert.equal(hooks.removeSelectedFile(docs, 3).length, 1);
+});
+
+test('buildSelectedFileListHtml incluye botón de quitar por archivo (#84)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('factura-a.pdf', 1024), fakeFile('ticket.jpg', 2048, 2, 'image/jpeg')], 'supplier');
+    const html = hooks.buildSelectedFileListHtml(docs);
+
+    assert.match(html, /data-aiscan-remove-file="0"/);
+    assert.match(html, /data-aiscan-remove-file="1"/);
+    assert.match(html, /factura-a\.pdf/);
+    assert.match(html, /ticket\.jpg/);
+    assert.match(html, /aria-label=/);
+    assert.match(html, /fa-trash/);
+});
