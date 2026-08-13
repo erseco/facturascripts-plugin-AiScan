@@ -608,6 +608,146 @@ final class SchemaValidatorTest extends TestCase
         $this->assertEqualsWithDelta(25.0, $line['pvptotal'], 0.01);
     }
 
+    /**
+     * Issue #82: PHP empty(0) is true, so a prepaid/credit line whose
+     * quantity the user set to 0 was rewritten as 1 on normalize.
+     */
+    public function testNormalizePreservesZeroQuantity(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => 'Ya pagado del pedido',
+                    'quantity' => 0,
+                    'unit_price' => -94.37,
+                    'discount' => 0,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(0.0, $data['lines'][0]['cantidad']);
+        $this->assertEqualsWithDelta(-94.37, $data['lines'][0]['pvpunitario'], 0.01);
+    }
+
+    public function testNormalizePreservesZeroQuantityFromCantidadAlias(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'descripcion' => 'Abono previo',
+                    'cantidad' => 0,
+                    'pvpunitario' => -10.0,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(0.0, $data['lines'][0]['cantidad']);
+    }
+
+    public function testNormalizeKeepsNegativePriceLineWithoutDescription(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => '',
+                    'quantity' => 1,
+                    'unit_price' => -94.37,
+                ],
+            ],
+        ]);
+
+        $this->assertCount(1, $data['lines']);
+        $this->assertEqualsWithDelta(-94.37, $data['lines'][0]['pvpunitario'], 0.01);
+    }
+
+    public function testNormalizeStillDropsBlankZeroPriceLines(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => '',
+                    'quantity' => 1,
+                    'unit_price' => 0,
+                ],
+            ],
+        ]);
+
+        $this->assertCount(0, $data['lines']);
+    }
+
+    public function testNormalizeDefaultsMissingQuantityToOne(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => 'Widget',
+                    'unit_price' => 10,
+                ],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(1.0, $data['lines'][0]['cantidad'], 0.01);
+    }
+
+    /**
+     * Issue #81: Leroy Merlin-style invoices discount in euros, not %.
+     * Convert dtoimporte / discount_amount into dtopor so FS can store it.
+     */
+    public function testNormalizeConvertsDiscountAmountToPercent(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => 'Rodapie',
+                    'quantity' => 20,
+                    'unit_price' => 4.99,
+                    'discount_amount' => 5.40,
+                ],
+            ],
+        ]);
+
+        $line = $data['lines'][0];
+        $this->assertEqualsWithDelta(5.40, $line['dtoimporte'], 0.01);
+        $this->assertEqualsWithDelta(5.410821643, $line['dtopor'], 0.0001);
+        $base = $line['cantidad'] * $line['pvpunitario'] * (1 - $line['dtopor'] / 100);
+        $this->assertEqualsWithDelta(20 * 4.99 - 5.40, $base, 0.01);
+    }
+
+    public function testNormalizeComputesDiscountAmountFromPercent(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => 'Widget',
+                    'quantity' => 2,
+                    'unit_price' => 10,
+                    'discount' => 10,
+                ],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(10.0, $data['lines'][0]['dtopor'], 0.01);
+        $this->assertEqualsWithDelta(2.0, $data['lines'][0]['dtoimporte'], 0.01);
+    }
+
+    public function testNormalizeKeepsExplicitPercentWhenAmountAlsoPresent(): void
+    {
+        $data = $this->validator->normalize([
+            'lines' => [
+                [
+                    'description' => 'Widget',
+                    'quantity' => 1,
+                    'unit_price' => 100,
+                    'dtopor' => 6.5,
+                    'dtoimporte' => 4.30,
+                ],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(6.5, $data['lines'][0]['dtopor'], 0.01);
+        $this->assertEqualsWithDelta(6.5, $data['lines'][0]['dtoimporte'], 0.01);
+    }
+
     public function testNormalizeTaxDecimals(): void
     {
         $data = $this->validator->normalize([

@@ -640,6 +640,8 @@
                     formData.append('invoice_files[]', doc.file);
                     formData.append('client_indices[]', String(start + i));
                 });
+                const convertToPdf = document.getElementById('aiscan-convert-to-pdf');
+                formData.append('convert_to_pdf', convertToPdf && convertToPdf.checked ? '1' : '0');
 
                 const response = await fetch('AiScanInvoice?action=upload', {
                     method: 'POST',
@@ -2685,6 +2687,47 @@
         return match ? match.rate : 0;
     }
 
+    function lineDiscountBase(qty, price) {
+        const quantity = Number(qty) || 0;
+        const unitPrice = Number(price) || 0;
+        return quantity * unitPrice;
+    }
+
+    function discountPercentFromAmount(qty, price, amount) {
+        const base = lineDiscountBase(qty, price);
+        if (Math.abs(base) < 1e-9) {
+            return 0;
+        }
+        return (Number(amount) || 0) / base * 100;
+    }
+
+    function discountAmountFromPercent(qty, price, percent) {
+        return lineDiscountBase(qty, price) * ((Number(percent) || 0) / 100);
+    }
+
+    function formatDiscountValue(value) {
+        if (!Number.isFinite(value)) {
+            return '0';
+        }
+        const rounded = Math.round(value * 1e6) / 1e6;
+        return String(rounded);
+    }
+
+    function syncModalDiscountFields(modal, source) {
+        const qty = parseFloat(modal.querySelector('.aiscan-modal-quantity')?.value || 0);
+        const price = parseFloat(modal.querySelector('.aiscan-modal-price')?.value || 0);
+        const pctEl = modal.querySelector('.aiscan-modal-discount');
+        const amtEl = modal.querySelector('.aiscan-modal-discount-amount');
+        if (!pctEl || !amtEl) {
+            return;
+        }
+        if (source === 'amount') {
+            pctEl.value = formatDiscountValue(discountPercentFromAmount(qty, price, amtEl.value));
+            return;
+        }
+        amtEl.value = formatDiscountValue(discountAmountFromPercent(qty, price, pctEl.value));
+    }
+
     function calcModalPreview(modal) {
         const qty = parseFloat(modal.querySelector('.aiscan-modal-quantity')?.value || 0);
         const price = parseFloat(modal.querySelector('.aiscan-modal-price')?.value || 0);
@@ -2720,6 +2763,7 @@
                 modalInput.value = rowInput.value;
             }
         }
+        syncModalDiscountFields(modal, 'percent');
         const taxRow = row.querySelector('[data-field="codimpuesto"]');
         const taxModal = modal.querySelector('.aiscan-modal-tax');
         if (taxRow && taxModal) {
@@ -2972,12 +3016,22 @@
                                         <input type="number" class="form-control aiscan-modal-price" step="any" value="${escapeAttr(price)}">
                                     </div>
                                 </div>
-                                <div class="col-4">
-                                    <label class="form-label small mb-1">% ${escapeHtml(trans('discount'))}</label>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1" for="${modalId}-discount-pct">${escapeHtml(trans('aiscan-discount-percent'))}</label>
                                     <div class="input-group input-group-sm">
-                                        <input type="number" class="form-control aiscan-modal-discount" min="0" max="100" step="any" value="${escapeAttr(dto)}">
+                                        <input id="${modalId}-discount-pct" type="number" class="form-control aiscan-modal-discount" min="0" max="100" step="any" value="${escapeAttr(dto)}" aria-describedby="${modalId}-discount-help">
                                         <span class="input-group-text">%</span>
                                     </div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1" for="${modalId}-discount-amt">${escapeHtml(trans('aiscan-discount-amount'))}</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="fa-solid fa-euro-sign fa-fw"></i></span>
+                                        <input id="${modalId}-discount-amt" type="number" class="form-control aiscan-modal-discount-amount" min="0" step="any" value="">
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div id="${modalId}-discount-help" class="form-text">${escapeHtml(trans('aiscan-discount-amount-help'))}</div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('tax'))}</label>
@@ -3406,6 +3460,15 @@
         section.addEventListener('input', e => {
             const modal = e.target.closest('.modal');
             if (modal) {
+                if (e.target.classList.contains('aiscan-modal-discount-amount')) {
+                    syncModalDiscountFields(modal, 'amount');
+                } else if (
+                    e.target.classList.contains('aiscan-modal-discount')
+                    || e.target.classList.contains('aiscan-modal-quantity')
+                    || e.target.classList.contains('aiscan-modal-price')
+                ) {
+                    syncModalDiscountFields(modal, 'percent');
+                }
                 calcModalPreview(modal);
                 return;
             }
@@ -4371,6 +4434,8 @@
             revokeReadyIfBlocked,
             collectFormData,
             confidenceBadgeClass,
+            discountAmountFromPercent,
+            discountPercentFromAmount,
             finalizeAnalyzedDoc,
             getBlockingImportErrors,
             getValidationWarnings,

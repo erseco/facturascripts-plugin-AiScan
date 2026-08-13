@@ -50,6 +50,44 @@ final class AiScanInvoiceControllerTest extends TestCase
         $this->assertSame('image/png', $result[1]['type']);
     }
 
+    public function testConvertStoredUploadToPdfDeletesTempsWhenConvertFails(): void
+    {
+        if (!defined('FS_FOLDER')) {
+            $this->markTestSkipped('FS_FOLDER is required to exercise aiscan_tmp cleanup.');
+        }
+
+        $tmpDir = FS_FOLDER . '/MyFiles/aiscan_tmp';
+        if (!is_dir($tmpDir) && !mkdir($tmpDir, 0777, true) && !is_dir($tmpDir)) {
+            $this->fail('Could not create aiscan_tmp for cleanup test.');
+        }
+
+        $tmpPath = $tmpDir . '/aiscan_broken_' . bin2hex(random_bytes(4)) . '.jpg';
+        $destPdf = dirname($tmpPath) . '/' . pathinfo($tmpPath, PATHINFO_FILENAME) . '.pdf';
+        file_put_contents($tmpPath, 'not a jpeg');
+
+        try {
+            $controller = $this->buildController();
+            $method = new \ReflectionMethod(AiScanInvoice::class, 'convertStoredUploadToPdf');
+            $method->setAccessible(true);
+            $method->invoke($controller, $tmpPath, 'image/jpeg', 'broken.jpg');
+            $this->fail('Expected conversion of a corrupt JPEG to fail');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('image', strtolower($exception->getMessage()));
+        } finally {
+            $sourceExists = is_file($tmpPath);
+            $pdfExists = is_file($destPdf);
+            if ($sourceExists) {
+                unlink($tmpPath);
+            }
+            if ($pdfExists) {
+                unlink($destPdf);
+            }
+        }
+
+        $this->assertFalse($sourceExists, 'El JPEG temporal debe borrarse si convert() falla');
+        $this->assertFalse($pdfExists, 'No debe quedar un PDF parcial si convert() falla');
+    }
+
     public function testResolveMimeTypeFallsBackToExtensionForGenericMimeTypes(): void
     {
         $controller = $this->buildController();

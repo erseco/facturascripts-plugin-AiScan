@@ -234,9 +234,16 @@ class InvoiceMapper
             $line->actualizastock = 0;
             $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
             $line->descripcion = trim((string) $desc);
-            $line->cantidad = max(1, (float) ($lineData['quantity'] ?? $lineData['cantidad'] ?? 1));
+            $line->cantidad = $this->resolveLineQuantity($lineData);
             $line->pvpunitario = (float) ($lineData['unit_price'] ?? $lineData['pvpunitario'] ?? $line->pvpunitario);
             $line->dtopor = (float) ($lineData['discount'] ?? $lineData['dtopor'] ?? 0);
+            if (abs($line->dtopor) < 0.0000001) {
+                $discountAmount = (float) ($lineData['dtoimporte'] ?? $lineData['discount_amount'] ?? 0);
+                $lineBase = $line->cantidad * $line->pvpunitario;
+                if (abs($discountAmount) > 0.0000001 && abs($lineBase) > 0.0000001) {
+                    $line->dtopor = ($discountAmount / $lineBase) * 100;
+                }
+            }
 
             if (!empty($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? '')) {
                 $line->codimpuesto = $lineData['codimpuesto'] ?? $lineData['tax_code'];
@@ -317,6 +324,23 @@ class InvoiceMapper
         $line->iva = !empty($taxes) ? (float) ($taxes[0]['rate'] ?? 0) : $this->computeTaxRate($invoiceData);
 
         return [$line];
+    }
+
+    /**
+     * Quantity 0 is valid (issue #82: prepaid/credit lines the user zeros out).
+     * Only default to 1 when the field is absent.
+     */
+    private function resolveLineQuantity(array $lineData): float
+    {
+        if (array_key_exists('cantidad', $lineData) && $lineData['cantidad'] !== '' && $lineData['cantidad'] !== null) {
+            return (float) $lineData['cantidad'];
+        }
+
+        if (array_key_exists('quantity', $lineData) && $lineData['quantity'] !== '' && $lineData['quantity'] !== null) {
+            return (float) $lineData['quantity'];
+        }
+
+        return 1.0;
     }
 
     private function prepareLines(array $lines, array $invoiceData, array $taxes = []): array

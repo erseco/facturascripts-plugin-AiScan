@@ -152,6 +152,7 @@ Output schema (single invoice):
       "cantidad": "number (quantity, default 1)",
       "pvpunitario": "number (unit price before tax, REQUIRED)",
       "dtopor": "number (discount %, default 0)",
+      "dtoimporte": "number (line discount amount in currency, default 0)",
       "dtopor2": "number (second discount %, default 0)",
       "codimpuesto": "string|null (tax code from available tax types list, e.g. IGIC7, IVA21)",
       "iva": "number (tax rate %, e.g. 7, 21)",
@@ -233,7 +234,14 @@ Field-specific rules:
   Also verify: sum of all line totals must approximately equal invoice subtotal.
 - lines.dtopor: discount percentage. Default 0.
   The "Dto" / "Descuento" column is often a percentage discount.
-  If the document shows a "Dto" column, map it to dtopor (not to pvpunitario).
+  If the document shows a "Dto" column with % (or a value that is clearly a
+  percentage, e.g. 5 or 10), map it to dtopor (not to pvpunitario).
+- lines.dtoimporte: line discount AMOUNT in currency (euros), not a percentage.
+  Use this when the document discounts a money amount ("Dto 0,27 €",
+  "Descuento 4,30", "Dto. Imp.") instead of a %. Put the LINE total discount
+  (unit discount × quantity when the ticket shows a per-unit euro discount).
+  Do NOT put a euro discount into dtopor. If only a % is visible, leave
+  dtoimporte empty and use dtopor.
 - lines.codimpuesto: tax type code from the available tax types list (e.g. IGIC7, IVA21).
   Match the visible tax rate to the closest code from the list.
 - lines.iva: the tax rate percentage matching codimpuesto.

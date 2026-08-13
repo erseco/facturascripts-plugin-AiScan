@@ -232,7 +232,7 @@ class SchemaValidator
         $data['lines'] = array_values(array_filter($data['lines'], function ($line) {
             $desc = trim((string) ($line['descripcion'] ?? $line['description'] ?? ''));
             $price = (float) ($line['pvpunitario'] ?? $line['unit_price'] ?? 0);
-            return $desc !== '' || $price > 0;
+            return $desc !== '' || abs($price) > 0.0000001;
         }));
         $data['warnings'] = array_values(array_unique(
             is_array($data['warnings'] ?? null) ? $data['warnings'] : []
@@ -274,6 +274,7 @@ class SchemaValidator
                     'quantity' => 'cantidad',
                     'unit_price' => 'pvpunitario',
                     'discount' => 'dtopor',
+                    'discount_amount' => 'dtoimporte',
                     'tax_rate' => 'iva',
                     'tax_code' => 'codimpuesto',
                     'irpf_code' => 'codretencion',
@@ -288,15 +289,17 @@ class SchemaValidator
 
                 // Normalize decimal fields
                 $decimalFields = ['cantidad', 'pvpunitario', 'dtopor', 'dtopor2',
-                    'iva', 'recargo', 'irpf', 'pvptotal'];
+                    'dtoimporte', 'iva', 'recargo', 'irpf', 'pvptotal'];
                 foreach ($decimalFields as $field) {
                     if (isset($line[$field])) {
                         $line[$field] = $this->normalizeDecimal($line[$field]);
                     }
                 }
 
-                // Default cantidad to 1 if missing
-                if (empty($line['cantidad'])) {
+                // Default cantidad to 1 if missing. Do not use empty():
+                // empty(0) is true, and issue #82 needs quantity 0 preserved
+                // (prepaid/credit lines the user zeros out on import).
+                if (!array_key_exists('cantidad', $line) || $line['cantidad'] === null || $line['cantidad'] === '') {
                     $line['cantidad'] = 1.0;
                 }
 
@@ -315,6 +318,8 @@ class SchemaValidator
                         ? $line['pvptotal'] / $qty
                         : $line['pvptotal'];
                 }
+
+                $this->syncLineDiscount($line);
             }
             unset($line);
 
@@ -497,6 +502,37 @@ class SchemaValidator
         unset($line);
 
         $data['_tax_inclusive_lines_converted'] = true;
+    }
+
+    /**
+     * FacturaScripts only stores line discounts as a percentage (`dtopor`).
+     * Issue #81: keep `dtoimporte` in sync so the review UI can edit euros
+     * and still persist a percentage that reproduces the same line total.
+     *
+     * @param array<string, mixed> $line
+     */
+    private function syncLineDiscount(array &$line): void
+    {
+        $qty = (float) ($line['cantidad'] ?? 1);
+        $price = (float) ($line['pvpunitario'] ?? 0);
+        $base = $qty * $price;
+        $percent = (float) ($line['dtopor'] ?? 0);
+        $hasAmount = array_key_exists('dtoimporte', $line)
+            && $line['dtoimporte'] !== ''
+            && $line['dtoimporte'] !== null;
+        $amount = $hasAmount ? (float) $line['dtoimporte'] : null;
+
+        if (abs($percent) < 0.0000001 && $amount !== null && abs($base) > 0.0000001) {
+            $percent = ($amount / $base) * 100;
+            $line['dtopor'] = $percent;
+        }
+
+        if (abs($base) > 0.0000001) {
+            $line['dtoimporte'] = $base * $percent / 100;
+            return;
+        }
+
+        $line['dtoimporte'] = $amount ?? 0.0;
     }
 
     private function normalizeDate(string $date): string
