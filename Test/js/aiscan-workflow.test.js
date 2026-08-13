@@ -1035,3 +1035,50 @@ test('buildSelectedFileListHtml desactiva la papelera si la cola está bloqueada
     assert.match(html, /disabled/);
     assert.match(html, /aria-disabled="true"/);
 });
+
+test('applyUploadedFileMeta usa el nombre PDF que devuelve el servidor (#80)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('nombre factura.jpeg', 4096, 1, 'image/jpeg')], 'supplier');
+    const doc = docs[0];
+
+    hooks.applyUploadedFileMeta(doc, {
+        client_index: 0,
+        mime_type: 'application/pdf',
+        original_name: 'nombre factura.pdf',
+        size: 8123,
+        tmp_file: 'aiscan_nombre-factura_abc123.pdf',
+    });
+
+    assert.equal(doc.originalName, 'nombre factura.pdf');
+    assert.equal(doc.mimeType, 'application/pdf');
+    assert.equal(doc.tmpFile, 'aiscan_nombre-factura_abc123.pdf');
+    assert.equal(doc.size, 8123);
+});
+
+test('applyUploadedFileMeta no pisa el nombre si el servidor no envía original_name (#80)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('ticket.png', 100, 1, 'image/png')], 'supplier');
+    const doc = docs[0];
+
+    hooks.applyUploadedFileMeta(doc, {
+        tmp_file: 'aiscan_ticket_xyz.png',
+        mime_type: 'image/png',
+    });
+
+    assert.equal(doc.originalName, 'ticket.png');
+    assert.equal(doc.tmpFile, 'aiscan_ticket_xyz.png');
+});
+
+test('previewAsPdf sigue mostrando la foto si el original era imagen (#80)', () => {
+    const {hooks} = loadTestHooks();
+    const docs = hooks.mergeSelectedFiles([], [fakeFile('nombre factura.jpeg', 4096, 1, 'image/jpeg')], 'supplier');
+    hooks.applyUploadedFileMeta(docs[0], {
+        mime_type: 'application/pdf',
+        original_name: 'nombre factura.pdf',
+        tmp_file: 'aiscan_nombre-factura_abc123.pdf',
+    });
+
+    assert.equal(hooks.previewAsPdf(docs[0]), false);
+    assert.equal(hooks.previewAsPdf({mimeType: 'application/pdf', file: {type: 'application/pdf'}}), true);
+    assert.equal(hooks.previewAsPdf({mimeType: 'application/pdf'}), true);
+});

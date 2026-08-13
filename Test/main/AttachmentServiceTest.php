@@ -102,6 +102,26 @@ final class AttachmentServiceTest extends TestCase
         $this->assertSame('Factura-original-14.JPG', $attachedFile->filename);
     }
 
+    public function testResolveAttachmentDisplayNameUsesPdfWhenStoredFileIsPdf(): void
+    {
+        $result = $this->invokeMethod(
+            'resolveAttachmentDisplayName',
+            ['nombre factura.jpeg', 'aiscan_nombre-factura_abc123.pdf']
+        );
+
+        $this->assertSame('nombre factura.pdf', $result);
+    }
+
+    public function testResolveAttachmentDisplayNameKeepsPdfName(): void
+    {
+        $result = $this->invokeMethod(
+            'resolveAttachmentDisplayName',
+            ['factura.pdf', 'aiscan_factura_abc123.pdf']
+        );
+
+        $this->assertSame('factura.pdf', $result);
+    }
+
     private function invokeMethod(string $methodName, array $args): mixed
     {
         $method = new \ReflectionMethod(AttachmentService::class, $methodName);
