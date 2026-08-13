@@ -22,6 +22,7 @@ namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Dinamic\Model\Serie;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
@@ -37,6 +38,9 @@ final class InvoiceMapperZeroQuantityTest extends TestCase
 
     /** @var Proveedor[] */
     private array $suppliersToDelete = [];
+
+    /** @var FormaPago[] */
+    private array $paymentMethodsToDelete = [];
 
     public static function setUpBeforeClass(): void
     {
@@ -74,18 +78,26 @@ final class InvoiceMapperZeroQuantityTest extends TestCase
             }
         }
 
+        foreach ($this->paymentMethodsToDelete as $method) {
+            if ($method->exists()) {
+                $method->delete();
+            }
+        }
+
         MiniLog::clear();
     }
 
     public function testMapToInvoicePreservesZeroQuantityOnPrepaidLine(): void
     {
-        $supplier = $this->createSupplier();
+        $codpago = $this->resolvePaymentMethodCode();
+        $supplier = $this->createSupplier($codpago);
 
         $result = (new InvoiceMapper())->mapToInvoice([
             'invoice' => [
                 'number' => 'LM-' . mt_rand(10000, 99999),
                 'issue_date' => '2026-08-12',
                 'currency' => 'EUR',
+                'codpago' => $codpago,
                 'subtotal' => 94.37,
                 'tax_amount' => 0,
                 'total' => 94.37,
@@ -135,13 +147,34 @@ final class InvoiceMapperZeroQuantityTest extends TestCase
         $this->assertEqualsWithDelta(-94.37, (float) $prepaid->pvpunitario, 0.01);
     }
 
-    private function createSupplier(): Proveedor
+    private function resolvePaymentMethodCode(): string
+    {
+        $existing = (new FormaPago())->all([], [], 0, 1);
+        if (!empty($existing)) {
+            return (string) $existing[0]->codpago;
+        }
+
+        $method = new FormaPago();
+        $method->codpago = 'T' . mt_rand(1000, 9999);
+        $method->descripcion = 'AiScan Qty0 test';
+        $method->pagado = false;
+        $method->plazovencimiento = 0;
+        $method->tipovencimiento = 'days';
+        $method->activa = true;
+        $this->assertTrue($method->save(), 'No se pudo crear la forma de pago de prueba');
+        $this->paymentMethodsToDelete[] = $method;
+
+        return (string) $method->codpago;
+    }
+
+    private function createSupplier(string $codpago): Proveedor
     {
         $supplier = new Proveedor();
         $supplier->nombre = 'AiScan Qty0 ' . mt_rand(10000, 99999);
         $supplier->razonsocial = $supplier->nombre;
         $supplier->cifnif = 'Y' . mt_rand(10000000, 99999999);
         $supplier->personafisica = false;
+        $supplier->codpago = $codpago;
 
         if (empty($supplier->codserie)) {
             $series = (new Serie())->all([], [], 0, 1);
