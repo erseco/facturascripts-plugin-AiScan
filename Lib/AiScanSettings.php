@@ -37,6 +37,7 @@ class AiScanSettings
         'openai_base_url' => 'https://api.openai.com/v1',
         'gemini_model' => 'gemini-2.5-flash-lite',
         'mistral_model' => 'mistral-small-latest',
+        'grok_model' => 'grok-4.5',
     ];
 
     public static function get(string $key, mixed $default = null): mixed

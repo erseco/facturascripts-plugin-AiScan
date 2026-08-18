@@ -70,12 +70,7 @@ class GeminiProvider implements ProviderInterface
             'contents' => [
                 ['parts' => $parts],
             ],
-            'generationConfig' => [
-                'temperature' => 0,
-                'maxOutputTokens' => 32768,
-                'responseMimeType' => 'application/json',
-                'thinkingConfig' => ['thinkingBudget' => 0],
-            ],
+            'generationConfig' => self::buildGenerationConfig($this->model),
         ];
 
         if (!empty($systemPrompt)) {
@@ -111,6 +106,84 @@ class GeminiProvider implements ProviderInterface
         }
 
         $data = json_decode($response, true);
-        return $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        if (!is_array($data)) {
+            return '';
+        }
+
+        return self::extractResponseText($data);
+    }
+
+    /**
+     * Gemini 3.x rejects temperature and thinkingBudget (HTTP 400 INVALID_ARGUMENT).
+     * Use thinkingLevel instead. Gemini 2.5 Flash can disable thinking with budget 0;
+     * Gemini 2.5 Pro cannot disable thinking, so that key is omitted.
+     *
+     * @return array<string, mixed>
+     */
+    public static function buildGenerationConfig(string $model): array
+    {
+        $config = [
+            'maxOutputTokens' => 32768,
+            'responseMimeType' => 'application/json',
+        ];
+
+        if (self::isGemini3Family($model)) {
+            $config['thinkingConfig'] = ['thinkingLevel' => 'low'];
+            return $config;
+        }
+
+        $config['temperature'] = 0;
+
+        if (self::isGemini25FlashFamily($model)) {
+            $config['thinkingConfig'] = ['thinkingBudget' => 0];
+        }
+
+        return $config;
+    }
+
+    /**
+     * Skip thought parts so Gemini 3 reasoning does not hide the JSON answer.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function extractResponseText(array $data): string
+    {
+        $parts = $data['candidates'][0]['content']['parts'] ?? [];
+        if (!is_array($parts)) {
+            return '';
+        }
+
+        $texts = [];
+        foreach ($parts as $part) {
+            if (!is_array($part) || !empty($part['thought'])) {
+                continue;
+            }
+            if (isset($part['text']) && is_string($part['text']) && $part['text'] !== '') {
+                $texts[] = $part['text'];
+            }
+        }
+
+        return implode('', $texts);
+    }
+
+    public static function isGemini3Family(string $model): bool
+    {
+        return str_contains(self::normalizeModelId($model), 'gemini-3');
+    }
+
+    public static function isGemini25FlashFamily(string $model): bool
+    {
+        $id = self::normalizeModelId($model);
+        return str_contains($id, 'gemini-2.5') && str_contains($id, 'flash');
+    }
+
+    public static function normalizeModelId(string $model): string
+    {
+        $id = strtolower(trim($model));
+        if (str_starts_with($id, 'models/')) {
+            return substr($id, 7);
+        }
+
+        return $id;
     }
 }

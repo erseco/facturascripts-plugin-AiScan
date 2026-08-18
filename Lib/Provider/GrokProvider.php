@@ -22,29 +22,29 @@ namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
 use FacturaScripts\Core\Tools;
 
-class OpenAICompatibleProvider implements ProviderInterface
+class GrokProvider implements ProviderInterface
 {
+    private const BASE_URL = 'https://api.x.ai/v1';
+
     private string $apiKey;
     private string $model;
-    private string $baseUrl;
     private int $timeout;
 
     public function __construct()
     {
-        $this->apiKey = Tools::settings('AiScan', 'custom_api_key', '');
-        $this->model = Tools::settings('AiScan', 'custom_model', '');
-        $this->baseUrl = Tools::settings('AiScan', 'custom_base_url', '');
+        $this->apiKey = Tools::settings('AiScan', 'grok_api_key', '');
+        $this->model = Tools::settings('AiScan', 'grok_model', 'grok-4.5');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
 
     public function getName(): string
     {
-        return 'openai-compatible';
+        return 'grok';
     }
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey) && !empty($this->baseUrl) && !empty($this->model);
+        return !empty($this->apiKey);
     }
 
     public function analyzeDocument(
@@ -78,7 +78,7 @@ class OpenAICompatibleProvider implements ProviderInterface
 
         $payload = json_encode(ChatCompletionsPayload::build($this->model, $messages));
 
-        $ch = curl_init(rtrim($this->baseUrl, '/') . '/chat/completions');
+        $ch = curl_init(self::BASE_URL . '/chat/completions');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
@@ -97,11 +97,11 @@ class OpenAICompatibleProvider implements ProviderInterface
         curl_close($ch);
 
         if ($error) {
-            throw new \RuntimeException('Custom provider request failed: ' . $error);
+            throw new \RuntimeException('Grok request failed: ' . $error);
         }
 
         if ($httpCode !== 200) {
-            throw new \RuntimeException('Custom provider API error (HTTP ' . $httpCode . '): ' . $response);
+            throw new \RuntimeException('Grok API error (HTTP ' . $httpCode . '): ' . $response);
         }
 
         $data = json_decode($response, true);

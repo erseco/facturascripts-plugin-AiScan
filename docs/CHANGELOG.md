@@ -5,7 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+
+- **xAI Grok** como proveedor de primera clase (`grok_api_key` / `grok_model`,
+  default `grok-4.5`). Docker acepta `XAI_API_KEY`. También se puede seguir
+  usando Grok vía endpoint compatible con OpenAI (`https://api.x.ai/v1`).
+
+### Changed
+
+- Las peticiones Chat Completions adaptan `temperature` / `max_tokens` /
+  `max_completion_tokens` al modelo (GPT-5 y o-series no envían `temperature`).
+- Gemini construye `generationConfig` según la familia del modelo: Gemini 3.x
+  usa `thinkingLevel` y omite `temperature`; Gemini 2.5 Flash sigue pudiendo
+  desactivar thinking con `thinkingBudget: 0`.
+
 ### Fixed
+
+- **Gemini 3.x HTTP 400 INVALID_ARGUMENT**: el plugin enviaba siempre
+  `temperature: 0` y `thinkingConfig.thinkingBudget: 0`, argumentos inválidos
+  en `gemini-3.6-flash`, `gemini-3.1-pro` y el resto de Gemini 3. No había
+  lista blanca de modelos: el identificador ya era texto libre. También se
+  ignoran las partes `thought` de la respuesta para no mezclar el razonamiento
+  con el JSON extraído.
 
 - **Convertir imagen a PDF no cambiaba el nombre** (#80): tras marcar la
   casilla, el análisis y el adjunto seguían mostrando `factura.jpeg` porque el

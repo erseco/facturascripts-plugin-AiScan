@@ -46,6 +46,8 @@ final class AiScanSettingsTest extends TestCase
         $this->assertArrayHasKey('openai_base_url', $defaults);
         $this->assertArrayHasKey('gemini_model', $defaults);
         $this->assertArrayHasKey('mistral_model', $defaults);
+        $this->assertArrayHasKey('grok_model', $defaults);
+        $this->assertSame('grok-4.5', $defaults['grok_model']);
     }
 
     public function testDefaultProviderIsOpenai(): void
