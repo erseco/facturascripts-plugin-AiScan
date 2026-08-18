@@ -22,6 +22,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\GeminiProvider;
+use FacturaScripts\Plugins\AiScan\Lib\Provider\GrokProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\MistralProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\MockProvider;
 use FacturaScripts\Plugins\AiScan\Lib\Provider\OpenAICompatibleProvider;
@@ -498,6 +499,7 @@ PROMPT;
             'openai' => new OpenAIProvider(),
             'gemini' => new GeminiProvider(),
             'mistral' => new MistralProvider(),
+            'grok' => new GrokProvider(),
             'openai-compatible' => new OpenAICompatibleProvider(),
             // Solo isAvailable() cuando debug_mode está activo
             'mock' => new MockProvider(),

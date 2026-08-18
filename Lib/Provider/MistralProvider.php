@@ -75,13 +75,7 @@ class MistralProvider implements ProviderInterface
 
         $messages[] = ['role' => 'user', 'content' => $messageContent];
 
-        $payload = json_encode([
-            'model' => $this->model,
-            'messages' => $messages,
-            'response_format' => ['type' => 'json_object'],
-            'temperature' => 0,
-            'max_tokens' => 32768,
-        ]);
+        $payload = json_encode(ChatCompletionsPayload::build($this->model, $messages));
 
         $ch = curl_init('https://api.mistral.ai/v1/chat/completions');
         curl_setopt_array($ch, [

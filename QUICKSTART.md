@@ -26,12 +26,13 @@ Enable the plugin from **Admin Panel → Plugins** (already enabled in the Docke
 
 Open **AiScan Configuration** and set at least one provider credential:
 
-- OpenAI
-- Google Gemini
+- OpenAI (`gpt-5-nano`, `gpt-5.6`, …)
+- Google Gemini (`gemini-2.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.1-pro`, …)
 - Mistral
+- xAI Grok (`grok-4.5`, `grok-4.6`, …)
 - OpenAI-compatible endpoint
 
-Or export keys before `make up` (`GEMINI_API_KEY`, `OPENAI_API_KEY`, …) so
+Or export keys before `make up` (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY`, …) so
 `docker/setup-aiscan.php` stores them on boot.
 
 ### Optional: debug / mock mode (no API keys)

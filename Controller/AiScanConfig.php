@@ -55,6 +55,7 @@ class AiScanConfig extends PanelController
                 ['value' => 'openai', 'title' => Tools::lang()->trans('aiscan-provider-openai')],
                 ['value' => 'gemini', 'title' => Tools::lang()->trans('aiscan-provider-gemini')],
                 ['value' => 'mistral', 'title' => Tools::lang()->trans('aiscan-provider-mistral')],
+                ['value' => 'grok', 'title' => Tools::lang()->trans('aiscan-provider-grok')],
                 ['value' => 'openai-compatible', 'title' => Tools::lang()->trans('aiscan-provider-openai-compatible')],
                 ['value' => 'browser-prompt', 'title' => Tools::lang()->trans('aiscan-provider-browser-prompt')],
             ], false, false);

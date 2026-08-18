@@ -92,12 +92,7 @@ class OpenAIProvider implements ProviderInterface
             ];
         }
 
-        $payload = json_encode([
-            'model' => $this->model,
-            'messages' => $messages,
-            'response_format' => ['type' => 'json_object'],
-            'max_completion_tokens' => 32768,
-        ]);
+        $payload = json_encode(ChatCompletionsPayload::build($this->model, $messages));
 
         $ch = curl_init($this->baseUrl . '/chat/completions');
         curl_setopt_array($ch, [

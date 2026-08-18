@@ -22,7 +22,7 @@ Cada documento se procesa de forma independiente y el resultado se presenta en u
 - **Pantalla dedicada de importación**: accesible desde el menú de Compras, permite subir múltiples archivos de golpe
 - **Procesamiento en paralelo**: analiza varios documentos simultáneamente para ahorrar tiempo
 - **Asistente multi-documento**: navega entre los documentos subidos revisando y corrigiendo cada uno
-- **Extracción asistida por IA**: soporta OpenAI, Google Gemini, Mistral y endpoints compatibles con OpenAI
+- **Extracción asistida por IA**: soporta OpenAI, Google Gemini, Mistral, xAI Grok y endpoints compatibles con OpenAI
 - **IA local en Google Chrome**: también puede usar la `Browser Prompt API` de Chrome para ejecutar el análisis en local, sin enviar la factura a servicios externos
 - **Detalle de líneas editable**: modal de edición para cada línea con búsqueda de productos, impuestos, retenciones y descuento en % o en importe (se calcula el otro valor)
 - **Detección de proveedores y productos**: empareja automáticamente proveedores por NIF/CIF o nombre, y busca productos existentes por SKU o descripción
@@ -40,8 +40,11 @@ Tras instalar el plugin, entra en **Administración > AiScan** desde el panel de
   <img src=".github/settings.png" alt="Pantalla de configuración de AiScan" width="700">
 </p>
 
-- **Proveedor de IA**: OpenAI, Google Gemini, Mistral, un endpoint compatible con OpenAI o la `Browser Prompt API`
-- **Modelo**: el modelo concreto que se usará para la extracción
+- **Proveedor de IA**: OpenAI, Google Gemini, Mistral, xAI Grok, un endpoint compatible con OpenAI o la `Browser Prompt API`
+- **Modelo**: el identificador exacto del modelo (campo de texto libre; no hay lista blanca). Ejemplos actuales:
+  - Gemini: `gemini-2.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.1-pro`
+  - OpenAI: `gpt-5-nano`, `gpt-5-mini`, `gpt-5.6`
+  - Grok: `grok-4.5`, `grok-4.6`
 - **Peticiones en paralelo**: número máximo de documentos que se analizan simultáneamente
 - **Modo depuración**: guarda más información en logs para diagnosticar respuestas del proveedor
 - **Extensiones permitidas**: define qué tipos de archivo se aceptan
@@ -49,10 +52,11 @@ Tras instalar el plugin, entra en **Administración > AiScan** desde el panel de
 
 ## Proveedores compatibles
 
-- **OpenAI**: requiere clave API de OpenAI
-- **Google Gemini**: requiere clave API de Google AI Studio
+- **OpenAI**: requiere clave API de OpenAI. Los modelos GPT-5 / o-series usan `max_completion_tokens` y no envían `temperature`.
+- **Google Gemini**: requiere clave API de Google AI Studio. Gemini 3.x (`gemini-3.6-flash`, `gemini-3.1-pro`, …) usa `thinkingLevel` y no envía `temperature` ni `thinkingBudget` (esos parámetros provocan HTTP 400).
 - **Mistral**: requiere clave API de Mistral
-- **OpenAI compatible**: válido para servicios como Ollama, LM Studio u otros endpoints con API compatible
+- **xAI Grok**: requiere clave API de xAI (`XAI_API_KEY` en Docker). Endpoint `https://api.x.ai/v1`. También se puede usar como endpoint compatible con OpenAI.
+- **OpenAI compatible**: válido para servicios como Ollama, LM Studio, xAI u otros endpoints con API compatible
 - **Browser Prompt API (experimental)**: usa el motor de IA integrado en Google Chrome para procesar el documento en local, sin claves API ni envío de datos a la nube. Para usarlo necesitas una versión compatible de Google Chrome con las funciones de IA activadas. Más información: <https://developer.chrome.com/docs/ai/prompt-api>
 
 ## Uso

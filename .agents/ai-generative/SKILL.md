@@ -1,6 +1,6 @@
 ---
 name: ai-generative
-description: AI provider integration for invoice scanning. ProviderInterface contract, OpenAI/Gemini/Mistral implementations, extraction prompts, schema validation, confidence scoring, PDF/image processing, base64 encoding.
+description: AI provider integration for invoice scanning. ProviderInterface contract, OpenAI/Gemini/Mistral/Grok implementations, extraction prompts, schema validation, confidence scoring, PDF/image processing, base64 encoding.
 ---
 
 # AI & Generative — AiScan Provider Integration
@@ -26,9 +26,10 @@ interface ProviderInterface {
 
 | Provider | Class | Default Model | API |
 |---|---|---|---|
-| OpenAI | `OpenAIProvider` | `gpt-5-mini` | Chat Completions |
-| Gemini | `GeminiProvider` | `gemini-2.5-flash` | GenerateContent |
+| OpenAI | `OpenAIProvider` | `gpt-5-nano` | Chat Completions (`max_completion_tokens`, no temperature on GPT-5/o-series) |
+| Gemini | `GeminiProvider` | `gemini-2.5-flash-lite` | GenerateContent (Gemini 3 uses `thinkingLevel`, not `thinkingBudget`) |
 | Mistral | `MistralProvider` | `mistral-small-latest` | Chat Completions |
+| Grok | `GrokProvider` | `grok-4.5` | xAI Chat Completions (`https://api.x.ai/v1`) |
 | Custom | `OpenAICompatibleProvider` | User-configured | OpenAI-compatible |
 
 ### Adding a New Provider
@@ -163,6 +164,8 @@ Display rules: see `usability-accessibility` skill for visual requirements.
 - `Lib/Provider/ProviderInterface.php` — Provider contract
 - `Lib/Provider/OpenAIProvider.php` — OpenAI implementation
 - `Lib/Provider/GeminiProvider.php` — Gemini implementation
+- `Lib/Provider/GrokProvider.php` — xAI Grok implementation
+- `Lib/Provider/ChatCompletionsPayload.php` — GPT-5 / Grok / compatible request body
 - `Lib/Provider/MistralProvider.php` — Mistral implementation
 - `Lib/Provider/OpenAICompatibleProvider.php` — Custom endpoint
 - `Lib/ExtractionService.php` — Extraction orchestration

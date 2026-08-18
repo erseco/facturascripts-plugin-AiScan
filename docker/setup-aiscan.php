@@ -173,7 +173,7 @@ function configureBillingDefaults(): void
 
     echo "[AiScan] Defaults: tax={$defaultTax}, serie={$codserie}"
         . ($codejercicio !== '' ? ", ejercicio={$codejercicio}" : '')
-        . ", warehouse=" . ($codalmacen ?: '(none)') . ".\n";
+        . ', warehouse=' . ($codalmacen ?: '(none)') . ".\n";
 
     ensureAccountingPlan($codpais, $codejercicio !== '' ? $codejercicio : null);
 }
@@ -282,6 +282,7 @@ function configureApiKeys(): void
         'OPENAI_API_KEY' => 'openai_api_key',
         'GEMINI_API_KEY' => 'gemini_api_key',
         'MISTRAL_API_KEY' => 'mistral_api_key',
+        'XAI_API_KEY' => 'grok_api_key',
         'ANTHROPIC_API_KEY' => 'custom_api_key',
         'OPENROUTER_API_KEY' => 'custom_api_key',
     ];
@@ -290,6 +291,7 @@ function configureApiKeys(): void
         'OPENAI_API_KEY' => ['provider' => 'openai'],
         'GEMINI_API_KEY' => ['provider' => 'gemini'],
         'MISTRAL_API_KEY' => ['provider' => 'mistral'],
+        'XAI_API_KEY' => ['provider' => 'grok'],
         'ANTHROPIC_API_KEY' => [
             'provider' => 'openai-compatible',
             'custom_base_url' => 'https://api.anthropic.com/v1',
@@ -318,6 +320,7 @@ function configureApiKeys(): void
         $settings->openai_base_url = 'https://api.openai.com/v1';
         $settings->gemini_model = 'gemini-2.5-flash-lite';
         $settings->mistral_model = 'mistral-small-latest';
+        $settings->grok_model = 'grok-4.5';
         $settings->save();
         echo "[AiScan] Settings created.\n";
     }

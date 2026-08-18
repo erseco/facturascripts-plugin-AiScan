@@ -13,6 +13,7 @@
                     <values title="aiscan-provider-openai">openai</values>
                     <values title="aiscan-provider-gemini">gemini</values>
                     <values title="aiscan-provider-mistral">mistral</values>
+                    <values title="aiscan-provider-grok">grok</values>
                     <values title="aiscan-provider-openai-compatible">openai-compatible</values>
                     <values title="aiscan-provider-browser-prompt">browser-prompt</values>
                     <values title="aiscan-provider-mock">mock</values>
@@ -55,6 +56,12 @@
             </column>
             <column name="mistral-model" numcolumns="6" order="310">
                 <widget type="text" fieldname="mistral_model"/>
+            </column>
+            <column name="grok-api-key" numcolumns="6" order="350">
+                <widget type="password" fieldname="grok_api_key"/>
+            </column>
+            <column name="grok-model" numcolumns="6" order="360">
+                <widget type="text" fieldname="grok_model"/>
             </column>
             <column name="custom-api-key" numcolumns="4" order="400">
                 <widget type="password" fieldname="custom_api_key"/>
