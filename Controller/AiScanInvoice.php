@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
+use FacturaScripts\Core\Lib\RegimenIVA;
 use FacturaScripts\Core\Template\Controller;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Lib\AssetManager;
@@ -57,6 +58,24 @@ class AiScanInvoice extends Controller
         return $data;
     }
 
+    /**
+     * Issue #95: la lista de excepciones de IVA la manda el core. Los códigos
+     * cambiaron en FacturaScripts 2026 (ES_PASSIVE_SUBJECT -> ES_84,
+     * ES_N1 -> ES_7...) y RegimenIVA::allExceptions() devuelve la lista que
+     * corresponde a cada versión, así que no se codifica aquí.
+     *
+     * @return array<int, array{code: string, description: string}>
+     */
+    private function buildTaxExceptionChoices(): array
+    {
+        $choices = [];
+        foreach (RegimenIVA::allExceptions() as $code => $label) {
+            $choices[] = ['code' => $code, 'description' => Tools::lang()->trans($label)];
+        }
+
+        return $choices;
+    }
+
     public function run(): void
     {
         parent::run();
@@ -79,6 +98,7 @@ class AiScanInvoice extends Controller
                 'defaultModel' => AiScanSettings::getDefaultModel(AiScanSettings::getDefaultProvider()),
                 'taxTypes' => $impuesto->all([], ['iva' => 'ASC'], 0, 0),
                 'withholdingTypes' => $retencion->all([], ['porcentaje' => 'ASC'], 0, 0),
+                'taxExceptions' => $this->buildTaxExceptionChoices(),
                 'paymentMethods' => $formaPago->all([], ['descripcion' => 'ASC'], 0, 0),
                 'defaultCodpago' => $defaultCodpago,
                 'debugMode' => $debugMode,
