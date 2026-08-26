@@ -165,6 +165,58 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->assertNotSame($decoy->codimpuesto, $invoice->getLines()[0]->codimpuesto);
     }
 
+    /**
+     * Un único candidato no basta: en una instalación estándar el 7 % solo lo
+     * tiene IGIC7, que no sirve para una empresa que trabaja con IVA.
+     */
+    public function testFallbackRejectsTheOnlyCandidateWhenItIsFromAnotherRegime(): void
+    {
+        $default = Impuestos::default();
+        $this->assertNotEmpty($default->operacion, 'El impuesto predeterminado debe tener operación');
+
+        // Único impuesto a ese tipo en toda la instalación, y de otro régimen.
+        $this->createTax('AAA9', $default->operacion === 'ES_04' ? 'ES_01' : 'ES_04');
+
+        $supplier = $this->createSupplier();
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['codimpuesto' => 'NOEXISTE9', 'iva' => 9.87]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertFalse($result['success'], 'No se puede aceptar un impuesto de otro régimen fiscal');
+        $this->assertNull($result['invoice_id']);
+        $this->assertSame(
+            0,
+            (new FacturaProveedor())->count([Where::eq('codproveedor', $supplier->codproveedor)]),
+            'No debe quedar ninguna factura en boceto'
+        );
+    }
+
+    /**
+     * Dos impuestos del mismo régimen y mismo tipo tampoco desempatan.
+     */
+    public function testFallbackRejectsAmbiguousTaxesInTheSameRegime(): void
+    {
+        $default = Impuestos::default();
+        $this->assertNotEmpty($default->operacion, 'El impuesto predeterminado debe tener operación');
+
+        $this->createTax('AAA8', $default->operacion, 8.76);
+        $this->createTax('ZZZ8', $default->operacion, 8.76);
+
+        $supplier = $this->createSupplier();
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['codimpuesto' => 'NOEXISTE8', 'iva' => 8.76]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertFalse($result['success'], 'Con dos candidatos del mismo régimen no se puede elegir');
+        $this->assertNull($result['invoice_id']);
+    }
+
     public function testUnresolvableTaxAbortsWithoutLeavingADraft(): void
     {
         $supplier = $this->createSupplier();
@@ -340,12 +392,12 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->markTestSkipped('No hay un estado editable para FacturaProveedor.');
     }
 
-    private function createTax(string $code, string $operation): Impuesto
+    private function createTax(string $code, string $operation, float $rate = 9.87): Impuesto
     {
         $tax = new Impuesto();
         $tax->codimpuesto = $code;
         $tax->descripcion = 'AiScan test ' . $code;
-        $tax->iva = 9.87;
+        $tax->iva = $rate;
         $tax->recargo = 0.0;
         $tax->operacion = $operation;
         $this->assertTrue($tax->save(), 'No se pudo crear el impuesto de prueba ' . $code);

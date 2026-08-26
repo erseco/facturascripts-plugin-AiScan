@@ -41,9 +41,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   valida contra los impuestos instalados, la excepción de IVA solo se acepta si
   es uno de los códigos del core, el mensaje incluye el error real y la cabecera
   creada se deshace en lugar de dejar el boceto huérfano. El respaldo por tipo
-  nunca cruza regímenes fiscales (IVA / IGIC / IPSI): si varios impuestos
-  comparten el tipo se exige el del régimen de la empresa y, si sigue habiendo
-  duda, se corta el import con un mensaje en vez de elegir uno al azar. Además,
+  nunca cruza regímenes fiscales (IVA / IGIC / IPSI): se descartan primero los
+  impuestos que no son del régimen de la empresa y solo vale si queda
+  exactamente uno; si no, se corta el import con un mensaje en vez de elegir uno
+  al azar. Además,
   sustituir las líneas al reimportar sobre una factura existente es ahora
   transaccional, así que un fallo ya no la deja sin líneas.
 - **404 al abrir el historial de importaciones** (#93): `ModelClass::url()`

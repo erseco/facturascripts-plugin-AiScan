@@ -374,12 +374,15 @@ class InvoiceMapper
      * rompe la clave ajena contra `impuestos`: la línea no se graba, el import
      * falla y queda una factura en boceto a 0 €.
      *
-     * El respaldo tiene que ser inequívoco. Buscar solo por tipo no vale: IVA4 e
-     * IPSI4 comparten el 4 % (y IGIC0, IPSI0 e IVA0 el 0 %), así que el orden
-     * alfabético de `Impuestos::all()` acabaría colando un impuesto de otro
-     * régimen fiscal. Por eso, cuando varios impuestos comparten el tipo, se
-     * exige que la operación coincida con la del impuesto predeterminado de la
-     * empresa; si sigue habiendo duda, se corta el import en vez de elegir.
+     * El respaldo tiene que ser inequívoco. Buscar por tipo no vale: IVA4 e IPSI4
+     * comparten el 4 % (y IGIC0, IPSI0 e IVA0 el 0 %), así que el orden
+     * alfabético de `Impuestos::all()` colaría un impuesto de otro régimen
+     * fiscal. Y un único candidato tampoco basta: en una instalación estándar el
+     * 7 % solo lo tiene IGIC7, que no sirve para una empresa con IVA.
+     *
+     * Por eso se descartan primero los impuestos que no son de la operación del
+     * impuesto predeterminado de la empresa, y solo se acepta el respaldo si
+     * queda exactamente uno. Si queda ninguno o varios, se corta el import.
      *
      * @throws RuntimeException si el impuesto no se puede determinar
      */
@@ -396,15 +399,16 @@ class InvoiceMapper
             }
         }
 
-        if (count($candidates) === 1) {
-            return $candidates[0]->codimpuesto;
+        $operation = Impuestos::default()->operacion;
+        if (!empty($operation)) {
+            $candidates = array_values(array_filter(
+                $candidates,
+                static fn ($tax): bool => $tax->operacion === $operation
+            ));
         }
 
-        $operation = Impuestos::default()->operacion;
-        foreach ($candidates as $tax) {
-            if (!empty($operation) && $tax->operacion === $operation) {
-                return $tax->codimpuesto;
-            }
+        if (count($candidates) === 1) {
+            return $candidates[0]->codimpuesto;
         }
 
         $message = Tools::lang()->trans('aiscan-unresolved-tax-code', [
