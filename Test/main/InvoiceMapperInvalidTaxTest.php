@@ -142,6 +142,26 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->assertEmpty($invoice->getLines()[0]->excepcioniva);
     }
 
+    public function testValidTaxExceptionIsKept(): void
+    {
+        $supplier = $this->createSupplier();
+
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 0, 'excepcioniva' => 'ES_20']),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $this->assertSame('ES_20', $invoice->getLines()[0]->excepcioniva);
+    }
+
     public function testFailedLinesLeaveNoDraftInvoiceBehind(): void
     {
         $supplier = $this->createSupplier();

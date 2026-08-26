@@ -23,6 +23,7 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 use FacturaScripts\Core\DataSrc\Impuestos;
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Lib\ReceiptGenerator;
+use FacturaScripts\Core\Lib\RegimenIVA;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Almacen;
@@ -280,9 +281,10 @@ class InvoiceMapper
 
             // Issue #93: la IA a veces devuelve el texto legal completo
             // ("Art. 50.Uno.27 Ley 4/2012") en lugar del código de excepción.
-            // La columna es varchar(20) y la línea no se podría grabar.
+            // La columna es varchar(20) y la línea no se podría grabar, así que
+            // solo se acepta un código de la lista del core.
             $taxException = trim((string) ($lineData['excepcioniva'] ?? ''));
-            if ($taxException !== '' && mb_strlen($taxException) <= 20) {
+            if (array_key_exists($taxException, RegimenIVA::allExceptions())) {
                 $line->excepcioniva = $taxException;
             }
 
