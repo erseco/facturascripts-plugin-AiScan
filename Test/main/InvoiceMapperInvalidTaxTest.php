@@ -24,6 +24,7 @@ use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Core\DataSrc\Impuestos;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Dinamic\Model\Serie;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
@@ -41,6 +42,9 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
 
     /** @var Proveedor[] */
     private array $suppliersToDelete = [];
+
+    /** @var FormaPago[] */
+    private array $paymentMethodsToDelete = [];
 
     public static function setUpBeforeClass(): void
     {
@@ -75,6 +79,12 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
                     $address->delete();
                 }
                 $supplier->delete();
+            }
+        }
+
+        foreach ($this->paymentMethodsToDelete as $method) {
+            if ($method->exists()) {
+                $method->delete();
             }
         }
 
@@ -181,6 +191,26 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         ];
     }
 
+    private function resolvePaymentMethodCode(): string
+    {
+        $existing = (new FormaPago())->all([], [], 0, 1);
+        if (!empty($existing)) {
+            return (string) $existing[0]->codpago;
+        }
+
+        $method = new FormaPago();
+        $method->codpago = 'T' . mt_rand(1000, 9999);
+        $method->descripcion = 'AiScan Tax93 test';
+        $method->pagado = false;
+        $method->plazovencimiento = 0;
+        $method->tipovencimiento = 'days';
+        $method->activa = true;
+        $this->assertTrue($method->save(), 'No se pudo crear la forma de pago de prueba');
+        $this->paymentMethodsToDelete[] = $method;
+
+        return (string) $method->codpago;
+    }
+
     private function createSupplier(): Proveedor
     {
         $supplier = new Proveedor();
@@ -188,6 +218,7 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $supplier->razonsocial = $supplier->nombre;
         $supplier->cifnif = 'Y' . mt_rand(10000000, 99999999);
         $supplier->personafisica = false;
+        $supplier->codpago = $this->resolvePaymentMethodCode();
 
         if (empty($supplier->codserie)) {
             $series = (new Serie())->all([], [], 0, 1);
