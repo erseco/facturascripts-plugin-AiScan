@@ -1082,3 +1082,88 @@ test('previewAsPdf sigue mostrando la foto si el original era imagen (#80)', () 
     assert.equal(hooks.previewAsPdf({mimeType: 'application/pdf', file: {type: 'application/pdf'}}), true);
     assert.equal(hooks.previewAsPdf({mimeType: 'application/pdf'}), true);
 });
+
+// ── Multi-model selection and re-analysis (#89) ───────────────────────
+
+function withModels(hooks) {
+    hooks.state.availableModels = [
+        {provider: 'openai', model: 'gpt-5-nano', label: 'OpenAI — gpt-5-nano'},
+        {provider: 'openai', model: 'gpt-5.2', label: 'OpenAI — gpt-5.2'},
+        {provider: 'gemini', model: 'gemini-2.5-flash-lite', label: 'Google Gemini — gemini-2.5-flash-lite'},
+    ];
+    hooks.state.defaultProvider = 'openai';
+    hooks.state.defaultModel = 'gpt-5-nano';
+    hooks.state.configuredDefault = {provider: 'openai', model: 'gpt-5-nano'};
+    return hooks;
+}
+
+test('modelChoiceForDoc repite el modelo con el que se analizó el documento (#89)', () => {
+    const {hooks} = loadTestHooks();
+    withModels(hooks);
+
+    const choice = hooks.modelChoiceForDoc({extractedData: {_provider: 'gemini', _model: 'gemini-2.5-flash-lite'}});
+
+    assert.equal(choice.provider, 'gemini');
+    assert.equal(choice.model, 'gemini-2.5-flash-lite');
+});
+
+test('modelChoiceForDoc usa el modelo predeterminado si el documento no se ha analizado (#89)', () => {
+    const {hooks} = loadTestHooks();
+    withModels(hooks);
+
+    for (const doc of [{extractedData: null}, null]) {
+        const choice = hooks.modelChoiceForDoc(doc);
+        assert.equal(choice.provider, 'openai');
+        assert.equal(choice.model, 'gpt-5-nano');
+    }
+});
+
+test('choiceLabel usa la etiqueta configurada y cae al par proveedor/modelo (#89)', () => {
+    const {hooks} = loadTestHooks();
+    withModels(hooks);
+
+    assert.equal(hooks.choiceLabel({provider: 'openai', model: 'gpt-5.2'}), 'OpenAI — gpt-5.2');
+    assert.equal(hooks.choiceLabel({provider: 'grok', model: 'grok-4.5'}), 'grok — grok-4.5');
+    assert.equal(hooks.choiceLabel({provider: 'mock', model: ''}), 'mock');
+});
+
+test('renderReanalyzeMenu lista los modelos configurados y marca el actual (#89)', () => {
+    const {elements, hooks} = loadTestHooks();
+    withModels(hooks);
+
+    hooks.renderReanalyzeMenu({extractedData: {_provider: 'openai', _model: 'gpt-5.2'}});
+    const html = elements['aiscan-reanalyze-menu'].innerHTML;
+
+    assert.equal((html.match(/data-provider=/g) || []).length, 3);
+    assert.match(html, /data-provider="openai" data-model="gpt-5.2"/);
+    assert.match(html, /data-provider="gemini" data-model="gemini-2.5-flash-lite"/);
+    // the current model is the only one with a check mark
+    assert.equal((html.match(/fa-check/g) || []).length, 1);
+    // only the configured default carries the badge
+    assert.equal((html.match(/badge text-bg-secondary/g) || []).length, 1);
+    const nanoItem = html.split('data-model="gpt-5-nano"')[1].split('</li>')[0];
+    assert.match(nanoItem, /badge text-bg-secondary/);
+});
+
+test('renderReanalyzeMenu marca como predeterminado el modelo configurado, no el primero (#89)', () => {
+    const {elements, hooks} = loadTestHooks();
+    withModels(hooks);
+    hooks.state.configuredDefault = {provider: 'gemini', model: 'gemini-2.5-flash-lite'};
+
+    hooks.renderReanalyzeMenu({extractedData: {_provider: 'openai', _model: 'gpt-5-nano'}});
+    const html = elements['aiscan-reanalyze-menu'].innerHTML;
+
+    assert.equal((html.match(/badge text-bg-secondary/g) || []).length, 1);
+    const geminiItem = html.split('data-model="gemini-2.5-flash-lite"')[1].split('</li>')[0];
+    assert.match(geminiItem, /badge text-bg-secondary/);
+});
+
+test('renderReanalyzeMenu no ofrece alternativas cuando solo hay un modelo (#89)', () => {
+    const {elements, hooks} = loadTestHooks();
+    withModels(hooks);
+    hooks.state.availableModels = [{provider: 'openai', model: 'gpt-5-nano', label: 'OpenAI — gpt-5-nano'}];
+
+    hooks.renderReanalyzeMenu({extractedData: {_provider: 'openai', _model: 'gpt-5-nano'}});
+
+    assert.equal(elements['aiscan-reanalyze-menu'].innerHTML, '');
+});

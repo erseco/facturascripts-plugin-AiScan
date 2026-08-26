@@ -21,19 +21,21 @@
 namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 
 class GrokProvider implements ProviderInterface
 {
+    use ProviderModelTrait;
+
     private const BASE_URL = 'https://api.x.ai/v1';
 
     private string $apiKey;
-    private string $model;
     private int $timeout;
 
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'grok_api_key', '');
-        $this->model = Tools::settings('AiScan', 'grok_model', 'grok-4.5');
+        $this->model = AiScanSettings::getDefaultModel('grok');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
 

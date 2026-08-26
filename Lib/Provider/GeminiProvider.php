@@ -21,17 +21,19 @@
 namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 
 class GeminiProvider implements ProviderInterface
 {
+    use ProviderModelTrait;
+
     private string $apiKey;
-    private string $model;
     private int $timeout;
 
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'gemini_api_key', '');
-        $this->model = Tools::settings('AiScan', 'gemini_model', 'gemini-2.5-flash-lite');
+        $this->model = AiScanSettings::getDefaultModel('gemini');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
 

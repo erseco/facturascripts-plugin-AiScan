@@ -130,4 +130,63 @@ final class AiScanSettingsTest extends TestCase
         $result = AiScanSettings::isDebugMode();
         $this->assertIsBool($result);
     }
+
+    public function testParseModelListKeepsLegacySingleModel(): void
+    {
+        $this->assertSame(['gpt-5-nano'], AiScanSettings::parseModelList('gpt-5-nano'));
+    }
+
+    public function testParseModelListSplitsSeveralModelsInOrder(): void
+    {
+        $this->assertSame(
+            ['gpt-5-nano', 'gpt-5', 'gpt-5.2'],
+            AiScanSettings::parseModelList('gpt-5-nano, gpt-5 ,gpt-5.2')
+        );
+    }
+
+    public function testParseModelListDropsBlanksAndDuplicates(): void
+    {
+        $this->assertSame(['gpt-5', 'gpt-5-nano'], AiScanSettings::parseModelList(' gpt-5 ,, gpt-5-nano, gpt-5 ,'));
+    }
+
+    public function testParseModelListReturnsEmptyArrayWhenNothingConfigured(): void
+    {
+        $this->assertSame([], AiScanSettings::parseModelList('  '));
+    }
+
+    public function testProvidersWithoutModelSettingHaveNoModels(): void
+    {
+        $this->assertSame([], AiScanSettings::getProviderModels('mock'));
+        $this->assertSame([], AiScanSettings::getProviderModels('not-a-provider'));
+        $this->assertSame('', AiScanSettings::getDefaultModel('mock'));
+    }
+
+    public function testResolveModelRejectsModelsThatAreNotConfigured(): void
+    {
+        $this->assertNull(AiScanSettings::resolveModel('openai', 'model-that-is-not-configured'));
+        $this->assertNull(AiScanSettings::resolveModel('mock', 'anything'));
+    }
+
+    public function testResolveModelWithoutRequestFallsBackToTheDefaultOne(): void
+    {
+        $this->assertSame(AiScanSettings::getDefaultModel('openai'), AiScanSettings::resolveModel('openai', null));
+        $this->assertSame(AiScanSettings::getDefaultModel('openai'), AiScanSettings::resolveModel('openai', ''));
+    }
+
+    public function testDefaultModelIsTheFirstOfTheConfiguredList(): void
+    {
+        foreach (['openai', 'gemini', 'mistral', 'grok'] as $provider) {
+            $models = AiScanSettings::getProviderModels($provider);
+            $this->assertSame($models[0] ?? '', AiScanSettings::getDefaultModel($provider));
+        }
+    }
+
+    public function testResolveModelAcceptsAnyConfiguredModel(): void
+    {
+        foreach (['openai', 'gemini', 'mistral', 'grok'] as $provider) {
+            foreach (AiScanSettings::getProviderModels($provider) as $model) {
+                $this->assertSame($model, AiScanSettings::resolveModel($provider, $model));
+            }
+        }
+    }
 }

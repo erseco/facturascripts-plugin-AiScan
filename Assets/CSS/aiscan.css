@@ -76,7 +76,9 @@
 .aiscan-split-left {
     flex: 0 0 40%;
     min-width: 0;
-    overflow: hidden;
+    /* visible so the re-analyze model dropdown is not clipped (#89);
+       the preview itself is still clipped by the card body below */
+    overflow: visible;
     display: flex;
     flex-direction: column;
 }
@@ -165,6 +167,11 @@
     flex-shrink: 0;
 }
 
+/* Re-analyze model dropdown (#89): never wider than the viewport */
+#aiscan-reanalyze-menu {
+    max-width: 92vw;
+}
+
 /* Preview */
 .aiscan-preview-area {
     height: 100%;
@@ -214,6 +221,11 @@
 }
 
 @media (max-width: 575.98px) {
+    /* Long "provider — model" labels wrap instead of overflowing (#89) */
+    #aiscan-reanalyze-menu .dropdown-item {
+        white-space: normal;
+    }
+
     .aiscan-default-product-picker .input-group {
         flex-wrap: nowrap;
     }

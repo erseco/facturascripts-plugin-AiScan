@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 
+- **Varios modelos por proveedor** (#89): los campos `openai_model`,
+  `gemini_model`, `mistral_model`, `grok_model` y `custom_model` aceptan una
+  lista separada por comas; el primer modelo de la lista es el predeterminado.
+- La pantalla de escaneo tiene un selector **Modelo de IA** con las
+  combinaciones `Proveedor — Modelo` disponibles, preseleccionando la
+  predeterminada.
+- **Re-analizar** es ahora un botón dividido: el botón repite el modelo usado y
+  el desplegable permite re-analizar esa factura con cualquier otro modelo
+  configurado, sin volver a subir el documento ni cambiar la configuración.
+- Las respuestas de análisis incluyen `_model` además de `_provider`, para que
+  la ficha indique con qué modelo se analizó.
 - **xAI Grok** como proveedor de primera clase (`grok_api_key` / `grok_model`,
   default `grok-4.5`). Docker acepta `XAI_API_KEY`. También se puede seguir
   usando Grok vía endpoint compatible con OpenAI (`https://api.x.ai/v1`).
