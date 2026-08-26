@@ -161,18 +161,22 @@ class InvoiceMapper
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
-            // Issue #93: sustituir las líneas tiene que ser atómico. Antes se
-            // borraban las antiguas antes de calcular, así que un fallo al grabar
-            // las nuevas dejaba la factura existente sin ninguna línea. Las
-            // líneas ya están construidas (y sus modelos instanciados) antes de
-            // abrir la transacción, para que ninguna comprobación de tablas la
-            // corte con un commit implícito.
-            $inTransaction = false === $database->inTransaction() && $database->beginTransaction();
+            // Issue #93: sustituir las líneas de una factura existente tiene que
+            // ser atómico. Antes se borraban las antiguas antes de calcular, así
+            // que un fallo al grabar las nuevas la dejaba sin ninguna línea.
+            //
+            // En una factura nueva no hace falta transacción: si algo falla se
+            // borra la cabecera y la clave ajena se lleva por delante las líneas
+            // que se hubieran grabado. Así se evita además que la creación
+            // diferida de tablas de FacturaScripts (que no admite DDL dentro de
+            // una transacción) rompa el import en una instalación recién hecha.
+            $oldLines = $invoiceId ? $invoice->getLines() : [];
+            $inTransaction = $oldLines !== []
+                && false === $database->inTransaction()
+                && $database->beginTransaction();
 
-            if ($invoiceId) {
-                foreach ($invoice->getLines() as $line) {
-                    $line->delete();
-                }
+            foreach ($oldLines as $oldLine) {
+                $oldLine->delete();
             }
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
