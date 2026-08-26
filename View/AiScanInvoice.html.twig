@@ -319,6 +319,11 @@
             {code: '{{ ret.codretencion }}', description: '{{ ret.descripcion|e('js') }}', rate: {{ ret.porcentaje }}},
         {% endfor %}
     ];
+    window.aiscanTaxExceptions = [
+        {% for exc in taxExceptions %}
+            {code: '{{ exc.code|e('js') }}', description: '{{ exc.description|e('js') }}'},
+        {% endfor %}
+    ];
     window.aiscanPaymentMethods = [
         {% for pm in paymentMethods %}
             {code: '{{ pm.codpago }}', description: '{{ pm.descripcion|e('js') }}'},

@@ -63,6 +63,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   selección (sin campo «Referencia» ni botón de guardado separados), se guarda al
   elegir el producto, se puede limpiar con ×, teclado usable (↑/↓/Enter/Esc) y
   textos traducidos vía `window.aiscanI18n` (ya no se muestran claves internas).
+- **Códigos de excepción de IVA obsoletos** (#95): el desplegable de la pantalla
+  de revisión estaba codificado a mano con la lista antigua
+  (`ES_PASSIVE_SUBJECT`, `ES_ART_7`, `ES_N1`…). FacturaScripts 2026 los renombró
+  (`ES_84`, `ES_7`, `ES_OTHER_NOT_SUBJECT`…) y solo los migra una vez, así que lo
+  que guardaba AiScan ya no se reconocía: el editor de la factura perdía el valor
+  al guardar y el PDF imprimía el código en crudo. Ahora la lista la envía el
+  core (`RegimenIVA::allExceptions()`), válida tanto en 2025 como en 2026.
 
 ### Added
 

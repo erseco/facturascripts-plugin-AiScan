@@ -84,6 +84,10 @@ function loadTestHooks() {
         {code: 'TAR', description: 'Tarjeta'},
     ];
     context.aiscanDefaultCodpago = 'CONT';
+    context.aiscanTaxExceptions = [
+        {code: 'ES_20', description: 'Exenta art. 20 LIVA'},
+        {code: 'ES_84', description: 'Inversión del sujeto pasivo'},
+    ];
 
     vm.createContext(context);
     vm.runInContext(script, context);
@@ -326,6 +330,26 @@ test('buildPaymentMethodSelect renders options with correct selection', () => {
     assert.match(html, /value="CONT"/);
     assert.match(html, /value="TAR"/);
     assert.match(html, /id="invoice_codpago"/);
+});
+
+test('buildTaxExceptionSelect renders the exception list sent by the core', () => {
+    const {hooks} = loadTestHooks();
+
+    const html = hooks.buildTaxExceptionSelect('ES_84');
+
+    assert.match(html, /value="ES_84"\s+selected/);
+    assert.match(html, /value="ES_20"/);
+    assert.match(html, /Inversión del sujeto pasivo/);
+    // Los códigos antiguos ya no se ofrecen (#95).
+    assert.doesNotMatch(html, /ES_PASSIVE_SUBJECT|ES_N1|ES_LOCATION_RULES/);
+});
+
+test('buildTaxExceptionSelect keeps the empty option selected when there is no exception', () => {
+    const {hooks} = loadTestHooks();
+
+    const html = hooks.buildTaxExceptionSelect('');
+
+    assert.match(html, /value=""\s+selected/);
 });
 
 test('collectFormData captures codpago from DOM select element', () => {

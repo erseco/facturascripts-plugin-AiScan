@@ -2708,6 +2708,20 @@
         return `<select class="form-select form-select-sm" data-field="tax_code" style="width:120px">${options}</select>`;
     }
 
+    // Issue #95: los códigos de excepción de IVA cambiaron en FacturaScripts 2026
+    // (ES_PASSIVE_SUBJECT -> ES_84, ES_N1 -> ES_7...). La lista la envía el core
+    // para no guardar códigos que el programa ya no reconoce.
+    function buildTaxExceptionSelect(selectedCode) {
+        const exceptions = window.aiscanTaxExceptions || [];
+        const code = selectedCode || '';
+        let options = `<option value=""${code === '' ? ' selected' : ''}>------</option>`;
+        for (const e of exceptions) {
+            const sel = code === e.code ? ' selected' : '';
+            options += `<option value="${escapeAttr(e.code)}"${sel}>${escapeHtml(e.description)}</option>`;
+        }
+        return `<select class="form-select form-select-sm aiscan-modal-excepcioniva">${options}</select>`;
+    }
+
     function buildWithholdingSelect(selectedRate, selectedCode) {
         const types = window.aiscanWithholdingTypes || [];
         const rate = parseFloat(selectedRate) || 0;
@@ -3253,21 +3267,7 @@
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>
-                                    <select class="form-select form-select-sm aiscan-modal-excepcioniva">
-                                        <option value=""${excepcion === '' ? ' selected' : ''}>------</option>
-                                        <option value="ES_20"${excepcion === 'ES_20' ? ' selected' : ''}>Art. 20 LIVA</option>
-                                        <option value="ES_21"${excepcion === 'ES_21' ? ' selected' : ''}>Art. 21 LIVA</option>
-                                        <option value="ES_22"${excepcion === 'ES_22' ? ' selected' : ''}>Art. 22 LIVA</option>
-                                        <option value="ES_23_24"${excepcion === 'ES_23_24' ? ' selected' : ''}>Art. 23-24 LIVA</option>
-                                        <option value="ES_25"${excepcion === 'ES_25' ? ' selected' : ''}>Art. 25 LIVA</option>
-                                        <option value="ES_OTHER"${excepcion === 'ES_OTHER' ? ' selected' : ''}>Otras exenciones</option>
-                                        <option value="ES_PASSIVE_SUBJECT"${excepcion === 'ES_PASSIVE_SUBJECT' ? ' selected' : ''}>N6 Inversión sujeto pasivo</option>
-                                        <option value="ES_ART_7"${excepcion === 'ES_ART_7' ? ' selected' : ''}>N3 No sujeta art. 7</option>
-                                        <option value="ES_ART_14"${excepcion === 'ES_ART_14' ? ' selected' : ''}>N4 No sujeta art. 14</option>
-                                        <option value="ES_LOCATION_RULES"${excepcion === 'ES_LOCATION_RULES' ? ' selected' : ''}>N2 Reglas localización</option>
-                                        <option value="ES_N1"${excepcion === 'ES_N1' ? ' selected' : ''}>IGIC art. 10.1</option>
-                                        <option value="ES_N5"${excepcion === 'ES_N5' ? ' selected' : ''}>IGIC art. 25</option>
-                                    </select>
+                                    ${buildTaxExceptionSelect(excepcion)}
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-suplido'))}</label>
@@ -4741,6 +4741,7 @@
             selectedModelChoice,
             buildEmptyExtractedData,
             buildPaymentMethodSelect,
+            buildTaxExceptionSelect,
             buildProductMatchBadge,
             buildTotalLines,
             calcAllLineTotals,
