@@ -74,7 +74,9 @@ class AiScanInvoice extends Controller
             $fixtureResolver = new MockFixtureResolver();
             $this->view('AiScanInvoice.html.twig', [
                 'availableProviders' => $service->getAvailableProviderNames(),
+                'availableModels' => $this->buildModelChoices($service),
                 'defaultProvider' => AiScanSettings::getDefaultProvider(),
+                'defaultModel' => AiScanSettings::getDefaultModel(AiScanSettings::getDefaultProvider()),
                 'taxTypes' => $impuesto->all([], ['iva' => 'ASC'], 0, 0),
                 'withholdingTypes' => $retencion->all([], ['porcentaje' => 'ASC'], 0, 0),
                 'paymentMethods' => $formaPago->all([], ['descripcion' => 'ASC'], 0, 0),
@@ -375,7 +377,9 @@ class AiScanInvoice extends Controller
             'errors' => $errors,
             'auto_scan' => AiScanSettings::isAutoScanEnabled(),
             'provider' => AiScanSettings::getDefaultProvider(),
+            'model' => AiScanSettings::getDefaultModel(AiScanSettings::getDefaultProvider()),
             'available_providers' => $service->getAvailableProviderNames(),
+            'available_models' => $this->buildModelChoices($service),
             'extraction_prompt' => ExtractionService::getSystemPrompt(),
             'max_parallel_requests' => (int) AiScanSettings::get('max_parallel_requests', 5),
         ];
@@ -385,6 +389,28 @@ class AiScanInvoice extends Controller
         }
 
         return $response;
+    }
+
+    /**
+     * Provider/model pairs shown in the analysis selector, with a localized
+     * label such as "OpenAI — gpt-5-nano" (#89).
+     *
+     * @return array<int, array{provider: string, model: string, label: string}>
+     */
+    private function buildModelChoices(ExtractionService $service): array
+    {
+        $choices = [];
+        foreach ($service->getAvailableModels() as $choice) {
+            $key = 'aiscan-provider-' . $choice['provider'];
+            $label = Tools::lang()->trans($key);
+            if ($label === $key || $label === '') {
+                $label = $choice['provider'];
+            }
+            $choice['label'] = $choice['model'] === '' ? $label : $label . ' — ' . $choice['model'];
+            $choices[] = $choice;
+        }
+
+        return $choices;
     }
 
     private function sanitizeBaseFilename(string $filename): string
@@ -436,6 +462,7 @@ class AiScanInvoice extends Controller
         }
 
         $provider = $this->request()->get('provider', '');
+        $model = $this->request()->get('model', '');
         $mockFixture = $this->request()->get('mock_fixture', '');
         $service = new ExtractionService();
 
@@ -446,7 +473,8 @@ class AiScanInvoice extends Controller
                 $provider ?: null,
                 $importMode,
                 $historicalContext,
-                $mockFixture !== '' ? $mockFixture : null
+                $mockFixture !== '' ? $mockFixture : null,
+                $model !== '' ? $model : null
             );
         } catch (\Throwable $e) {
             // AI / provider failures must not block manual accounting: return a

@@ -457,7 +457,20 @@ PROMPT;
         return $hint;
     }
 
-    public function getProvider(?string $providerName = null): ProviderInterface
+    /**
+     * Resolve the provider to use and, when given, the model it must run (#89).
+     * An unknown model is rejected instead of silently falling back, so the
+     * frontend can never push an unconfigured model to a provider API.
+     */
+    public function getProvider(?string $providerName = null, ?string $model = null): ProviderInterface
+    {
+        $provider = $this->resolveProvider($providerName);
+        $this->applyModel($provider, $model);
+
+        return $provider;
+    }
+
+    private function resolveProvider(?string $providerName): ProviderInterface
     {
         $defaultProvider = $providerName ?: Tools::settings('AiScan', 'default_provider', 'openai');
 
@@ -482,6 +495,22 @@ PROMPT;
         );
     }
 
+    private function applyModel(ProviderInterface $provider, ?string $model): void
+    {
+        if ($model === null || trim($model) === '') {
+            return;
+        }
+
+        $resolved = AiScanSettings::resolveModel($provider->getName(), $model);
+        if ($resolved === null) {
+            throw new \RuntimeException(
+                'Model "' . $model . '" is not configured for provider "' . $provider->getName() . '".'
+            );
+        }
+
+        $provider->setModel($resolved);
+    }
+
     public function getAvailableProviderNames(): array
     {
         $names = [];
@@ -491,6 +520,29 @@ PROMPT;
             }
         }
         return $names;
+    }
+
+    /**
+     * Every provider/model pair the user can pick from, in preference order.
+     * Providers without a model list (mock) yield a single entry with no model.
+     *
+     * @return array<int, array{provider: string, model: string}>
+     */
+    public function getAvailableModels(): array
+    {
+        $combos = [];
+        foreach ($this->getAvailableProviderNames() as $name) {
+            $models = AiScanSettings::getProviderModels($name);
+            if (empty($models)) {
+                $combos[] = ['provider' => $name, 'model' => ''];
+                continue;
+            }
+            foreach ($models as $model) {
+                $combos[] = ['provider' => $name, 'model' => $model];
+            }
+        }
+
+        return $combos;
     }
 
     private function getAllProviders(): array
@@ -512,13 +564,14 @@ PROMPT;
         ?string $providerName = null,
         string $importMode = 'lines',
         string $historicalContext = '',
-        ?string $mockFixture = null
+        ?string $mockFixture = null,
+        ?string $model = null
     ): array {
         if (!file_exists($filePath)) {
             throw new \RuntimeException('File not found: ' . $filePath);
         }
 
-        $provider = $this->getProvider($providerName);
+        $provider = $this->getProvider($providerName, $model);
         if ($provider instanceof MockProvider && $mockFixture !== null && $mockFixture !== '') {
             $provider->setForcedFixture($mockFixture);
         }
@@ -585,6 +638,7 @@ PROMPT;
                 $errors = $this->validator->validate($single);
                 $single['_validation_errors'] = $errors;
                 $single['_provider'] = $provider->getName();
+                $single['_model'] = $provider->getModel();
                 $results[] = $single;
             }
             return ['_multi_invoice' => true, 'invoices' => $results];
@@ -595,6 +649,7 @@ PROMPT;
 
         $data['_validation_errors'] = $errors;
         $data['_provider'] = $provider->getName();
+        $data['_model'] = $provider->getModel();
 
         return $data;
     }
@@ -647,6 +702,7 @@ PROMPT;
             'warnings' => [],
             '_validation_errors' => [],
             '_provider' => null,
+            '_model' => null,
             '_scan_failed' => true,
         ];
 

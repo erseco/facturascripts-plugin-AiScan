@@ -29,6 +29,8 @@ use FacturaScripts\Plugins\AiScan\Lib\MockFixtureResolver;
  */
 class MockProvider implements ProviderInterface
 {
+    use ProviderModelTrait;
+
     private ?string $forcedFixture = null;
 
     public function getName(): string

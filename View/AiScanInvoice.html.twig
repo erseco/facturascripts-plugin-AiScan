@@ -66,12 +66,12 @@
                                 </div>
                                 <hr>
                                 <div class="mb-3">
-                                    <label class="form-label fw-semibold" for="aiscan-provider-select">{{ i18n.trans('default-provider') }}</label>
+                                    <label class="form-label fw-semibold" for="aiscan-provider-select">{{ i18n.trans('aiscan-ai-model') }}</label>
                                     <select class="form-select" id="aiscan-provider-select">
-                                        {% for provider in availableProviders %}
-                                            <option value="{{ provider }}"{% if provider == defaultProvider %} selected{% endif %}>{{ provider }}</option>
+                                        {% for choice in availableModels %}
+                                            <option value="{{ choice.provider }}" data-model="{{ choice.model }}"{% if choice.provider == defaultProvider and choice.model == defaultModel %} selected{% endif %}>{{ choice.label }}</option>
                                         {% endfor %}
-                                        {% if availableProviders is empty %}
+                                        {% if availableModels is empty %}
                                             <option value="" disabled>{{ i18n.trans('aiscan-no-providers') }}</option>
                                         {% endif %}
                                     </select>
@@ -212,9 +212,16 @@
                         <div class="card-header d-flex justify-content-between align-items-center py-2">
                             <span class="fw-semibold text-truncate d-inline-block" id="aiscan-preview-title" style="max-width:250px" title="">{{ i18n.trans('aiscan-document-preview') }}</span>
                             <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-reanalyze-btn">
-                                    <i class="fa-solid fa-rotate me-1"></i>{{ i18n.trans('aiscan-reanalyze') }}
-                                </button>
+                                {# Split button: re-analyze with the same model, or pick another one (#89). #}
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="aiscan-reanalyze-btn">
+                                        <i class="fa-solid fa-rotate me-1"></i>{{ i18n.trans('aiscan-reanalyze') }}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split" id="aiscan-reanalyze-menu-btn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                                        <span class="visually-hidden">{{ i18n.trans('aiscan-reanalyze-with') }}</span>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" id="aiscan-reanalyze-menu" aria-labelledby="aiscan-reanalyze-menu-btn"></ul>
+                                </div>
                                 <button type="button" class="btn btn-outline-danger btn-sm" id="aiscan-discard-btn">
                                     <i class="fa-solid fa-ban me-1"></i>{{ i18n.trans('aiscan-discard') }}
                                 </button>
@@ -331,6 +338,9 @@
         'aiscan-analyzing': '{{ i18n.trans('aiscan-analyzing')|e('js') }}',
         'aiscan-create-new-supplier-confirm': '{{ i18n.trans('aiscan-create-new-supplier-confirm')|e('js') }}',
         'aiscan-doc-discarded': '{{ i18n.trans('aiscan-doc-discarded')|e('js') }}',
+        'aiscan-default-model': '{{ i18n.trans('aiscan-default-model')|e('js') }}',
+        'aiscan-reanalyze-with': '{{ i18n.trans('aiscan-reanalyze-with')|e('js') }}',
+        'aiscan-reanalyze-keeps-mode': '{{ i18n.trans('aiscan-reanalyze-keeps-mode')|e('js') }}',
         'aiscan-copy-json': '{{ i18n.trans('aiscan-copy-json')|e('js') }}',
         'aiscan-clear-default-product': '{{ i18n.trans('aiscan-clear-default-product')|e('js') }}',
         'aiscan-create-supplier': '{{ i18n.trans('aiscan-create-supplier')|e('js') }}',

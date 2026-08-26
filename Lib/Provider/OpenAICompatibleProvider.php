@@ -21,18 +21,20 @@
 namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 
 class OpenAICompatibleProvider implements ProviderInterface
 {
+    use ProviderModelTrait;
+
     private string $apiKey;
-    private string $model;
     private string $baseUrl;
     private int $timeout;
 
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'custom_api_key', '');
-        $this->model = Tools::settings('AiScan', 'custom_model', '');
+        $this->model = AiScanSettings::getDefaultModel('openai-compatible');
         $this->baseUrl = Tools::settings('AiScan', 'custom_base_url', '');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }

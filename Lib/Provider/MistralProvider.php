@@ -21,17 +21,19 @@
 namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
 use FacturaScripts\Core\Tools;
+use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 
 class MistralProvider implements ProviderInterface
 {
+    use ProviderModelTrait;
+
     private string $apiKey;
-    private string $model;
     private int $timeout;
 
     public function __construct()
     {
         $this->apiKey = Tools::settings('AiScan', 'mistral_api_key', '');
-        $this->model = Tools::settings('AiScan', 'mistral_model', 'mistral-small-latest');
+        $this->model = AiScanSettings::getDefaultModel('mistral');
         $this->timeout = (int) Tools::settings('AiScan', 'request_timeout', 120);
     }
 

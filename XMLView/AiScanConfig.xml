@@ -8,7 +8,7 @@
             <column name="enabled" order="100">
                 <widget type="checkbox" fieldname="enabled"/>
             </column>
-            <column name="default-provider" numcolumns="4" order="110">
+            <column name="default-provider" numcolumns="4" order="110" description="aiscan-default-provider-help">
                 <widget type="select" fieldname="default_provider" required="true">
                     <values title="aiscan-provider-openai">openai</values>
                     <values title="aiscan-provider-gemini">gemini</values>
@@ -39,7 +39,7 @@
             <column name="openai-api-key" numcolumns="4" order="100">
                 <widget type="password" fieldname="openai_api_key"/>
             </column>
-            <column name="openai-model" numcolumns="4" order="110">
+            <column name="openai-model" description="aiscan-model-list-help" numcolumns="4" order="110">
                 <widget type="text" fieldname="openai_model"/>
             </column>
             <column name="openai-base-url" numcolumns="4" order="120">
@@ -48,25 +48,25 @@
             <column name="gemini-api-key" numcolumns="6" order="200">
                 <widget type="password" fieldname="gemini_api_key"/>
             </column>
-            <column name="gemini-model" numcolumns="6" order="210">
+            <column name="gemini-model" description="aiscan-model-list-help" numcolumns="6" order="210">
                 <widget type="text" fieldname="gemini_model"/>
             </column>
             <column name="mistral-api-key" numcolumns="6" order="300">
                 <widget type="password" fieldname="mistral_api_key"/>
             </column>
-            <column name="mistral-model" numcolumns="6" order="310">
+            <column name="mistral-model" description="aiscan-model-list-help" numcolumns="6" order="310">
                 <widget type="text" fieldname="mistral_model"/>
             </column>
             <column name="grok-api-key" numcolumns="6" order="350">
                 <widget type="password" fieldname="grok_api_key"/>
             </column>
-            <column name="grok-model" numcolumns="6" order="360">
+            <column name="grok-model" description="aiscan-model-list-help" numcolumns="6" order="360">
                 <widget type="text" fieldname="grok_model"/>
             </column>
             <column name="custom-api-key" numcolumns="4" order="400">
                 <widget type="password" fieldname="custom_api_key"/>
             </column>
-            <column name="custom-model" numcolumns="4" order="410">
+            <column name="custom-model" description="aiscan-model-list-help" numcolumns="4" order="410">
                 <widget type="text" fieldname="custom_model"/>
             </column>
             <column name="custom-base-url" numcolumns="4" order="420">

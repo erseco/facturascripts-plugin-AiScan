@@ -40,11 +40,16 @@ Tras instalar el plugin, entra en **Administración > AiScan** desde el panel de
   <img src=".github/settings.png" alt="Pantalla de configuración de AiScan" width="700">
 </p>
 
-- **Proveedor de IA**: OpenAI, Google Gemini, Mistral, xAI Grok, un endpoint compatible con OpenAI o la `Browser Prompt API`
-- **Modelo**: el identificador exacto del modelo (campo de texto libre; no hay lista blanca). Ejemplos actuales:
-  - Gemini: `gemini-2.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.1-pro`
-  - OpenAI: `gpt-5-nano`, `gpt-5-mini`, `gpt-5.6`
-  - Grok: `grok-4.5`, `grok-4.6`
+- **Proveedor de IA predeterminado**: OpenAI, Google Gemini, Mistral, xAI Grok, un endpoint compatible con OpenAI o la `Browser Prompt API`
+- **Modelos**: uno o varios identificadores de modelo separados por comas (campo de texto libre; no hay lista blanca).
+  **El primero de la lista es el predeterminado** de ese proveedor. Ejemplos:
+  - OpenAI: `gpt-5-nano, gpt-5, gpt-5.6`
+  - Gemini: `gemini-2.5-flash-lite, gemini-3.6-flash, gemini-3.1-pro`
+  - Grok: `grok-4.5, grok-4.6`
+
+  Al analizar una factura se usa el proveedor predeterminado con el primer modelo de su lista, pero el
+  selector **Modelo de IA** de la pantalla de escaneo permite elegir cualquier otra combinación
+  `Proveedor — Modelo` sin tocar la configuración.
 - **Peticiones en paralelo**: número máximo de documentos que se analizan simultáneamente
 - **Modo depuración**: guarda más información en logs para diagnosticar respuestas del proveedor
 - **Extensiones permitidas**: define qué tipos de archivo se aceptan
@@ -63,12 +68,22 @@ Tras instalar el plugin, entra en **Administración > AiScan** desde el panel de
 
 1. Ve a **Compras > AiScan** en el menú principal.
 2. Sube uno o varios PDFs o imágenes.
-3. Selecciona el proveedor de IA (o déjalo en el predeterminado).
+3. Selecciona el modelo de IA (`Proveedor — Modelo`) o déjalo en el predeterminado.
 4. El análisis se lanza automáticamente en paralelo.
 5. Revisa los datos extraídos de cada documento: proveedor, cabecera, líneas e impuestos.
 6. En el resumen de importación, activa opcionalmente la actualización de stock y datos de compra si quieres aplicar las líneas al almacén.
 7. Corrige lo necesario y confirma para crear la factura de compra.
 8. Si has subido varios archivos, el asistente te lleva al siguiente documento.
+
+### Re-analizar con otro modelo
+
+Si la extracción de una factura no es buena, no hace falta volver a subir el documento ni cambiar la
+configuración del plugin:
+
+- **Re-analizar** repite el análisis con el mismo modelo que se usó.
+- La flecha del botón despliega la lista de modelos configurados: al elegir uno, esa factura se vuelve
+  a analizar con él (se mantiene el modo líneas / totales). El pie del documento indica siempre con qué
+  modelo se analizó, y el resultado se revisa antes de importar.
 
 ## Detección de proveedores y productos
 

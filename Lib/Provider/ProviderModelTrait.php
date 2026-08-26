@@ -20,22 +20,21 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
-interface ProviderInterface
+/**
+ * Holds the model id a provider sends to its API. Providers start with the
+ * default model of their configured list and the caller may switch it (#89).
+ */
+trait ProviderModelTrait
 {
-    public function getName(): string;
+    protected string $model = '';
 
-    /** Model id this provider will send to its API. */
-    public function getModel(): string;
+    public function getModel(): string
+    {
+        return $this->model;
+    }
 
-    /** Switch the model used for the next analysis (#89). */
-    public function setModel(string $model): void;
-
-    public function isAvailable(): bool;
-
-    public function analyzeDocument(
-        string $content,
-        string $mimeType,
-        string $prompt,
-        string $systemPrompt = ''
-    ): string;
+    public function setModel(string $model): void
+    {
+        $this->model = $model;
+    }
 }

@@ -21,7 +21,12 @@
         partyType: 'supplier',
         useHistory: false,
         availableProviders: [],
+        // Provider/model pairs the user can analyze with (#89)
+        availableModels: [],
         defaultProvider: null,
+        defaultModel: null,
+        // Provider/model configured as the plugin default, for the badge (#89)
+        configuredDefault: null,
         extractionPrompt: null,
         maxParallelRequests: 5,
         selectedIndices: new Set(),
@@ -376,10 +381,21 @@
     function init() {
         const providerSelect = document.getElementById('aiscan-provider-select');
         if (providerSelect && providerSelect.value) {
-            state.defaultProvider = providerSelect.value;
-            state.availableProviders = Array.from(providerSelect.options)
+            state.availableModels = Array.from(providerSelect.options)
                 .filter(o => o.value)
-                .map(o => o.value);
+                .map(o => ({
+                    provider: o.value,
+                    model: o.dataset ? (o.dataset.model || '') : '',
+                    label: o.textContent,
+                }));
+            state.availableProviders = state.availableModels
+                .map(c => c.provider)
+                .filter((p, i, all) => all.indexOf(p) === i);
+            const initial = selectedModelChoice();
+            state.defaultProvider = initial.provider;
+            state.defaultModel = initial.model;
+            // The view preselects the configured default, so this is it.
+            state.configuredDefault = initial;
         }
         bindUploadStep();
         bindReviewStep();
@@ -807,8 +823,8 @@
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-uploading-file'))}`;
 
-        // Save user's provider choice BEFORE upload (buildProviderSelect will rebuild the dropdown)
-        const userSelectedProvider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+        // Save user's model choice BEFORE upload (buildProviderSelect will rebuild the dropdown)
+        const userSelectedChoice = selectedModelChoice();
 
         // Upload in chunks to avoid PHP max_file_uploads limit
         const chunkSize = 10;
@@ -839,9 +855,14 @@
                 if (!firstData) {
                     firstData = data;
                     state.availableProviders = data.available_providers || [data.provider];
+                    state.availableModels = data.available_models || [];
                     state.extractionPrompt = data.extraction_prompt || '';
                     state.maxParallelRequests = data.max_parallel_requests || 5;
-                    state.defaultProvider = userSelectedProvider;
+                    state.defaultProvider = userSelectedChoice.provider;
+                    state.defaultModel = userSelectedChoice.model;
+                    if (data.provider) {
+                        state.configuredDefault = {provider: data.provider, model: data.model || ''};
+                    }
                 }
 
                 const uploadedFiles = data.files || [];
@@ -1032,7 +1053,7 @@
     }
 
     async function analyzeAllPending() {
-        const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+        const choice = selectedModelChoice();
         const concurrency = state.maxParallelRequests;
         const queue = state.documents.filter(d => d.tmpFile && d.status !== STATUS.FAILED);
 
@@ -1058,7 +1079,8 @@
                     import_mode: state.importMode,
                     use_history: state.useHistory ? '1' : '0',
                     supplier_id: '',
-                    provider,
+                    provider: choice.provider,
+                    model: choice.model,
                 });
 
                 const response = await fetch('AiScanInvoice?' + params.toString());
@@ -1123,7 +1145,8 @@
                         import_mode: state.importMode,
                         use_history: '1',
                         supplier_id: doc.extractedData.supplier.matched_supplier_id,
-                        provider,
+                        provider: choice.provider,
+                        model: choice.model,
                     });
                     const reResponse = await fetch('AiScanInvoice?' + reParams.toString());
                     const reData = await reResponse.json();
@@ -1329,7 +1352,8 @@
     // ── Step 2: Review ─────────────────────────────────────────────────
 
     function bindReviewStep() {
-        document.getElementById('aiscan-reanalyze-btn')?.addEventListener('click', reanalyzeCurrentDoc);
+        document.getElementById('aiscan-reanalyze-btn')?.addEventListener('click', () => reanalyzeCurrentDoc());
+        bindReanalyzeMenu();
         document.getElementById('aiscan-discard-btn')?.addEventListener('click', discardCurrentDoc);
 
         document.getElementById('aiscan-sort-by')?.addEventListener('change', (e) => {
@@ -1764,6 +1788,8 @@
             titleEl.title = doc.originalName;
         }
 
+        renderReanalyzeMenu(doc);
+
         const statusEl = document.getElementById('aiscan-status');
         const jsonBtn = doc.extractedData
             ? ` <button class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1 aiscan-debug-json-btn" type="button" title="JSON"><i class="fa-solid fa-code"></i></button>`
@@ -1774,9 +1800,9 @@
             const msg = doc.scanFailedMessage || trans('aiscan-scan-failed-manual-entry');
             statusEl.innerHTML = `<div class="alert alert-warning py-1 px-2 small mb-0 d-flex align-items-center justify-content-between"><span><i class="fa-solid fa-triangle-exclamation me-1"></i>${escapeHtml(msg)}</span>${jsonBtn}</div>`;
         } else if (doc.status === STATUS.ANALYZING) {
-            statusEl.innerHTML = `<div class="alert alert-info py-1 px-2 small mb-0"><i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-analysis-started', {'%provider%': state.defaultProvider}))}</div>`;
+            statusEl.innerHTML = `<div class="alert alert-info py-1 px-2 small mb-0"><i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-analysis-started', {'%provider%': choiceLabel(modelChoiceForDoc(doc))}))}</div>`;
         } else if (doc.status === STATUS.ANALYZED || doc.status === STATUS.READY || doc.status === STATUS.NEEDS_REVIEW) {
-            statusEl.innerHTML = `<div class="alert alert-success py-1 px-2 small mb-0 d-flex align-items-center justify-content-between">${escapeHtml(trans('aiscan-analysis-completed', {'%provider%': doc.extractedData?._provider || state.defaultProvider}))}${jsonBtn}</div>`;
+            statusEl.innerHTML = `<div class="alert alert-success py-1 px-2 small mb-0 d-flex align-items-center justify-content-between">${escapeHtml(trans('aiscan-analysis-completed', {'%provider%': choiceLabel(modelChoiceForDoc(doc))}))}${jsonBtn}</div>`;
         } else if (doc.status === STATUS.DISCARDED) {
             statusEl.innerHTML = `<div class="alert alert-dark py-1 px-2 small mb-0"><i class="fa-solid fa-ban me-1"></i>${escapeHtml(trans('aiscan-doc-discarded'))}</div>`;
         } else {
@@ -4116,11 +4142,11 @@
         }
     }
 
-    async function reanalyzeDocs(docs, modeOverride) {
-        const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+    async function reanalyzeDocs(docs, modeOverride, choice) {
         const importMode = modeOverride || state.importMode;
 
         for (const doc of docs) {
+            const target = choice || modelChoiceForDoc(doc);
             doc.status = STATUS.ANALYZING;
             doc.error = null;
             doc.reviewDecision = null;
@@ -4136,7 +4162,8 @@
                     import_mode: importMode,
                     use_history: state.useHistory ? '1' : '0',
                     supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
-                    provider,
+                    provider: target.provider,
+                    model: target.model,
                 });
 
                 const response = await fetch('AiScanInvoice?' + params.toString());
@@ -4159,13 +4186,13 @@
         }
     }
 
-    async function reanalyzeCurrentDoc() {
+    async function reanalyzeCurrentDoc(choice) {
         const doc = currentDoc();
         if (!doc || !doc.tmpFile) {
             return;
         }
 
-        const provider = document.getElementById('aiscan-provider-select')?.value || state.defaultProvider;
+        const target = choice || modelChoiceForDoc(doc);
         doc.status = STATUS.ANALYZING;
         doc.error = null;
         doc.reviewDecision = null;
@@ -4176,7 +4203,8 @@
                 import_mode: state.importMode,
                 use_history: state.useHistory ? '1' : '0',
                 supplier_id: doc.extractedData?.supplier?.matched_supplier_id || '',
-                provider,
+                provider: target.provider,
+                model: target.model,
             });
 
             const response = await fetch('AiScanInvoice?' + params.toString());
@@ -4192,6 +4220,43 @@
         }
 
         renderCurrentDocument();
+    }
+
+    /**
+     * Provider/model currently picked in the analysis selector (#89).
+     */
+    function selectedModelChoice() {
+        const select = document.getElementById('aiscan-provider-select');
+        const option = select && select.options ? select.options[select.selectedIndex] : null;
+        if (option && option.value) {
+            return {provider: option.value, model: option.dataset ? (option.dataset.model || '') : ''};
+        }
+        return {provider: state.defaultProvider, model: state.defaultModel || ''};
+    }
+
+    /**
+     * Model a document was last analyzed with, so re-analyzing repeats it
+     * instead of silently switching model (#89).
+     */
+    function modelChoiceForDoc(doc) {
+        const provider = doc && doc.extractedData ? doc.extractedData._provider : null;
+        if (provider) {
+            return {provider, model: doc.extractedData._model || ''};
+        }
+        return selectedModelChoice();
+    }
+
+    function sameChoice(a, b) {
+        return !!a && !!b && a.provider === b.provider && (a.model || '') === (b.model || '');
+    }
+
+    function choiceLabel(choice) {
+        const model = choice.model || '';
+        const known = (state.availableModels || []).find(c => c.provider === choice.provider && c.model === model);
+        if (known) {
+            return known.label;
+        }
+        return model ? `${choice.provider} \u2014 ${model}` : String(choice.provider || '');
     }
 
     function buildAnalyzeParams(doc, extra) {
@@ -4524,15 +4589,68 @@
             return;
         }
         select.innerHTML = '';
-        (state.availableProviders || []).forEach(p => {
+        (state.availableModels || []).forEach(choice => {
             const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = p;
-            if (p === state.defaultProvider) {
+            opt.value = choice.provider;
+            opt.dataset.model = choice.model || '';
+            opt.textContent = choice.label || choiceLabel(choice);
+            if (sameChoice(choice, {provider: state.defaultProvider, model: state.defaultModel})) {
                 opt.selected = true;
             }
             select.appendChild(opt);
         });
+    }
+
+    /**
+     * Re-analyze split button: the main button repeats the document's model,
+     * the dropdown re-runs it with any other configured model (#89).
+     */
+    function bindReanalyzeMenu() {
+        const menu = document.getElementById('aiscan-reanalyze-menu');
+        if (!menu) {
+            return;
+        }
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('[data-provider]');
+            if (!item) {
+                return;
+            }
+            e.preventDefault();
+            reanalyzeCurrentDoc({provider: item.dataset.provider, model: item.dataset.model || ''});
+        });
+    }
+
+    function renderReanalyzeMenu(doc) {
+        const menu = document.getElementById('aiscan-reanalyze-menu');
+        if (!menu) {
+            return;
+        }
+        const current = modelChoiceForDoc(doc);
+        const configured = state.configuredDefault;
+        const items = (state.availableModels || []).map(choice => {
+            const isCurrent = sameChoice(choice, current);
+            const check = isCurrent
+                ? '<i class="fa-solid fa-check text-primary me-2"></i>'
+                : '<span class="d-inline-block me-2" style="width:1em"></span>';
+            const badge = configured && sameChoice(choice, configured)
+                ? ` <span class="badge text-bg-secondary ms-2">${escapeHtml(trans('aiscan-default-model'))}</span>`
+                : '';
+            return `<li><button type="button" class="dropdown-item" data-provider="${escapeAttr(choice.provider)}" data-model="${escapeAttr(choice.model || '')}">${check}${escapeHtml(choice.label || choiceLabel(choice))}${badge}</button></li>`;
+        });
+
+        const toggle = document.getElementById('aiscan-reanalyze-menu-btn');
+        if (toggle) {
+            toggle.classList.toggle('d-none', items.length < 2);
+        }
+        if (items.length < 2) {
+            menu.innerHTML = '';
+            return;
+        }
+
+        menu.innerHTML = `<li><h6 class="dropdown-header">${escapeHtml(trans('aiscan-reanalyze-with'))}</h6></li>`
+            + items.join('')
+            + '<li><hr class="dropdown-divider"></li>'
+            + `<li><span class="dropdown-item-text small text-muted">${escapeHtml(trans('aiscan-reanalyze-keeps-mode'))}</span></li>`;
     }
 
     // ── Split handle ───────────────────────────────────────────────────
@@ -4616,6 +4734,11 @@
             applyPinnedProductToLines,
             applySelectionRange,
             buildConfidenceBadge,
+            choiceLabel,
+            modelChoiceForDoc,
+            sameChoice,
+            renderReanalyzeMenu,
+            selectedModelChoice,
             buildEmptyExtractedData,
             buildPaymentMethodSelect,
             buildProductMatchBadge,

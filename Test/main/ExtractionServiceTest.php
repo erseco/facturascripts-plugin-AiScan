@@ -20,11 +20,49 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use PHPUnit\Framework\TestCase;
 
 final class ExtractionServiceTest extends TestCase
 {
+    public function testEmptyExtractionPayloadReportsNoModel(): void
+    {
+        $payload = ExtractionService::emptyExtractionPayload('scan failed');
+        $this->assertArrayHasKey('_provider', $payload);
+        $this->assertArrayHasKey('_model', $payload);
+        $this->assertNull($payload['_model']);
+    }
+
+    public function testAvailableModelsOnlyListAvailableProviders(): void
+    {
+        $service = new ExtractionService();
+        $providers = $service->getAvailableProviderNames();
+
+        foreach ($service->getAvailableModels() as $choice) {
+            $this->assertArrayHasKey('provider', $choice);
+            $this->assertArrayHasKey('model', $choice);
+            $this->assertContains($choice['provider'], $providers);
+        }
+    }
+
+    public function testAvailableModelsListEveryConfiguredModelOfAProvider(): void
+    {
+        $service = new ExtractionService();
+        $combos = $service->getAvailableModels();
+
+        foreach ($service->getAvailableProviderNames() as $provider) {
+            $listed = array_values(array_map(
+                static fn (array $choice): string => $choice['model'],
+                array_filter($combos, static fn (array $choice): bool => $choice['provider'] === $provider)
+            ));
+            $configured = AiScanSettings::getProviderModels($provider);
+
+            // Providers without a model list (mock) still get one selectable entry.
+            $this->assertSame($configured ?: [''], $listed);
+        }
+    }
+
     public function testGetDefaultSystemPromptIsNotEmpty(): void
     {
         $prompt = ExtractionService::getDefaultSystemPrompt();
