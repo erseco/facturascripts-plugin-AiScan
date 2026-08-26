@@ -23,8 +23,10 @@ namespace FacturaScripts\Test\Plugins;
 use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Core\DataSrc\Impuestos;
 use FacturaScripts\Core\Where;
+use FacturaScripts\Dinamic\Model\EstadoDocumento;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\FormaPago;
+use FacturaScripts\Dinamic\Model\Impuesto;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Dinamic\Model\Serie;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
@@ -45,6 +47,9 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
 
     /** @var FormaPago[] */
     private array $paymentMethodsToDelete = [];
+
+    /** @var Impuesto[] */
+    private array $taxesToDelete = [];
 
     public static function setUpBeforeClass(): void
     {
@@ -88,6 +93,12 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
             }
         }
 
+        foreach ($this->taxesToDelete as $tax) {
+            if ($tax->exists()) {
+                $tax->delete();
+            }
+        }
+
         MiniLog::clear();
     }
 
@@ -110,12 +121,116 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
 
         $lines = $invoice->getLines();
         $this->assertCount(1, $lines);
-        $this->assertNotEmpty(
-            Impuestos::get((string) $lines[0]->codimpuesto)->codimpuesto,
-            'El impuesto de la línea debe existir en la instalación'
+
+        $resolved = Impuestos::get((string) $lines[0]->codimpuesto);
+        $this->assertNotEmpty($resolved->codimpuesto, 'El impuesto de la línea debe existir en la instalación');
+        $this->assertSame(
+            Impuestos::default()->operacion,
+            $resolved->operacion,
+            'El respaldo no puede cambiar de régimen fiscal (IVA / IGIC / IPSI)'
         );
         $this->assertEqualsWithDelta(0.0, (float) $lines[0]->iva, 0.001);
         $this->assertEqualsWithDelta(30.0, (float) $invoice->total, 0.01);
+    }
+
+    /**
+     * Con varios impuestos al mismo tipo, buscar «el primero que coincida» elegía
+     * por orden alfabético y podía cruzar regímenes (IVA4 -> IPSI4).
+     */
+    public function testFallbackNeverCrossesTaxRegimes(): void
+    {
+        $default = Impuestos::default();
+        $this->assertNotEmpty($default->operacion, 'El impuesto predeterminado debe tener operación');
+
+        // Dos impuestos al mismo tipo y distinto régimen. El señuelo ordena
+        // antes alfabéticamente, así que «el primero que coincida» lo elegiría.
+        $decoy = $this->createTax('AAA9', $default->operacion === 'ES_04' ? 'ES_01' : 'ES_04');
+        $expected = $this->createTax('ZZZ9', $default->operacion);
+
+        $supplier = $this->createSupplier();
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['codimpuesto' => 'NOEXISTE9', 'iva' => 9.87]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $this->assertSame($expected->codimpuesto, $invoice->getLines()[0]->codimpuesto);
+        $this->assertNotSame($decoy->codimpuesto, $invoice->getLines()[0]->codimpuesto);
+    }
+
+    public function testUnresolvableTaxAbortsWithoutLeavingADraft(): void
+    {
+        $supplier = $this->createSupplier();
+
+        // 3,17 % no existe en ninguna instalación, así que no hay candidato.
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['codimpuesto' => 'NOEXISTE', 'iva' => 3.17]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertNull($result['invoice_id']);
+        $this->assertStringContainsString('NOEXISTE', implode('; ', $result['errors']));
+        $this->assertSame(
+            0,
+            (new FacturaProveedor())->count([Where::eq('codproveedor', $supplier->codproveedor)]),
+            'No debe quedar ninguna factura en boceto'
+        );
+    }
+
+    /**
+     * Al reimportar sobre una factura existente se borraban sus líneas antes de
+     * saber si las nuevas se podían grabar.
+     */
+    public function testFailedUpdateKeepsTheLinesOfTheExistingInvoice(): void
+    {
+        $supplier = $this->createSupplier();
+
+        $created = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 0]),
+            null,
+            'lines',
+            false
+        );
+        $this->assertTrue($created['success'], implode('; ', $created['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($created['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+        $this->assertCount(1, $invoice->getLines());
+
+        // El import deja la factura como «Recibida» (no editable) si ese estado
+        // existe. El caso que interesa es reimportar sobre una que sí se puede
+        // editar, que es cuando se llegaba a borrar sus líneas.
+        $this->makeEditable($invoice);
+
+        $failed = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, [
+                'iva' => 0,
+                'referencia' => 'REF-DEMASIADO-LARGA-PARA-LA-COLUMNA-DE-30',
+            ]),
+            (int) $created['invoice_id'],
+            'lines',
+            false
+        );
+
+        $this->assertFalse($failed['success']);
+
+        $reloaded = new FacturaProveedor();
+        $this->assertTrue($reloaded->loadFromCode($created['invoice_id']));
+        $lines = $reloaded->getLines();
+        $this->assertCount(1, $lines, 'La factura existente no puede quedarse sin líneas');
+        $this->assertSame('ONA MESITA NOCHE 1 CAJON 1 HUECO BLANCO', $lines[0]->descripcion);
+        $this->assertEqualsWithDelta(30.0, (float) $reloaded->total, 0.01);
     }
 
     public function testOverlongTaxExceptionIsIgnored(): void
@@ -209,6 +324,34 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
                 'dtopor' => 0,
             ], $line)],
         ];
+    }
+
+    private function makeEditable(FacturaProveedor $invoice): void
+    {
+        $where = [Where::eq('tipodoc', 'FacturaProveedor')];
+        foreach ((new EstadoDocumento())->all($where, [], 0, 0) as $status) {
+            if ($status->editable) {
+                $invoice->idestado = $status->idestado;
+                $this->assertTrue($invoice->save(), 'No se pudo devolver la factura a un estado editable');
+                return;
+            }
+        }
+
+        $this->markTestSkipped('No hay un estado editable para FacturaProveedor.');
+    }
+
+    private function createTax(string $code, string $operation): Impuesto
+    {
+        $tax = new Impuesto();
+        $tax->codimpuesto = $code;
+        $tax->descripcion = 'AiScan test ' . $code;
+        $tax->iva = 9.87;
+        $tax->recargo = 0.0;
+        $tax->operacion = $operation;
+        $this->assertTrue($tax->save(), 'No se pudo crear el impuesto de prueba ' . $code);
+        $this->taxesToDelete[] = $tax;
+
+        return $tax;
     }
 
     private function resolvePaymentMethodCode(): string

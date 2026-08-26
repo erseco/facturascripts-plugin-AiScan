@@ -204,6 +204,7 @@
     "aiscan-total-mismatch": "Calculated total (%calculated%) does not match invoice total (%invoice%). Review the line items.",
     "aiscan-undecided-remaining": "%count% invoice(s) still need a review decision",
     "aiscan-unknown-action": "Unknown action: %action%",
+    "aiscan-unresolved-tax-code": "Could not determine the tax for line \"%description%\": code \"%code%\" does not exist and several taxes share %rate%%. Please review the line tax before importing.",
     "aiscan-unsupported-file-extension": "Unsupported file extension: %extension%",
     "aiscan-unsupported-file-type": "Unsupported file type: %mimeType%",
     "aiscan-update-stock-purchase-data": "Update stock and purchase data from invoice lines",

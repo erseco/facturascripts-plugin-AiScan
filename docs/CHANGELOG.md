@@ -38,10 +38,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   en `excepcioniva`. Al grabar la línea saltaba la clave ajena contra
   `impuestos` (o el texto excedía la columna), la factura quedaba en boceto a
   0 € y sin pagar, y el error no decía nada. Ahora el código de impuesto se
-  valida contra los impuestos instalados (con respaldo por tipo), la excepción
-  de IVA solo se acepta si es uno de los códigos del core, el mensaje incluye el
-  error real y la cabecera creada se deshace en lugar de dejar el boceto
-  huérfano.
+  valida contra los impuestos instalados, la excepción de IVA solo se acepta si
+  es uno de los códigos del core, el mensaje incluye el error real y la cabecera
+  creada se deshace en lugar de dejar el boceto huérfano. El respaldo por tipo
+  nunca cruza regímenes fiscales (IVA / IGIC / IPSI): si varios impuestos
+  comparten el tipo se exige el del régimen de la empresa y, si sigue habiendo
+  duda, se corta el import con un mensaje en vez de elegir uno al azar. Además,
+  sustituir las líneas al reimportar sobre una factura existente es ahora
+  transaccional, así que un fallo ya no la deja sin líneas.
 - **404 al abrir el historial de importaciones** (#93): `ModelClass::url()`
   concatena el prefijo de listado con el nombre del modelo, así que el enlace
   apuntaba a `ListAiScanHistoryAiScanImportBatch`. Ahora devuelve
