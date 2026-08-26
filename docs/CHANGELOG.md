@@ -32,6 +32,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- **Importación fallida con "No se pudieron calcular las líneas"** (#93): la IA
+  puede devolver en la línea un `codimpuesto` que no existe en la instalación
+  (p. ej. `IGICEXENTO` en una factura exenta de IGIC) o el texto legal completo
+  en `excepcioniva`. Al grabar la línea saltaba la clave ajena contra
+  `impuestos` (o el texto excedía la columna), la factura quedaba en boceto a
+  0 € y sin pagar, y el error no decía nada. Ahora el código de impuesto se
+  valida contra los impuestos instalados (con respaldo por tipo), la excepción
+  de IVA demasiado larga se descarta, el mensaje incluye el error real y la
+  cabecera creada se deshace en lugar de dejar el boceto huérfano.
+- **404 al abrir el historial de importaciones** (#93): `ModelClass::url()`
+  concatena el prefijo de listado con el nombre del modelo, así que el enlace
+  apuntaba a `ListAiScanHistoryAiScanImportBatch`. Ahora devuelve
+  `ListAiScanHistory`.
 - **Gemini 3.x HTTP 400 INVALID_ARGUMENT**: el plugin enviaba siempre
   `temperature: 0` y `thinkingConfig.thinkingBudget: 0`, argumentos inválidos
   en `gemini-3.6-flash`, `gemini-3.1-pro` y el resto de Gemini 3. No había

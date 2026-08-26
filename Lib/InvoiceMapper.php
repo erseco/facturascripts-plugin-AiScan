@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
+use FacturaScripts\Core\DataSrc\Impuestos;
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Lib\ReceiptGenerator;
 use FacturaScripts\Core\Tools;
@@ -141,9 +142,7 @@ class InvoiceMapper
             }
 
             if (!$invoice->save()) {
-                $miniLog = Tools::log()::read('', ['critical', 'error', 'warning']);
-                $detail = implode('; ', array_map(fn ($m) => $m['message'], $miniLog));
-                $result['errors'][] = $detail ?: Tools::lang()->trans('record-save-error');
+                $result['errors'][] = $this->readLogDetail() ?: Tools::lang()->trans('record-save-error');
                 return $result;
             }
 
@@ -163,7 +162,17 @@ class InvoiceMapper
                 : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
             if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
-                $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
+                $message = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
+                $detail = $this->readLogDetail();
+                $result['errors'][] = $detail === '' ? $message : $message . ' ' . $detail;
+
+                // Issue #93: la cabecera ya está guardada. Si las líneas no se
+                // pueden grabar quedaría un boceto a 0 € huérfano, así que
+                // deshacemos la factura que acabamos de crear.
+                if ($invoiceId === null) {
+                    $invoice->delete();
+                }
+
                 return $result;
             }
 
@@ -245,13 +254,14 @@ class InvoiceMapper
                 }
             }
 
-            if (!empty($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? '')) {
-                $line->codimpuesto = $lineData['codimpuesto'] ?? $lineData['tax_code'];
-            }
-
             $taxRate = $lineData['tax_rate'] ?? $lineData['iva'] ?? null;
             if ($taxRate !== null && $taxRate !== '') {
                 $line->iva = (float) $taxRate;
+            }
+
+            $taxCode = trim((string) ($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? ''));
+            if ($taxCode !== '') {
+                $line->codimpuesto = $this->resolveTaxCode($taxCode, (float) $line->iva) ?? $line->codimpuesto;
             }
 
             $irpf = $lineData['irpf'] ?? null;
@@ -268,8 +278,12 @@ class InvoiceMapper
                 $line->recargo = (float) $lineData['recargo'];
             }
 
-            if (!empty($lineData['excepcioniva'] ?? '')) {
-                $line->excepcioniva = $lineData['excepcioniva'];
+            // Issue #93: la IA a veces devuelve el texto legal completo
+            // ("Art. 50.Uno.27 Ley 4/2012") en lugar del código de excepción.
+            // La columna es varchar(20) y la línea no se podría grabar.
+            $taxException = trim((string) ($lineData['excepcioniva'] ?? ''));
+            if ($taxException !== '' && mb_strlen($taxException) <= 20) {
+                $line->excepcioniva = $taxException;
             }
 
             if (!empty($lineData['suplido'] ?? false)) {
@@ -324,6 +338,34 @@ class InvoiceMapper
         $line->iva = !empty($taxes) ? (float) ($taxes[0]['rate'] ?? 0) : $this->computeTaxRate($invoiceData);
 
         return [$line];
+    }
+
+    /**
+     * Issue #93: la IA puede devolver un codimpuesto que no existe en la
+     * instalación (p. ej. "IGICEXENTO" en una factura exenta de IGIC). Guardarlo
+     * rompe la clave ajena contra `impuestos`: la línea no se graba, el import
+     * falla y queda una factura en boceto a 0 €. Se busca el código real y, si
+     * no existe, uno con el mismo tipo; si tampoco, se conserva el de la línea.
+     */
+    private function resolveTaxCode(string $code, float $rate): ?string
+    {
+        if (!empty(Impuestos::get($code)->codimpuesto)) {
+            return $code;
+        }
+
+        foreach (Impuestos::all() as $tax) {
+            if (abs((float) $tax->iva - $rate) < 0.001) {
+                return $tax->codimpuesto;
+            }
+        }
+
+        return null;
+    }
+
+    private function readLogDetail(): string
+    {
+        $miniLog = Tools::log()::read('', ['critical', 'error', 'warning']);
+        return implode('; ', array_map(fn ($m) => $m['message'], $miniLog));
     }
 
     /**
