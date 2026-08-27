@@ -999,6 +999,84 @@ final class SchemaValidatorTest extends TestCase
         );
     }
 
+    /**
+     * Issue #97: minuta de honorarios del Registro Mercantil. La columna
+     * "Honorarios" es la tarifa unitaria y no cuadra con la columna "Total"
+     * porque se aplican reducciones (R.D.L. 6/1999 y 6/2000). Al calcular
+     * la factura desde cantidad x tarifa salia 63,13 de base y 67,55 de
+     * total, en lugar de 54,47 y 58,28.
+     */
+    public function testNormalizeRebuildsUnitPriceFromLineTotal(): void
+    {
+        $lines = [
+            ['Actos de Cuantia Indeterminada', 2, 3.01, 6.01],
+            ['Nota Marginal', 6, 0.15, 0.90],
+            ['Certificacion de un Asiento', 3, 1.50, 4.51],
+            ['Certificacion de Asiento de Presentacion', 1, 1.50, 1.50],
+            ['Certificacion de despacho', 1, 1.50, 1.50],
+            ['Busqueda de datos', 8, 1.50, 12.02],
+            ['Deposito de documentos', 10, 3.01, 21.41],
+            ['Diligencia de Ratificacion de Documentos', 1, 0.60, 0.60],
+            ['Asiento de Presentacion', 1, 6.01, 6.01],
+        ];
+
+        $payload = ['invoice' => [
+            'number' => 'WEB35799955',
+            'issue_date' => '2026-07-29',
+            'subtotal' => 54.47,
+            'tax_amount' => 3.81,
+            'total' => 58.28,
+        ], 'lines' => []];
+        foreach ($lines as [$description, $quantity, $unitPrice, $lineTotal]) {
+            $payload['lines'][] = [
+                'descripcion' => $description,
+                'cantidad' => $quantity,
+                'pvpunitario' => $unitPrice,
+                'pvptotal' => $lineTotal,
+                'iva' => 7,
+            ];
+        }
+
+        $data = $this->validator->normalize($payload);
+
+        $base = 0.0;
+        foreach ($data['lines'] as $line) {
+            $base += $line['cantidad'] * $line['pvpunitario'];
+        }
+        $this->assertEqualsWithDelta(54.46, $base, 0.01);
+        $this->assertEqualsWithDelta(58.27, $base * 1.07, 0.01);
+        $this->assertTrue($data['_line_totals_reconciled']);
+    }
+
+    /**
+     * Issue #97: no tocar las lineas cuando los precios unitarios ya cuadran
+     * con la base imponible declarada.
+     */
+    public function testNormalizeKeepsUnitPriceWhenLinesMatchSubtotal(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'INV-002',
+                'issue_date' => '2026-01-01',
+                'subtotal' => 100.0,
+                'tax_amount' => 21.0,
+                'total' => 121.0,
+            ],
+            'lines' => [
+                [
+                    'descripcion' => 'Widget',
+                    'cantidad' => 4,
+                    'pvpunitario' => 25.0,
+                    'pvptotal' => 99.0,
+                    'iva' => 21,
+                ],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(25.0, $data['lines'][0]['pvpunitario'], 0.0001);
+        $this->assertArrayNotHasKey('_line_totals_reconciled', $data);
+    }
+
     public function testNormalizeRespectsDiscountWhenDetectingInclusive(): void
     {
         // Line: qty 1, price 21.40 with 50% discount and 7% IGIC included.
