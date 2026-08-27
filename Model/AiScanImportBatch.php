@@ -71,6 +71,11 @@ class AiScanImportBatch extends ModelClass
 
     public function url(string $type = 'auto', string $list = 'ListAiScanHistory'): string
     {
-        return parent::url($type, $list);
+        // Issue #93: ModelClass::url() compone el listado como $list . nombre del
+        // modelo, así que devolvía ListAiScanHistoryAiScanImportBatch (404). Aquí el
+        // listado es un controlador propio, sin el nombre del modelo detrás.
+        $url = parent::url($type, $list);
+
+        return $url === $list . $this->modelClassName() ? $list : $url;
     }
 }

@@ -20,8 +20,11 @@
 
 namespace FacturaScripts\Plugins\AiScan\Lib;
 
+use FacturaScripts\Core\Base\DataBase;
+use FacturaScripts\Core\DataSrc\Impuestos;
 use FacturaScripts\Core\Lib\Calculator;
 use FacturaScripts\Core\Lib\ReceiptGenerator;
+use FacturaScripts\Core\Lib\RegimenIVA;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\Almacen;
@@ -31,6 +34,7 @@ use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
+use RuntimeException;
 
 class InvoiceMapper
 {
@@ -50,6 +54,9 @@ class InvoiceMapper
         bool $updateStockPurchaseData = false
     ): array {
         $result = ['success' => false, 'invoice_id' => null, 'errors' => [], 'warnings' => []];
+        $database = new DataBase();
+        $inTransaction = false;
+        $invoice = null;
 
         try {
             // Issue #78: require complete identity data only for new imports.
@@ -140,17 +147,15 @@ class InvoiceMapper
                 }
             }
 
-            if (!$invoice->save()) {
-                $miniLog = Tools::log()::read('', ['critical', 'error', 'warning']);
-                $detail = implode('; ', array_map(fn ($m) => $m['message'], $miniLog));
-                $result['errors'][] = $detail ?: Tools::lang()->trans('record-save-error');
+            // Una factura nueva necesita idfactura para poder colgarle las líneas,
+            // así que su cabecera se guarda ya. Si algo falla después se borra
+            // entera. La de una factura existente se guarda más abajo, dentro de
+            // la transacción (issue #93): si las líneas no se pueden grabar
+            // tampoco debe quedarse con el número, la fecha o las observaciones
+            // nuevos.
+            if ($invoiceId === null && false === $invoice->save()) {
+                $result['errors'][] = $this->readLogDetail() ?: Tools::lang()->trans('record-save-error');
                 return $result;
-            }
-
-            if ($invoiceId) {
-                foreach ($invoice->getLines() as $line) {
-                    $line->delete();
-                }
             }
 
             $taxes = $extractedData['taxes'] ?? [];
@@ -162,9 +167,72 @@ class InvoiceMapper
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
-            if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
-                $result['errors'][] = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
+            // Issue #93: al reimportar, guardar la cabecera y sustituir las
+            // líneas tiene que ser atómico. Antes se guardaba la cabecera y se
+            // borraban las líneas antiguas antes de saber si las nuevas se
+            // podían grabar, así que un fallo la dejaba sin líneas y con el
+            // número, la fecha y las observaciones ya cambiados.
+            //
+            // Lo que va después del commit (recibos, adjunto, estado, stock) ya
+            // no entra en esa garantía.
+            //
+            // Las líneas se construyen antes de abrir la transacción para que la
+            // creación diferida de tablas de FacturaScripts (que no admite DDL
+            // dentro de una transacción) no la rompa. En una factura nueva no
+            // hace falta transacción: si algo falla se borra la cabecera y la
+            // clave ajena se lleva por delante las líneas que se hubieran
+            // grabado.
+            $oldLines = $invoiceId ? $invoice->getLines() : [];
+            $inTransaction = false;
+
+            // Si ya hay una transacción abierta por quien nos llama, es suya:
+            // ni la empezamos ni la cerramos, pero nos protege igual. Si no hay
+            // y no se puede abrir, se aborta antes de tocar nada: sin ella los
+            // cambios dejarían de ser reversibles.
+            if ($invoiceId && false === $database->inTransaction()) {
+                if (false === $database->beginTransaction()) {
+                    throw new RuntimeException(Tools::lang()->trans('aiscan-transaction-error'));
+                }
+
+                $inTransaction = true;
+            }
+
+            if ($invoiceId && false === $invoice->save()) {
+                $result['errors'][] = $this->readLogDetail() ?: Tools::lang()->trans('record-save-error');
+
+                if ($inTransaction) {
+                    $database->rollback();
+                    $inTransaction = false;
+                }
+
                 return $result;
+            }
+
+            foreach ($oldLines as $oldLine) {
+                $oldLine->delete();
+            }
+
+            if (empty($invoiceLines) || false === Calculator::calculate($invoice, $invoiceLines, true)) {
+                $message = Tools::lang()->trans('aiscan-failed-to-calculate-invoice-lines');
+                $detail = $this->readLogDetail();
+                $result['errors'][] = $detail === '' ? $message : $message . ' ' . $detail;
+
+                if ($inTransaction) {
+                    $database->rollback();
+                    $inTransaction = false;
+                }
+
+                $this->discardDraft($invoiceId, $invoice);
+                return $result;
+            }
+
+            if ($inTransaction) {
+                $inTransaction = false;
+                if (false === $database->commit()) {
+                    $database->rollback();
+                    $result['errors'][] = Tools::lang()->trans('aiscan-transaction-error');
+                    return $result;
+                }
             }
 
             // Tras calcular líneas FS genera recibos. Ajustamos vencimiento y
@@ -189,6 +257,11 @@ class InvoiceMapper
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
         } catch (\Exception $e) {
+            if ($inTransaction) {
+                $database->rollback();
+            }
+
+            $this->discardDraft($invoiceId, $invoice);
             $result['errors'][] = $e->getMessage();
         }
 
@@ -245,13 +318,14 @@ class InvoiceMapper
                 }
             }
 
-            if (!empty($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? '')) {
-                $line->codimpuesto = $lineData['codimpuesto'] ?? $lineData['tax_code'];
-            }
-
             $taxRate = $lineData['tax_rate'] ?? $lineData['iva'] ?? null;
             if ($taxRate !== null && $taxRate !== '') {
                 $line->iva = (float) $taxRate;
+            }
+
+            $taxCode = trim((string) ($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? ''));
+            if ($taxCode !== '') {
+                $line->codimpuesto = $this->resolveTaxCode($taxCode, (float) $line->iva, $line->descripcion);
             }
 
             $irpf = $lineData['irpf'] ?? null;
@@ -268,8 +342,13 @@ class InvoiceMapper
                 $line->recargo = (float) $lineData['recargo'];
             }
 
-            if (!empty($lineData['excepcioniva'] ?? '')) {
-                $line->excepcioniva = $lineData['excepcioniva'];
+            // Issue #93: la IA a veces devuelve el texto legal completo
+            // ("Art. 50.Uno.27 Ley 4/2012") en lugar del código de excepción.
+            // La columna es varchar(20) y la línea no se podría grabar, así que
+            // solo se acepta un código de la lista del core.
+            $taxException = trim((string) ($lineData['excepcioniva'] ?? ''));
+            if (array_key_exists($taxException, RegimenIVA::allExceptions())) {
+                $line->excepcioniva = $taxException;
             }
 
             if (!empty($lineData['suplido'] ?? false)) {
@@ -324,6 +403,79 @@ class InvoiceMapper
         $line->iva = !empty($taxes) ? (float) ($taxes[0]['rate'] ?? 0) : $this->computeTaxRate($invoiceData);
 
         return [$line];
+    }
+
+    /**
+     * Issue #93: la IA puede devolver un codimpuesto que no existe en la
+     * instalación (p. ej. "IGICEXENTO" en una factura exenta de IGIC). Guardarlo
+     * rompe la clave ajena contra `impuestos`: la línea no se graba, el import
+     * falla y queda una factura en boceto a 0 €.
+     *
+     * El respaldo tiene que ser inequívoco. Buscar por tipo no vale: IVA4 e IPSI4
+     * comparten el 4 % (y IGIC0, IPSI0 e IVA0 el 0 %), así que el orden
+     * alfabético de `Impuestos::all()` colaría un impuesto de otro régimen
+     * fiscal. Y un único candidato tampoco basta: en una instalación estándar el
+     * 7 % solo lo tiene IGIC7, que no sirve para una empresa con IVA.
+     *
+     * Por eso se descartan primero los impuestos que no son de la operación del
+     * impuesto predeterminado de la empresa, y solo se acepta el respaldo si
+     * queda exactamente uno. Si queda ninguno o varios, se corta el import.
+     *
+     * @throws RuntimeException si el impuesto no se puede determinar
+     */
+    private function resolveTaxCode(string $code, float $rate, string $description): string
+    {
+        if (!empty(Impuestos::get($code)->codimpuesto)) {
+            return $code;
+        }
+
+        $candidates = [];
+        foreach (Impuestos::all() as $tax) {
+            if (abs((float) $tax->iva - $rate) < 0.001) {
+                $candidates[] = $tax;
+            }
+        }
+
+        $operation = Impuestos::default()->operacion;
+        if (!empty($operation)) {
+            $candidates = array_values(array_filter(
+                $candidates,
+                static fn ($tax): bool => $tax->operacion === $operation
+            ));
+        }
+
+        if (count($candidates) === 1) {
+            return $candidates[0]->codimpuesto;
+        }
+
+        $message = Tools::lang()->trans('aiscan-unresolved-tax-code', [
+            '%code%' => $code,
+            '%rate%' => Tools::number($rate),
+            '%description%' => $description,
+        ]);
+        if (!str_contains($message, $code)) {
+            $message .= ': ' . $code;
+        }
+
+        throw new RuntimeException($message);
+    }
+
+    /**
+     * Issue #93: la cabecera se guarda antes que las líneas. Si el import falla
+     * después, hay que deshacerla o quedaría un boceto a 0 € huérfano. Solo se
+     * borra la factura que hemos creado nosotros; una existente no se toca.
+     */
+    private function discardDraft(?int $invoiceId, ?FacturaProveedor $invoice): void
+    {
+        if ($invoiceId === null && $invoice instanceof FacturaProveedor && $invoice->exists()) {
+            $invoice->delete();
+        }
+    }
+
+    private function readLogDetail(): string
+    {
+        $miniLog = Tools::log()::read('', ['critical', 'error', 'warning']);
+        return implode('; ', array_map(fn ($m) => $m['message'], $miniLog));
     }
 
     /**
