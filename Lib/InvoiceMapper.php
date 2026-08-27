@@ -171,9 +171,19 @@ class InvoiceMapper
             // diferida de tablas de FacturaScripts (que no admite DDL dentro de
             // una transacción) rompa el import en una instalación recién hecha.
             $oldLines = $invoiceId ? $invoice->getLines() : [];
-            $inTransaction = $oldLines !== []
-                && false === $database->inTransaction()
-                && $database->beginTransaction();
+            $inTransaction = false;
+
+            // Si ya hay una transacción abierta por quien nos llama, es suya:
+            // ni la empezamos ni la cerramos, pero nos protege igual. Si no hay
+            // y no se puede abrir, se aborta antes de tocar nada: sin ella el
+            // borrado de las líneas antiguas dejaría de ser reversible.
+            if ($oldLines !== [] && false === $database->inTransaction()) {
+                if (false === $database->beginTransaction()) {
+                    throw new RuntimeException(Tools::lang()->trans('aiscan-transaction-error'));
+                }
+
+                $inTransaction = true;
+            }
 
             foreach ($oldLines as $oldLine) {
                 $oldLine->delete();
@@ -194,8 +204,12 @@ class InvoiceMapper
             }
 
             if ($inTransaction) {
-                $database->commit();
                 $inTransaction = false;
+                if (false === $database->commit()) {
+                    $database->rollback();
+                    $result['errors'][] = Tools::lang()->trans('aiscan-transaction-error');
+                    return $result;
+                }
             }
 
             // Tras calcular líneas FS genera recibos. Ajustamos vencimiento y
