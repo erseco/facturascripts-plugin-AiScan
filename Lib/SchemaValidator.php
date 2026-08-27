@@ -323,6 +323,10 @@ class SchemaValidator
             }
             unset($line);
 
+            // Rebuild unit prices from the printed line amounts when the
+            // extracted unit prices do not add up to the invoice subtotal.
+            $this->reconcileLineTotalsWithSubtotal($data);
+
             // Detect tax-inclusive line prices typical of "factura simplificada"
             // / tickets marked "IGIC INCLUIDO" or "IVA INCLUIDO" and convert
             // each unit price to tax-exclusive so downstream calculation does
@@ -427,6 +431,65 @@ class SchemaValidator
             }
         }
         return round($n, 4);
+    }
+
+    /**
+     * Issue #97: tariff-based invoices (registry fees, notary "minutas")
+     * print a unit price that does not multiply out to the line amount
+     * because per-line reductions or roundings are applied. Rebuilding the
+     * invoice from cantidad x pvpunitario then inflates it (63,13 EUR of
+     * base instead of the 54,47 EUR stated on the document).
+     *
+     * When every line carries a printed amount (pvptotal) and those amounts
+     * reproduce the extracted subtotal clearly better than the unit prices
+     * do, the printed amounts win and each pvpunitario is derived from them.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function reconcileLineTotalsWithSubtotal(array &$data): void
+    {
+        $subtotal = (float) ($data['invoice']['subtotal'] ?? 0);
+        if ($subtotal <= 0 || empty($data['lines']) || !is_array($data['lines'])) {
+            return;
+        }
+
+        $priceSum = 0.0;
+        $totalSum = 0.0;
+        foreach ($data['lines'] as $line) {
+            if (!isset($line['pvptotal'])) {
+                // Without a printed amount on every line there is nothing to
+                // reconcile against.
+                return;
+            }
+            $qty = (float) ($line['cantidad'] ?? 1);
+            $price = (float) ($line['pvpunitario'] ?? 0);
+            $discount = (float) ($line['dtopor'] ?? 0);
+            $priceSum += $qty * $price * (1 - $discount / 100);
+            $totalSum += (float) $line['pvptotal'];
+        }
+
+        $tolerance = max(0.02, $subtotal * 0.005);
+        $priceDiff = abs($priceSum - $subtotal);
+        $totalDiff = abs($totalSum - $subtotal);
+
+        // Unit prices already reproduce the subtotal, or the printed amounts
+        // are no better than them: leave the lines untouched.
+        if ($priceDiff <= $tolerance || $totalDiff >= $priceDiff) {
+            return;
+        }
+
+        foreach ($data['lines'] as &$line) {
+            $qty = (float) ($line['cantidad'] ?? 1);
+            $factor = $qty * (1 - (float) ($line['dtopor'] ?? 0) / 100);
+            if (abs($factor) < 0.0000001) {
+                continue;
+            }
+            $line['pvpunitario'] = round((float) $line['pvptotal'] / $factor, 6);
+            $this->syncLineDiscount($line);
+        }
+        unset($line);
+
+        $data['_line_totals_reconciled'] = true;
     }
 
     /**

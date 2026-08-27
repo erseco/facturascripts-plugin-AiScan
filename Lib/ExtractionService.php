@@ -152,6 +152,7 @@ Output schema (single invoice):
       "descripcion": "string (line description)",
       "cantidad": "number (quantity, default 1)",
       "pvpunitario": "number (unit price before tax, REQUIRED)",
+      "pvptotal": "number|null (line amount printed in the Importe/Total column, after discount and before tax)",
       "dtopor": "number (discount %, default 0)",
       "dtoimporte": "number (line discount amount in currency, default 0)",
       "dtopor2": "number (second discount %, default 0)",
@@ -233,6 +234,12 @@ Field-specific rules:
   pvpunitario = line_total / cantidad (when dtopor is 0).
   Example: Qty=75, Total=75 → pvpunitario = 75/75 = 1 (NOT 0.25 or any other number).
   Also verify: sum of all line totals must approximately equal invoice subtotal.
+- lines.pvptotal: the line amount EXACTLY AS PRINTED in the "Importe" / "Total" /
+  "Total linea" column (after discount, before tax). COPY it, never compute it as
+  cantidad * pvpunitario. Leave it null only when the document shows no line amount.
+  This is what reconciles the lines with the subtotal when a tariff, a reduction or a
+  rounding makes cantidad * pvpunitario differ from the printed amount
+  (e.g. registry "minutas de honorarios" with reductions per R.D.L. 6/1999 and 6/2000).
 - lines.dtopor: discount percentage. Default 0.
   The "Dto" / "Descuento" column is often a percentage discount.
   If the document shows a "Dto" column with % (or a value that is clearly a

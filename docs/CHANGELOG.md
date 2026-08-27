@@ -32,6 +32,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- **Totales inflados en facturas por arancel** (#97): en una minuta de
+  honorarios del Registro Mercantil la columna «Honorarios» es la tarifa
+  unitaria y no cuadra con la columna «Total» porque se aplican reducciones
+  (R.D.L. 6/1999 y 6/2000). AiScan recalculaba la factura como
+  `cantidad × tarifa` y salía una base de 63,13 € y un total de 67,55 €, en
+  lugar de los 54,47 € y 58,28 € impresos en el documento. Ahora se pide a la
+  IA el importe impreso de cada línea (`pvptotal`) y, cuando esos importes
+  reproducen la base imponible declarada mejor que los precios unitarios, el
+  precio unitario se recalcula a partir del importe de la línea.
+
 - **Importación fallida con "No se pudieron calcular las líneas"** (#93): la IA
   puede devolver en la línea un `codimpuesto` que no existe en la instalación
   (p. ej. `IGICEXENTO` en una factura exenta de IGIC) o el texto legal completo
