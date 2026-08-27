@@ -147,7 +147,13 @@ class InvoiceMapper
                 }
             }
 
-            if (!$invoice->save()) {
+            // Una factura nueva necesita idfactura para poder colgarle las líneas,
+            // así que su cabecera se guarda ya. Si algo falla después se borra
+            // entera. La de una factura existente se guarda más abajo, dentro de
+            // la transacción (issue #93): si las líneas no se pueden grabar
+            // tampoco debe quedarse con el número, la fecha o las observaciones
+            // nuevos.
+            if ($invoiceId === null && false === $invoice->save()) {
                 $result['errors'][] = $this->readLogDetail() ?: Tools::lang()->trans('record-save-error');
                 return $result;
             }
@@ -161,28 +167,42 @@ class InvoiceMapper
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
-            // Issue #93: sustituir las líneas de una factura existente tiene que
-            // ser atómico. Antes se borraban las antiguas antes de calcular, así
-            // que un fallo al grabar las nuevas la dejaba sin ninguna línea.
+            // Issue #93: reimportar sobre una factura existente tiene que ser
+            // atómico de principio a fin. Antes se guardaba la cabecera y se
+            // borraban las líneas antiguas antes de saber si las nuevas se
+            // podían grabar, así que un fallo la dejaba sin líneas y con el
+            // número, la fecha y las observaciones ya cambiados.
             //
-            // En una factura nueva no hace falta transacción: si algo falla se
-            // borra la cabecera y la clave ajena se lleva por delante las líneas
-            // que se hubieran grabado. Así se evita además que la creación
-            // diferida de tablas de FacturaScripts (que no admite DDL dentro de
-            // una transacción) rompa el import en una instalación recién hecha.
+            // Las líneas se construyen antes de abrir la transacción para que la
+            // creación diferida de tablas de FacturaScripts (que no admite DDL
+            // dentro de una transacción) no la rompa. En una factura nueva no
+            // hace falta transacción: si algo falla se borra la cabecera y la
+            // clave ajena se lleva por delante las líneas que se hubieran
+            // grabado.
             $oldLines = $invoiceId ? $invoice->getLines() : [];
             $inTransaction = false;
 
             // Si ya hay una transacción abierta por quien nos llama, es suya:
             // ni la empezamos ni la cerramos, pero nos protege igual. Si no hay
-            // y no se puede abrir, se aborta antes de tocar nada: sin ella el
-            // borrado de las líneas antiguas dejaría de ser reversible.
-            if ($oldLines !== [] && false === $database->inTransaction()) {
+            // y no se puede abrir, se aborta antes de tocar nada: sin ella los
+            // cambios dejarían de ser reversibles.
+            if ($invoiceId && false === $database->inTransaction()) {
                 if (false === $database->beginTransaction()) {
                     throw new RuntimeException(Tools::lang()->trans('aiscan-transaction-error'));
                 }
 
                 $inTransaction = true;
+            }
+
+            if ($invoiceId && false === $invoice->save()) {
+                $result['errors'][] = $this->readLogDetail() ?: Tools::lang()->trans('record-save-error');
+
+                if ($inTransaction) {
+                    $database->rollback();
+                    $inTransaction = false;
+                }
+
+                return $result;
             }
 
             foreach ($oldLines as $oldLine) {

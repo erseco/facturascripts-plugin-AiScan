@@ -240,10 +240,10 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
     }
 
     /**
-     * Al reimportar sobre una factura existente se borraban sus líneas antes de
-     * saber si las nuevas se podían grabar.
+     * Al reimportar sobre una factura existente se guardaba la cabecera y se
+     * borraban sus líneas antes de saber si las nuevas se podían grabar.
      */
-    public function testFailedUpdateKeepsTheLinesOfTheExistingInvoice(): void
+    public function testFailedUpdateLeavesTheExistingInvoiceUntouched(): void
     {
         $supplier = $this->createSupplier();
 
@@ -265,11 +265,20 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         // editar, que es cuando se llegaba a borrar sus líneas.
         $this->makeEditable($invoice);
 
+        $originalNumber = (string) $invoice->numproveedor;
+        $originalDate = (string) $invoice->fecha;
+        $originalNotes = (string) $invoice->observaciones;
+
         $failed = (new InvoiceMapper())->mapToInvoice(
-            $this->buildData($supplier, [
-                'iva' => 0,
-                'referencia' => 'REF-DEMASIADO-LARGA-PARA-LA-COLUMNA-DE-30',
-            ]),
+            $this->buildData(
+                $supplier,
+                ['iva' => 0, 'referencia' => 'REF-DEMASIADO-LARGA-PARA-LA-COLUMNA-DE-30'],
+                [
+                    'number' => 'NUMERO-QUE-NO-DEBE-PERSISTIR',
+                    'issue_date' => '2026-09-30',
+                    'summary' => 'Observaciones que no deben persistir',
+                ]
+            ),
             (int) $created['invoice_id'],
             'lines',
             false
@@ -279,10 +288,16 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
 
         $reloaded = new FacturaProveedor();
         $this->assertTrue($reloaded->loadFromCode($created['invoice_id']));
+
         $lines = $reloaded->getLines();
         $this->assertCount(1, $lines, 'La factura existente no puede quedarse sin líneas');
         $this->assertSame('ONA MESITA NOCHE 1 CAJON 1 HUECO BLANCO', $lines[0]->descripcion);
         $this->assertEqualsWithDelta(30.0, (float) $reloaded->total, 0.01);
+
+        // La cabecera tampoco puede quedarse a medias (issue #93).
+        $this->assertSame($originalNumber, (string) $reloaded->numproveedor);
+        $this->assertSame($originalDate, (string) $reloaded->fecha);
+        $this->assertSame($originalNotes, (string) $reloaded->observaciones);
     }
 
     public function testOverlongTaxExceptionIsIgnored(): void
@@ -354,17 +369,17 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         );
     }
 
-    private function buildData(Proveedor $supplier, array $line): array
+    private function buildData(Proveedor $supplier, array $line, array $invoice = []): array
     {
         return [
-            'invoice' => [
+            'invoice' => array_merge([
                 'number' => 'RFAC-' . mt_rand(10000, 99999),
                 'issue_date' => '2026-08-25',
                 'currency' => 'EUR',
                 'subtotal' => 30.0,
                 'tax_amount' => 0.0,
                 'total' => 30.0,
-            ],
+            ], $invoice),
             'supplier' => [
                 'matched_supplier_id' => $supplier->codproveedor,
                 'match_status' => 'matched',

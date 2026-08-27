@@ -45,8 +45,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   impuestos que no son del régimen de la empresa y solo vale si queda
   exactamente uno; si no, se corta el import con un mensaje en vez de elegir uno
   al azar. Además,
-  sustituir las líneas al reimportar sobre una factura existente es ahora
-  transaccional, así que un fallo ya no la deja sin líneas.
+  reimportar sobre una factura existente es ahora transaccional de principio a
+  fin: si falla, la factura se queda exactamente como estaba, con sus líneas y
+  con el número, la fecha y las observaciones anteriores.
 - **404 al abrir el historial de importaciones** (#93): `ModelClass::url()`
   concatena el prefijo de listado con el nombre del modelo, así que el enlace
   apuntaba a `ListAiScanHistoryAiScanImportBatch`. Ahora devuelve
