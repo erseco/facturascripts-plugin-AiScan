@@ -167,11 +167,14 @@ class InvoiceMapper
                 ? $this->buildTotalModeLines($invoice, $invoiceData, $taxes, $supplier)
                 : $this->buildLinesMode($invoice, $lines, $invoiceData, $taxes, $supplier);
 
-            // Issue #93: reimportar sobre una factura existente tiene que ser
-            // atómico de principio a fin. Antes se guardaba la cabecera y se
+            // Issue #93: al reimportar, guardar la cabecera y sustituir las
+            // líneas tiene que ser atómico. Antes se guardaba la cabecera y se
             // borraban las líneas antiguas antes de saber si las nuevas se
             // podían grabar, así que un fallo la dejaba sin líneas y con el
             // número, la fecha y las observaciones ya cambiados.
+            //
+            // Lo que va después del commit (recibos, adjunto, estado, stock) ya
+            // no entra en esa garantía.
             //
             // Las líneas se construyen antes de abrir la transacción para que la
             // creación diferida de tablas de FacturaScripts (que no admite DDL
