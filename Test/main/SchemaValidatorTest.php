@@ -1105,6 +1105,170 @@ final class SchemaValidatorTest extends TestCase
         $this->assertEqualsWithDelta(20.0, $data['lines'][0]['pvpunitario'], 0.001);
     }
 
+    /**
+     * Issue #99: la factura descuenta un importe global (5,63 EUR sobre
+     * 112,50 EUR) que no aparece en ninguna linea. Sin repartirlo, las
+     * lineas suman 112,50 EUR y el total se dispara a 120,38 EUR en vez
+     * de los 114,35 EUR impresos en el documento.
+     */
+    public function testNormalizeDistributesGlobalDiscountToLines(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'A2026-00695',
+                'issue_date' => '2026-08-28',
+                'subtotal' => 106.87,
+                'tax_amount' => 7.48,
+                'total' => 114.35,
+            ],
+            'lines' => [
+                [
+                    'descripcion' => 'SUMINISTRO E INSTALACION EXTINTOR',
+                    'cantidad' => 3,
+                    'pvpunitario' => 37.50,
+                    'pvptotal' => 112.50,
+                    'iva' => 7,
+                    'codimpuesto' => 'IGIC7',
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($data['_global_discount_applied'] ?? false);
+        $line = $data['lines'][0];
+        $base = $line['cantidad'] * $line['pvpunitario'] * (1 - $line['dtopor'] / 100);
+        $this->assertEqualsWithDelta(106.87, $base, 0.01);
+        $this->assertEqualsWithDelta(114.35, $base * 1.07, 0.01);
+    }
+
+    /**
+     * Issue #99: algunos modelos devuelven en subtotal el "Subtotal antes de
+     * descuentos" (112,50) en lugar de la base imponible (106,87). La base
+     * real se deduce de total - impuestos y el descuento se reparte igual.
+     */
+    public function testNormalizeAppliesGlobalDiscountWhenSubtotalIsPreDiscount(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'A2026-00695',
+                'issue_date' => '2026-08-28',
+                'subtotal' => 112.50,
+                'tax_amount' => 7.48,
+                'total' => 114.35,
+            ],
+            'lines' => [
+                [
+                    'descripcion' => 'SUMINISTRO E INSTALACION EXTINTOR',
+                    'cantidad' => 3,
+                    'pvpunitario' => 37.50,
+                    'pvptotal' => 112.50,
+                    'iva' => 7,
+                    'codimpuesto' => 'IGIC7',
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($data['_global_discount_applied'] ?? false);
+        $line = $data['lines'][0];
+        $base = $line['cantidad'] * $line['pvpunitario'] * (1 - $line['dtopor'] / 100);
+        $this->assertEqualsWithDelta(106.87, $base, 0.01);
+    }
+
+    /**
+     * Issue #99: el descuento global se reparte proporcionalmente entre
+     * todas las lineas, no solo en la primera.
+     */
+    public function testNormalizeSpreadsGlobalDiscountAcrossEveryLine(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'A2026-00696',
+                'issue_date' => '2026-08-28',
+                'subtotal' => 90.0,
+                'tax_amount' => 18.9,
+                'total' => 108.9,
+            ],
+            'lines' => [
+                [
+                    'descripcion' => 'Linea A',
+                    'cantidad' => 1,
+                    'pvpunitario' => 60.0,
+                    'pvptotal' => 60.0,
+                    'iva' => 21,
+                ],
+                [
+                    'descripcion' => 'Linea B',
+                    'cantidad' => 1,
+                    'pvpunitario' => 40.0,
+                    'pvptotal' => 40.0,
+                    'iva' => 21,
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($data['_global_discount_applied'] ?? false);
+        $this->assertEqualsWithDelta(10.0, $data['lines'][0]['dtopor'], 0.01);
+        $this->assertEqualsWithDelta(10.0, $data['lines'][1]['dtopor'], 0.01);
+    }
+
+    /**
+     * Issue #99: si las lineas suman MENOS que la base imponible faltan
+     * lineas, no sobra descuento. Nunca inflar (issue #97).
+     */
+    public function testNormalizeDoesNotInflateLinesBelowSubtotal(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'A2026-00697',
+                'issue_date' => '2026-08-28',
+                'subtotal' => 200.0,
+                'tax_amount' => 42.0,
+                'total' => 242.0,
+            ],
+            'lines' => [
+                [
+                    'descripcion' => 'Unica linea extraida',
+                    'cantidad' => 1,
+                    'pvpunitario' => 100.0,
+                    'pvptotal' => 100.0,
+                    'iva' => 21,
+                ],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey('_global_discount_applied', $data);
+        $this->assertEqualsWithDelta(0.0, $data['lines'][0]['dtopor'], 0.0001);
+        $this->assertEqualsWithDelta(100.0, $data['lines'][0]['pvpunitario'], 0.0001);
+    }
+
+    /**
+     * Issue #99: si los totales del documento no cuadran entre si
+     * (subtotal + impuestos != total) no se puede deducir un descuento.
+     */
+    public function testNormalizeSkipsGlobalDiscountWhenTotalsAreInconsistent(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => [
+                'number' => 'A2026-00698',
+                'issue_date' => '2026-08-28',
+                'subtotal' => 50.0,
+                'tax_amount' => 21.0,
+                'total' => 121.0,
+            ],
+            'lines' => [
+                [
+                    'descripcion' => 'Linea',
+                    'cantidad' => 1,
+                    'pvpunitario' => 100.0,
+                    'pvptotal' => 100.0,
+                    'iva' => 21,
+                ],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey('_global_discount_applied', $data);
+        $this->assertEqualsWithDelta(0.0, $data['lines'][0]['dtopor'], 0.0001);
+    }
+
     // ── isMultiInvoice() ────────────────────────────────────
 
     public function testIsMultiInvoiceReturnsTrueForMultipleInvoices(): void
