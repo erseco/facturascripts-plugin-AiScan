@@ -333,6 +333,10 @@ class SchemaValidator
             // not double-count the tax.
             $this->fixTaxInclusiveLinePrices($data);
 
+            // Spread a document-level discount (a lump sum deducted from the
+            // subtotal, never printed on any line) across the lines.
+            $this->applyGlobalDiscountToLines($data);
+
             // Distribute withholding to lines if invoice has it but lines don't
             $withholding = (float) ($data['invoice']['withholding_amount'] ?? 0);
             if ($withholding > 0 && !empty($data['lines'])) {
@@ -565,6 +569,87 @@ class SchemaValidator
         unset($line);
 
         $data['_tax_inclusive_lines_converted'] = true;
+    }
+
+    /**
+     * Issue #99: some invoices deduct a global discount from the totals
+     * ("Subtotal antes de descuentos 112,50 / Descuentos 5,63 / Base
+     * imponible 106,87") without touching any line. The lines then add up to
+     * the pre-discount subtotal and the rebuilt invoice is inflated
+     * (120,38 EUR instead of the printed 114,35 EUR).
+     *
+     * When the lines exceed the taxable base of the document (the extracted
+     * subtotal, or total - taxes when the model reported the pre-discount
+     * subtotal), that difference is the global discount: spread it over every
+     * line proportionally as `dtopor`.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function applyGlobalDiscountToLines(array &$data): void
+    {
+        if (empty($data['lines']) || !is_array($data['lines'])) {
+            return;
+        }
+
+        $invoice = is_array($data['invoice'] ?? null) ? $data['invoice'] : [];
+        $subtotal = (float) ($invoice['subtotal'] ?? 0);
+        $total = (float) ($invoice['total'] ?? 0);
+        if ($subtotal <= 0 || $total <= 0) {
+            return;
+        }
+
+        $tolerance = max(0.02, $subtotal * 0.005);
+
+        // Taxable base to reach. When the totals section does not add up the
+        // model reported the pre-discount subtotal ("Subtotal antes de
+        // descuentos"), so derive the base from the total instead.
+        $taxes = (float) ($invoice['tax_amount'] ?? 0)
+            - (float) ($invoice['withholding_amount'] ?? 0);
+        $base = $subtotal;
+        if (abs($subtotal + $taxes - $total) > $tolerance) {
+            $base = $total - $taxes;
+            // Only a base below the reported subtotal means a deducted
+            // discount; anything else is an unreliable extraction.
+            if ($base <= 0 || $base >= $subtotal) {
+                return;
+            }
+        }
+
+        $lineSum = 0.0;
+        foreach ($data['lines'] as $line) {
+            $lineSum += (float) ($line['cantidad'] ?? 1)
+                * (float) ($line['pvpunitario'] ?? 0)
+                * (1 - (float) ($line['dtopor'] ?? 0) / 100);
+        }
+
+        // Lines below the taxable base mean missing lines, not a discount:
+        // never inflate them (issue #97).
+        $excess = $lineSum - $base;
+        if ($lineSum <= 0 || $excess <= $tolerance) {
+            return;
+        }
+
+        // A deduction bigger than half the invoice is more likely a bad
+        // extraction (duplicated lines, wrong subtotal) than a discount.
+        $ratio = $excess / $lineSum;
+        if ($ratio > 0.5) {
+            return;
+        }
+
+        foreach ($data['lines'] as &$line) {
+            $kept = (1 - (float) ($line['dtopor'] ?? 0) / 100) * (1 - $ratio);
+            $line['dtopor'] = round((1 - $kept) * 100, 6);
+            if (isset($line['pvptotal'])) {
+                $line['pvptotal'] = round(
+                    (float) ($line['cantidad'] ?? 1) * (float) ($line['pvpunitario'] ?? 0) * $kept,
+                    2
+                );
+            }
+            $this->syncLineDiscount($line);
+        }
+        unset($line);
+
+        $data['_global_discount_applied'] = true;
     }
 
     /**
