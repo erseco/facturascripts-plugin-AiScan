@@ -321,6 +321,26 @@ test('getValidationWarnings recalculates the current total mismatch warning', ()
     assert.deepEqual(warnings, ['aiscan-total-mismatch']);
 });
 
+test('getValidationWarnings removes the missing tax id warning after selecting a supplier (#101)', () => {
+    const {hooks} = loadTestHooks();
+
+    const warnings = hooks.getValidationWarnings({
+        invoice: {number: 'F-1', issue_date: '2025-01-01', total: 10},
+        supplier: {
+            matched_supplier_id: '000001',
+            name: 'Proveedor existente',
+            tax_id: 'B12345678',
+        },
+        lines: [{cantidad: 1, pvpunitario: 10, iva: 0, irpf: 0}],
+        _validation_errors: [
+            'aiscan-missing-supplier-tax-id',
+            'aiscan-supplier-name-required',
+        ],
+    });
+
+    assert.deepEqual(warnings, []);
+});
+
 test('buildPaymentMethodSelect renders options with correct selection', () => {
     const {hooks} = loadTestHooks();
 
