@@ -130,7 +130,11 @@
 
     function filterOutDynamicWarnings(data) {
         const staticValidationErrors = Array.isArray(data?._validation_errors) ? data._validation_errors : [];
-        const dynamicWarnings = [data?._total_mismatch_warning].filter(Boolean);
+        const dynamicWarnings = [
+            data?._total_mismatch_warning,
+            trans('aiscan-missing-supplier-tax-id'),
+            trans('aiscan-supplier-name-required'),
+        ].filter(Boolean);
         return staticValidationErrors.filter(message => !dynamicWarnings.includes(message));
     }
 
