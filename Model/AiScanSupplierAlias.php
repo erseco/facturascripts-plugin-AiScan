@@ -20,9 +20,9 @@
 
 namespace FacturaScripts\Plugins\AiScan\Model;
 
-use FacturaScripts\Core\Base\DataBase\DataBaseWhere;
-use FacturaScripts\Core\Model\Base\ModelClass;
-use FacturaScripts\Core\Model\Base\ModelTrait;
+use FacturaScripts\Core\Where;
+use FacturaScripts\Core\Template\ModelClass;
+use FacturaScripts\Core\Template\ModelTrait;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 
@@ -129,7 +129,7 @@ class AiScanSupplierAlias extends ModelClass
             return null;
         }
 
-        $where = [new DataBaseWhere('fingerprint', $fingerprint)];
+        $where = [new Where('fingerprint', $fingerprint)];
         $found = self::all($where, [], 0, 1);
         return $found[0] ?? null;
     }
@@ -151,7 +151,7 @@ class AiScanSupplierAlias extends ModelClass
         }
 
         $supplier = new Proveedor();
-        if ($supplier->loadFromCode($alias->codproveedor)) {
+        if ($supplier->load($alias->codproveedor)) {
             return $supplier;
         }
 

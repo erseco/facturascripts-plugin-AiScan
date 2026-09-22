@@ -413,7 +413,7 @@ PROMPT;
     {
         try {
             $company = new \FacturaScripts\Dinamic\Model\Empresa();
-            $company->loadFromCode(Tools::settings('default', 'idempresa', 1));
+            $company->load(Tools::settings('default', 'idempresa', 1));
             $names = array_filter([
                 $company->nombre ?? '',
                 $company->nombrecorto ?? '',

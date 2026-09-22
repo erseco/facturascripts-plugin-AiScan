@@ -20,7 +20,7 @@
 
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
-use FacturaScripts\Core\Base\DataBase\DataBaseWhere;
+use FacturaScripts\Core\Where;
 use FacturaScripts\Core\Lib\ExtendedController\PanelController;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 
@@ -78,17 +78,17 @@ class EditAiScanImportBatch extends PanelController
 
             case 'EditAiScanImportDocument':
                 $idbatch = $this->getViewModelValue($mvn, 'id');
-                $where = [new DataBaseWhere('idbatch', $idbatch)];
+                $where = [new Where('idbatch', $idbatch)];
                 $view->loadData('', $where, ['id' => 'ASC']);
                 break;
 
             case 'EditAiScanImportLine':
                 $idbatch = $this->getViewModelValue($mvn, 'id');
                 $doc = new AiScanImportDocument();
-                $docs = $doc->all([new DataBaseWhere('idbatch', $idbatch)], [], 0, 0);
+                $docs = $doc->all([new Where('idbatch', $idbatch)], [], 0, 0);
                 $docIds = array_map(fn ($d) => $d->id, $docs);
                 $idList = empty($docIds) ? '0' : implode(',', $docIds);
-                $where = [new DataBaseWhere('iddocument', $idList, 'IN')];
+                $where = [new Where('iddocument', $idList, 'IN')];
                 $view->loadData('', $where, ['iddocument' => 'ASC', 'sortorder' => 'ASC']);
                 break;
         }

@@ -32,6 +32,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 
+- Replace removed `toolBox()->i18nLog()` with `Tools::log()` when validating scan logs on FacturaScripts 2025+.
+
 - **Totales inflados en facturas por arancel** (#97): en una minuta de
   honorarios del Registro Mercantil la columna «Honorarios» es la tarifa
   unitaria y no cuadra con la columna «Total» porque se aplican reducciones

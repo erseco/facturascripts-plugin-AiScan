@@ -72,7 +72,7 @@ class InvoiceMapper
 
             if ($invoiceId) {
                 $invoice = new FacturaProveedor();
-                if (!$invoice->loadFromCode($invoiceId)) {
+                if (!$invoice->load($invoiceId)) {
                     $result['errors'][] = Tools::lang()->trans(
                         'aiscan-invoice-not-found',
                         ['%invoiceId%' => (string) $invoiceId]
@@ -90,7 +90,7 @@ class InvoiceMapper
             $resolvedFormaPago = null;
             if (!empty($invoiceData['codpago'])) {
                 $formaPago = new FormaPago();
-                if (!$formaPago->loadFromCode($invoiceData['codpago'])) {
+                if (!$formaPago->load($invoiceData['codpago'])) {
                     $codpago = (string) $invoiceData['codpago'];
                     $message = Tools::lang()->trans(
                         'aiscan-invalid-payment-method',
@@ -126,7 +126,7 @@ class InvoiceMapper
 
             if (!empty($invoiceData['currency'])) {
                 $divisa = new Divisa();
-                if ($divisa->loadFromCode(strtoupper($invoiceData['currency']))) {
+                if ($divisa->load(strtoupper($invoiceData['currency']))) {
                     $invoice->coddivisa = $divisa->coddivisa;
                 }
             }
@@ -695,6 +695,6 @@ class InvoiceMapper
 
         $generator = new ReceiptGenerator();
         $generator->update($invoice);
-        $invoice->loadFromCode($invoice->idfactura);
+        $invoice->load($invoice->idfactura);
     }
 }

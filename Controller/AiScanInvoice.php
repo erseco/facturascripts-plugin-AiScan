@@ -854,7 +854,7 @@ class AiScanInvoice extends Controller
 
         // Verificar que el proveedor existe (no guardar alias huérfano).
         $supplier = new \FacturaScripts\Dinamic\Model\Proveedor();
-        if (!$supplier->loadFromCode($codproveedor)) {
+        if (!$supplier->load($codproveedor)) {
             http_response_code(404);
             echo json_encode(['error' => 'Supplier not found', 'success' => false]);
             return;
@@ -1243,18 +1243,18 @@ class AiScanInvoice extends Controller
 
         $factura = new \FacturaScripts\Dinamic\Model\FacturaProveedor();
         $where = [
-            new \FacturaScripts\Core\Base\DataBase\DataBaseWhere(
+            new \FacturaScripts\Core\Where(
                 'numproveedor',
                 $numproveedor
             ),
-            new \FacturaScripts\Core\Base\DataBase\DataBaseWhere(
+            new \FacturaScripts\Core\Where(
                 'codproveedor',
                 $codproveedor
             ),
         ];
 
         if (!empty($fecha)) {
-            $where[] = new \FacturaScripts\Core\Base\DataBase\DataBaseWhere(
+            $where[] = new \FacturaScripts\Core\Where(
                 'fecha',
                 $fecha
             );
@@ -1283,7 +1283,7 @@ class AiScanInvoice extends Controller
             return null;
         }
         $invoice = new \FacturaScripts\Dinamic\Model\FacturaProveedor();
-        if ($invoice->loadFromCode($invoiceId)) {
+        if ($invoice->load($invoiceId)) {
             return $invoice->codigo;
         }
         return null;

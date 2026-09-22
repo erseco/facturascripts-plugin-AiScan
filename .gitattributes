@@ -37,3 +37,6 @@
 /phpcs.xml              export-ignore
 /.php-cs-fixer.php      export-ignore
 /.php-cs-fixer.cache    export-ignore
+/phpunit-coverage.xml export-ignore
+/codecov.yml export-ignore
+/coverage.xml export-ignore

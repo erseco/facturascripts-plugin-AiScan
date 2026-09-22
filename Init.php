@@ -33,7 +33,7 @@ class Init extends InitClass
     public function update(): void
     {
         $settings = new Settings();
-        $settings->loadFromCode('AiScan');
+        $settings->load('AiScan');
         $settings->name = 'AiScan';
 
         if (false === $settings->exists()) {

@@ -37,7 +37,7 @@ class SupplierService
 
         if (!empty($supplierData['matched_supplier_id'])) {
             $supplier = new Proveedor();
-            if ($supplier->loadFromCode($supplierData['matched_supplier_id'])) {
+            if ($supplier->load($supplierData['matched_supplier_id'])) {
                 $this->applyCreditorFlag($supplier, $isCreditor, $supplierData, $explicitPartyType);
                 return $supplier;
             }
