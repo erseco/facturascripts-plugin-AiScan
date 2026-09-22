@@ -213,7 +213,8 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           use_oidc: true
-          files: facturascripts/coverage.xml
+          working-directory: plugin
+          files: ../facturascripts/coverage.xml
           disable_search: true
           fail_ci_if_error: true
 
