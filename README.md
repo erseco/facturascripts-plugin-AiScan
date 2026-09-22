@@ -1,5 +1,7 @@
 # AiScan para FacturaScripts
 
+[![codecov](https://codecov.io/gh/erseco/facturascripts-plugin-AiScan/branch/main/graph/badge.svg)](https://codecov.io/gh/erseco/facturascripts-plugin-AiScan)
+
 <a href="https://erseco.github.io/facturascripts-playground/?blueprint=https%3A%2F%2Fraw.githubusercontent.com%2Ferseco%2Ffacturascripts-plugin-AiScan%2Frefs%2Fheads%2Fmain%2Fblueprint.json">
   <img src="https://raw.githubusercontent.com/erseco/facturascripts-playground/main/ogimage.png" alt="Try AiScan in your browser" width="220">
 </a><br>

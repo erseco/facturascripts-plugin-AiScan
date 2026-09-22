@@ -58,6 +58,10 @@ jobs:
           echo "Waiting for FacturaScripts to initialize..."
           sleep 15
 
+      - name: Restore Composer manifest omitted from the production image
+        run: |
+          docker compose exec -T facturascripts sh -c 'test -f composer.json || curl -fsSL https://raw.githubusercontent.com/NeoRazorX/facturascripts/master/composer.json -o composer.json'
+
       - name: Copy plugin files to container
         run: |
           echo "📦 Copying plugin files to container..."
@@ -90,6 +94,9 @@ jobs:
         run: make clean
 
   test:
+    permissions:
+      contents: read
+      id-token: write
     needs: docker-test
     runs-on: ubuntu-latest
 
@@ -123,7 +130,7 @@ jobs:
           php-version: ${{ matrix.php-version }}
           extensions: mbstring, intl, curl, dom, json, pdo, mysql, xml, zip, soap
           tools: composer
-          coverage: none
+          coverage: ${{ matrix.php-version == '8.3' && 'pcov' || 'none' }}
 
       - name: Run JavaScript flow tests
         working-directory: plugin
@@ -193,19 +200,24 @@ jobs:
       - name: Run PHPUnit tests
         working-directory: facturascripts
         run: |
-          if [ -f "phpunit-plugins.xml" ]; then
-            vendor/bin/phpunit -c phpunit-plugins.xml
+          cp Plugins/AiScan/phpunit-coverage.xml phpunit-coverage.xml
+          if [ "${{ matrix.php-version }}" = "8.3" ]; then
+            php -d pcov.directory=Plugins/AiScan vendor/bin/phpunit \
+              -c phpunit-coverage.xml --coverage-clover coverage.xml --coverage-text
           else
-            echo "No phpunit-plugins.xml found, creating one..."
-            cat > phpunit-plugins.xml << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <phpunit bootstrap="Test/bootstrap.php" colors="true">
-              <testsuites>
-                  <testsuite name="PluginTests">
-                      <directory>Test/Plugins</directory>
-                  </testsuite>
-              </testsuites>
-          </phpunit>
-          EOF
-            vendor/bin/phpunit -c phpunit-plugins.xml
+            vendor/bin/phpunit -c phpunit-coverage.xml
           fi
+
+      - name: Upload coverage to Codecov
+        if: ${{ matrix.php-version == '8.3' }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          working-directory: plugin
+          files: ../facturascripts/coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+
+      - name: Enforce minimum coverage
+        if: ${{ matrix.php-version == '8.3' }}
+        run: php plugin/Test/check-coverage.php facturascripts/coverage.xml

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="Test/bootstrap.php" colors="true" failOnWarning="true">
+    <testsuites>
+        <testsuite name="AiScan"><directory>Test/Plugins</directory></testsuite>
+    </testsuites>
+    <coverage includeUncoveredFiles="true" processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">Plugins/AiScan/Controller</directory>
+            <directory suffix=".php">Plugins/AiScan/Lib</directory>
+            <directory suffix=".php">Plugins/AiScan/Model</directory>
+            <file>Plugins/AiScan/Init.php</file>
+        </include>
+    </coverage>
+</phpunit>

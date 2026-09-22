@@ -285,18 +285,18 @@ class ImageToPdfConverter
 
         $content = sprintf("q\n%.2F 0 0 %.2F 0 0 cm\n/Im0 Do\nQ\n", $pageW, $pageH);
         $objects = [];
-        $objects[] = "<< /Type /Catalog /Pages 2 0 R >>";
-        $objects[] = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
+        $objects[] = '<< /Type /Catalog /Pages 2 0 R >>';
+        $objects[] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
         $objects[] = sprintf(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] /Contents 4 0 R"
-            . " /Resources << /XObject << /Im0 5 0 R >> >> >>",
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2F %.2F] /Contents 4 0 R'
+            . ' /Resources << /XObject << /Im0 5 0 R >> >> >>',
             $pageW,
             $pageH
         );
-        $objects[] = "<< /Length " . strlen($content) . " >>\nstream\n" . $content . "endstream";
-        $objects[] = "<< /Type /XObject /Subtype /Image /Width " . $imgWidth
-            . " /Height " . $imgHeight
-            . " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "
+        $objects[] = '<< /Length ' . strlen($content) . " >>\nstream\n" . $content . 'endstream';
+        $objects[] = '<< /Type /XObject /Subtype /Image /Width ' . $imgWidth
+            . ' /Height ' . $imgHeight
+            . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '
             . strlen($jpeg) . " >>\nstream\n" . $jpeg . "\nendstream";
 
         $pdf = "%PDF-1.4\n";

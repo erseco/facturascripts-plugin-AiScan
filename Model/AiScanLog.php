@@ -20,8 +20,9 @@
 
 namespace FacturaScripts\Plugins\AiScan\Model;
 
-use FacturaScripts\Core\Model\Base\ModelClass;
-use FacturaScripts\Core\Model\Base\ModelTrait;
+use FacturaScripts\Core\Template\ModelClass;
+use FacturaScripts\Core\Template\ModelTrait;
+use FacturaScripts\Core\Tools;
 
 class AiScanLog extends ModelClass
 {
@@ -61,7 +62,7 @@ class AiScanLog extends ModelClass
     public function test(): bool
     {
         if (empty($this->filename)) {
-            $this->toolBox()->i18nLog()->warning('aiscan-filename-required');
+            Tools::log()->warning('aiscan-filename-required');
             return false;
         }
         return parent::test();
