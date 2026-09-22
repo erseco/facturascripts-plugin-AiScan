@@ -36,6 +36,7 @@ final class ExtractionServiceTest extends TestCase
 
     public function testAvailableModelsOnlyListAvailableProviders(): void
     {
+        \FacturaScripts\Core\Tools::settingsSet('AiScan', 'debug_mode', true);
         $service = new ExtractionService();
         $providers = $service->getAvailableProviderNames();
 
@@ -44,10 +45,12 @@ final class ExtractionServiceTest extends TestCase
             $this->assertArrayHasKey('model', $choice);
             $this->assertContains($choice['provider'], $providers);
         }
+        \FacturaScripts\Core\Tools::settingsClear();
     }
 
     public function testAvailableModelsListEveryConfiguredModelOfAProvider(): void
     {
+        \FacturaScripts\Core\Tools::settingsSet('AiScan', 'debug_mode', true);
         $service = new ExtractionService();
         $combos = $service->getAvailableModels();
 
@@ -61,6 +64,7 @@ final class ExtractionServiceTest extends TestCase
             // Providers without a model list (mock) still get one selectable entry.
             $this->assertSame($configured ?: [''], $listed);
         }
+        \FacturaScripts\Core\Tools::settingsClear();
     }
 
     public function testGetDefaultSystemPromptIsNotEmpty(): void

@@ -42,8 +42,11 @@ use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\AttachedFile;
 use FacturaScripts\Dinamic\Model\AttachedFileRelation;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Producto;
 use FacturaScripts\Dinamic\Model\Proveedor;
+use FacturaScripts\Dinamic\Model\Serie;
+use FacturaScripts\Dinamic\Model\Settings;
 use FacturaScripts\Dinamic\Model\User;
 use FacturaScripts\Plugins\AiScan\Controller\AiScanConfig;
 use FacturaScripts\Plugins\AiScan\Controller\AiScanInvoice;
@@ -271,6 +274,21 @@ final class AiScanRequestFlowTest extends TestCase
         self::assertTrue($supplier['success']);
         $id = $supplier['supplier']['id'];
         $this->suppliers[] = $id;
+        $supplierModel = new Proveedor();
+        self::assertTrue($supplierModel->load($id));
+        $payments = (new FormaPago())->all([], [], 0, 1);
+        $series = (new Serie())->all([], [], 0, 1);
+        if (empty($series)) {
+            $serie = new Serie();
+            $serie->codserie = 'A';
+            $serie->descripcion = 'Test series';
+            self::assertTrue($serie->save());
+            $series[] = $serie;
+        }
+        self::assertNotEmpty($payments);
+        $supplierModel->codpago = $payments[0]->codpago;
+        $supplierModel->codserie = $series[0]->codserie;
+        self::assertTrue($supplierModel->save());
         $data = [
             'supplier' => ['matched_supplier_id' => $id, 'match_status' => 'matched'],
             'invoice' => ['number' => 'FLOW-' . bin2hex(random_bytes(5)), 'issue_date' => '2026-06-01',
@@ -367,6 +385,11 @@ final class AiScanRequestFlowTest extends TestCase
 
     public function testSettingsAndHistoryViewsUseRealCoreViews(): void
     {
+        $settings = new Settings();
+        if (!$settings->load('AiScan')) {
+            $settings->name = 'AiScan';
+            self::assertTrue($settings->save());
+        }
         $config = new AiScanConfig('AiScanConfig');
         self::assertSame('admin', $config->getPageData()['menu']);
         $method = new ReflectionMethod($config, 'createViews');
