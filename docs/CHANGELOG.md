@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 
+- Añade pruebas de los endpoints, vistas, importación, adjuntos y proveedores con transporte simulado; exige 90 % de cobertura PHP en CI y publica el reporte en Codecov.
+
 - **Varios modelos por proveedor** (#89): los campos `openai_model`,
   `gemini_model`, `mistral_model`, `grok_model` y `custom_model` aceptan una
   lista separada por comas; el primer modelo de la lista es el predeterminado.

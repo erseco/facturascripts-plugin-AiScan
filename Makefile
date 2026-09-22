@@ -97,6 +97,9 @@ package:
 		-x "*phpcs.xml" \
 		-x "*phpunit.xml" \
 		-x "*phpunit-plugins.xml" \
+		-x "*phpunit-coverage.xml" \
+		-x "*codecov.yml" \
+		-x "*coverage.xml" \
 		-x "*QUICKSTART.md" \
 		-x "*README.md" \
 		-x "*Test/*" \

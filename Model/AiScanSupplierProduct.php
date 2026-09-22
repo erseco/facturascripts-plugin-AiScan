@@ -20,9 +20,9 @@
 
 namespace FacturaScripts\Plugins\AiScan\Model;
 
-use FacturaScripts\Core\Where;
 use FacturaScripts\Core\Template\ModelClass;
 use FacturaScripts\Core\Template\ModelTrait;
+use FacturaScripts\Core\Where;
 
 class AiScanSupplierProduct extends ModelClass
 {

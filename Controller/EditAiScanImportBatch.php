@@ -20,8 +20,8 @@
 
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
-use FacturaScripts\Core\Where;
 use FacturaScripts\Core\Lib\ExtendedController\PanelController;
+use FacturaScripts\Core\Where;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 
 class EditAiScanImportBatch extends PanelController
@@ -72,7 +72,9 @@ class EditAiScanImportBatch extends PanelController
 
         switch ($viewName) {
             case $mvn:
-                $code = $this->request->get('code');
+                $code = $this->request->request->has('code')
+                    ? $this->request->request->get('code')
+                    : $this->request->query->get('code');
                 $view->loadData($code);
                 break;
 

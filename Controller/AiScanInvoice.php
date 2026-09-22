@@ -76,11 +76,19 @@ class AiScanInvoice extends Controller
         return $choices;
     }
 
+    private function requestValue(string $key, ?string $default = null): ?string
+    {
+        $request = $this->request();
+        return $request->request->has($key)
+            ? $request->request->get($key)
+            : $request->query->get($key, $default);
+    }
+
     public function run(): void
     {
         parent::run();
 
-        $action = $this->request()->get('action', '');
+        $action = $this->requestValue('action', '');
 
         if (empty($action)) {
             $this->loadPageAssets();
@@ -337,7 +345,7 @@ class AiScanInvoice extends Controller
 
     private function shouldConvertUploadToPdf(): bool
     {
-        $flag = $this->request()->get('convert_to_pdf', '0');
+        $flag = $this->requestValue('convert_to_pdf', '0');
         return $flag === '1' || $flag === 1 || $flag === true || $flag === 'true';
     }
 
@@ -442,11 +450,11 @@ class AiScanInvoice extends Controller
 
     private function handleAnalyze(): void
     {
-        $tmpFile = $this->request()->get('tmp_file', '');
-        $mimeType = $this->request()->get('mime_type', '');
-        $importMode = $this->request()->get('import_mode', 'lines');
-        $useHistory = $this->request()->get('use_history', '0');
-        $supplierId = $this->request()->get('supplier_id', '');
+        $tmpFile = $this->requestValue('tmp_file', '');
+        $mimeType = $this->requestValue('mime_type', '');
+        $importMode = $this->requestValue('import_mode', 'lines');
+        $useHistory = $this->requestValue('use_history', '0');
+        $supplierId = $this->requestValue('supplier_id', '');
 
         if (empty($tmpFile)) {
             http_response_code(400);
@@ -481,9 +489,9 @@ class AiScanInvoice extends Controller
             $historicalContext = $contextService->formatForPrompt($context);
         }
 
-        $provider = $this->request()->get('provider', '');
-        $model = $this->request()->get('model', '');
-        $mockFixture = $this->request()->get('mock_fixture', '');
+        $provider = $this->requestValue('provider', '');
+        $model = $this->requestValue('model', '');
+        $mockFixture = $this->requestValue('mock_fixture', '');
         $service = new ExtractionService();
 
         try {
@@ -630,8 +638,8 @@ class AiScanInvoice extends Controller
 
     private function handleMatchSupplier(): void
     {
-        $name = $this->request()->get('name', '');
-        $taxId = $this->request()->get('tax_id', '');
+        $name = $this->requestValue('name', '');
+        $taxId = $this->requestValue('tax_id', '');
 
         $matcher = new SupplierMatcher();
         $matchResult = $matcher->findMatch(['name' => $name, 'tax_id' => $taxId]);
@@ -661,7 +669,7 @@ class AiScanInvoice extends Controller
 
     private function handleSearchSuppliers(): void
     {
-        $query = trim($this->request()->get('query', ''));
+        $query = trim($this->requestValue('query', ''));
         if (strlen($query) < 2) {
             echo json_encode(['results' => []]);
             return;
@@ -754,7 +762,7 @@ class AiScanInvoice extends Controller
 
     private function handleSearchProducts(): void
     {
-        $query = trim($this->request()->get('query', ''));
+        $query = trim($this->requestValue('query', ''));
         if (strlen($query) < 2) {
             echo json_encode(['results' => []]);
             return;
@@ -773,7 +781,7 @@ class AiScanInvoice extends Controller
 
     private function handleGetSupplierDefaultProduct(): void
     {
-        $codproveedor = $this->request()->get('codproveedor', '');
+        $codproveedor = $this->requestValue('codproveedor', '');
         if (empty($codproveedor)) {
             echo json_encode(['found' => false]);
             return;
@@ -888,7 +896,7 @@ class AiScanInvoice extends Controller
 
     private function handleGetHistoricalContext(): void
     {
-        $codproveedor = $this->request()->get('codproveedor', '');
+        $codproveedor = $this->requestValue('codproveedor', '');
         if (empty($codproveedor)) {
             echo json_encode(['context' => []]);
             return;
@@ -905,7 +913,7 @@ class AiScanInvoice extends Controller
      */
     private function handleSuggestSupplierProducts(): void
     {
-        $codproveedor = trim((string) $this->request()->get('codproveedor', ''));
+        $codproveedor = trim((string) $this->requestValue('codproveedor', ''));
         if ($codproveedor === '') {
             echo json_encode(['found' => false]);
             return;
@@ -936,7 +944,7 @@ class AiScanInvoice extends Controller
 
         $resolver = new MockFixtureResolver();
         $names = $resolver->listFixtureNames();
-        $current = $this->request()->get('current', '');
+        $current = $this->requestValue('current', '');
         $next = $resolver->nextFixtureName($current !== '' ? $current : null);
 
         echo json_encode([
@@ -948,7 +956,7 @@ class AiScanInvoice extends Controller
 
     private function handleGetText(): void
     {
-        $tmpFile = $this->request()->get('tmp_file', '');
+        $tmpFile = $this->requestValue('tmp_file', '');
 
         if (empty($tmpFile)) {
             http_response_code(400);
@@ -984,9 +992,9 @@ class AiScanInvoice extends Controller
 
     private function handleApply(): void
     {
-        $invoiceId = $this->request()->get('invoice_id', '');
+        $invoiceId = $this->requestValue('invoice_id', '');
         $invoiceId = $invoiceId !== '' ? (int) $invoiceId : null;
-        $importMode = $this->request()->get('import_mode', 'lines');
+        $importMode = $this->requestValue('import_mode', 'lines');
 
         $body = file_get_contents('php://input');
         $data = json_decode($body, true);
