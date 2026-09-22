@@ -520,7 +520,9 @@ final class AiScanRequestFlowTest extends TestCase
                 return true;
             }
         };
-        $controller->testRequest = new Request(['query' => array_merge($query, ['action' => $action]), 'request' => $form]);
+        $controller->testRequest = new Request([
+            'query' => array_merge($query, ['action' => $action]), 'request' => $form,
+        ]);
         ob_start();
         try {
             $controller->run();
