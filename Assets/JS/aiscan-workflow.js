@@ -1676,18 +1676,11 @@
             return;
         }
 
-        const nonFailed = state.documents.filter(d => d.status !== STATUS.FAILED);
-        const allDecided = nonFailed.length > 0
-            && nonFailed.every(d => d.reviewDecision !== null);
-
-        btn.disabled = !allDecided;
-
-        if (allDecided) {
-            btn.title = '';
-        } else {
-            const undecided = nonFailed.filter(d => d.reviewDecision === null).length;
-            btn.title = trans('aiscan-undecided-remaining', {'%count%': String(undecided)});
-        }
+        const hasReady = state.documents.some(d =>
+            d.status === STATUS.READY && d.extractedData && canMarkDocReady(d.extractedData)
+        );
+        btn.disabled = !hasReady;
+        btn.title = hasReady ? '' : trans('aiscan-mark-ready');
     }
 
     // ── Navigation & Rendering ─────────────────────────────────────────
@@ -4353,7 +4346,7 @@
 
         const countEl = document.getElementById('aiscan-import-count');
         if (countEl) {
-            const importable = state.documents.filter(d => d.status === STATUS.READY || d.status === STATUS.ANALYZED).length;
+            const importable = state.documents.filter(d => d.status === STATUS.READY).length;
             countEl.textContent = trans('aiscan-import-count', {'%count%': String(importable), '%total%': String(state.documents.length)});
         }
 

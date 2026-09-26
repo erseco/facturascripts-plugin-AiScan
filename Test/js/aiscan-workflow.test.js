@@ -78,6 +78,7 @@ function loadTestHooks() {
     context.globalThis = context;
     context.window = context;
     context.__AISCAN_TEST__ = true;
+    context.aiscanI18n = {'aiscan-import-count': '%count% / %total%'};
     context.aiscanPaymentMethods = [
         {code: 'CONT', description: 'Contado'},
         {code: 'TRANS', description: 'Transferencia'},
@@ -151,6 +152,42 @@ test('renderSidebar marks the full Shift-selected range as checked', () => {
     assert.match(elements['aiscan-sidebar-list'].innerHTML, /data-index="1" checked/);
     assert.match(elements['aiscan-sidebar-list'].innerHTML, /data-index="2" checked/);
     assert.match(elements['aiscan-sidebar-list'].innerHTML, /data-index="3" checked/);
+});
+
+test('partial batches can proceed with a ready invoice regardless of other review decisions (#104)', () => {
+    const {elements, hooks} = loadTestHooks();
+    const ready = {
+        status: 'ready', reviewDecision: 'approved',
+        extractedData: {invoice: {number: 'F-104', issue_date: '2026-09-26'}, supplier: {matched_supplier_id: '1'}},
+    };
+    for (const status of ['needs_review', 'discarded', 'failed', 'pending', 'analyzing', 'analyzed', 'ready']) {
+        hooks.state.documents = [ready, {status, reviewDecision: null, extractedData: {}}];
+        hooks.renderSidebar();
+        assert.equal(elements['aiscan-proceed-import-btn'].disabled, false, status);
+    }
+});
+
+test('batches without a valid ready invoice cannot proceed (#104)', () => {
+    const {elements, hooks} = loadTestHooks();
+    for (const documents of [
+        [],
+        [{status: 'discarded', reviewDecision: 'discarded'}],
+        [{status: 'failed', reviewDecision: null}],
+        [{status: 'ready', reviewDecision: 'approved', extractedData: {invoice: {}, supplier: {}}}],
+        [{status: 'ready', reviewDecision: 'approved', extractedData: null}],
+        [{status: 'analyzed', reviewDecision: null}],
+    ]) {
+        hooks.state.documents = documents;
+        hooks.renderSidebar();
+        assert.equal(elements['aiscan-proceed-import-btn'].disabled, true, JSON.stringify(documents));
+    }
+});
+
+test('import summary counts only approved invoices in a mixed batch (#104)', () => {
+    const {elements, hooks} = loadTestHooks();
+    hooks.state.documents = ['ready', 'analyzed', 'needs_review', 'discarded', 'failed'].map(status => ({status}));
+    hooks.buildImportSummary();
+    assert.equal(elements['aiscan-import-count'].textContent, '1 / 5');
 });
 
 test('handleMultiInvoiceResponse splits one document into multiple entries', () => {
