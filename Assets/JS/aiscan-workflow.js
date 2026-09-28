@@ -1076,6 +1076,7 @@
 
         async function analyzeOne(doc) {
             doc.status = STATUS.ANALYZING;
+            doc.analyzingChoice = choice;
             refreshUI();
 
             try {
@@ -4145,6 +4146,7 @@
         for (const doc of docs) {
             const target = choice || modelChoiceForDoc(doc);
             doc.status = STATUS.ANALYZING;
+            doc.analyzingChoice = target;
             doc.error = null;
             doc.reviewDecision = null;
             doc._importMode = importMode;
@@ -4191,6 +4193,7 @@
 
         const target = choice || modelChoiceForDoc(doc);
         doc.status = STATUS.ANALYZING;
+        doc.analyzingChoice = target;
         doc.error = null;
         doc.reviewDecision = null;
         renderCurrentDocument();
@@ -4236,6 +4239,10 @@
      * instead of silently switching model (#89).
      */
     function modelChoiceForDoc(doc) {
+        // While (re)analyzing, report the model in use, not the previous one (#106).
+        if (doc && doc.status === STATUS.ANALYZING && doc.analyzingChoice) {
+            return doc.analyzingChoice;
+        }
         const provider = doc && doc.extractedData ? doc.extractedData._provider : null;
         if (provider) {
             return {provider, model: doc.extractedData._model || ''};
