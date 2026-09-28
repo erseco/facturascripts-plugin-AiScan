@@ -1199,6 +1199,22 @@ test('modelChoiceForDoc usa el modelo predeterminado si el documento no se ha an
     }
 });
 
+test('modelChoiceForDoc muestra el modelo nuevo mientras se re-analiza (#106)', () => {
+    const {hooks} = loadTestHooks();
+    withModels(hooks);
+
+    const doc = {
+        status: hooks.STATUS.ANALYZING,
+        analyzingChoice: {provider: 'openai', model: 'gpt-5.2'},
+        extractedData: {_provider: 'openai', _model: 'gpt-5-nano'},
+    };
+    assert.equal(hooks.choiceLabel(hooks.modelChoiceForDoc(doc)), 'OpenAI — gpt-5.2');
+
+    doc.status = hooks.STATUS.ANALYZED;
+    doc.extractedData = {_provider: 'gemini', _model: 'gemini-2.5-flash-lite'};
+    assert.equal(hooks.modelChoiceForDoc(doc).model, 'gemini-2.5-flash-lite');
+});
+
 test('choiceLabel usa la etiqueta configurada y cae al par proveedor/modelo (#89)', () => {
     const {hooks} = loadTestHooks();
     withModels(hooks);
