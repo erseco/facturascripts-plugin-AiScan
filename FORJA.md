@@ -8,4 +8,4 @@ El plugin busca automáticamente coincidencias con proveedores existentes por NI
 
 El prompt de extracción se mantiene actualizado con cada versión del plugin. Desde la configuración puedes consultar el prompt base completo y añadir instrucciones adicionales que se concatenan automáticamente, sin necesidad de mantener el prompt entero a mano.
 
-Compatible con FacturaScripts 2025 y PHP 8.1 o superior. No requiere dependencias externas más allá de la clave API del proveedor de IA elegido.
+Compatible con FacturaScripts 2025.7 y PHP 8.1 o superior. No requiere dependencias externas más allá de la clave API del proveedor de IA elegido.

@@ -26,6 +26,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Changed
 
+- Sube `min_version` a 2025.7: la pantalla de escaneo usa `Controller::view()`, que no existe en versiones anteriores del núcleo.
 - Las peticiones Chat Completions adaptan `temperature` / `max_tokens` /
   `max_completion_tokens` al modelo (GPT-5 y o-series no envían `temperature`).
 - Gemini construye `generationConfig` según la familia del modelo: Gemini 3.x

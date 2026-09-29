@@ -4,7 +4,7 @@ Canonical instructions are in [`/AGENTS.md`](/AGENTS.md). Read that file first.
 
 ## Critical rules (repeated here for reliability)
 
-- This is a **FacturaScripts 2025+ plugin** written in PHP 8.1+. Keep that compatibility.
+- This is a **FacturaScripts 2025.7+ plugin** written in PHP 8.1+. Keep that compatibility.
 - Follow **PSR-12**; max line length **120 characters**; short array syntax; single quotes.
 - Make **minimal, focused diffs** — no unrelated refactors.
 - **Preserve existing behavior** unless the task explicitly requires a change.
