@@ -1504,6 +1504,69 @@ final class SchemaValidatorTest extends TestCase
         $this->assertEqualsWithDelta(0.7, (float) $normalized['confidence']['supplier_tax_id'], 0.001);
     }
 
+    // ── Descuentos por importe redondeados por unidad (issue #112) ──
+
+    public function testNormalizeUsesPrintedLineAmountWhenUnitDiscountIsRounded(): void
+    {
+        // Ticket de Leroy Merlin: "Descu. unid" se imprime redondeado a
+        // céntimos (0,10) pero el importe de la línea usa el descuento real
+        // (4 x 0,3025 = 1,21), no 4 x (0,40 - 0,10) = 1,20.
+        $rows = [
+            [1, 0.20, 0.05, 0.15],
+            [1, 15.99, 3.85, 12.14],
+            [1, 17.99, 4.32, 13.67],
+            [4, 0.40, 0.40, 1.21],
+            [6, 0.15, 0.24, 0.68],
+            [8, 0.20, 0.40, 1.21],
+            [1, 0.15, 0.04, 0.11],
+            [3, 0.20, 0.15, 0.46],
+        ];
+        $lines = [];
+        foreach ($rows as [$qty, $price, $discount, $amount]) {
+            $lines[] = [
+                'descripcion' => 'Artículo',
+                'cantidad' => $qty,
+                'pvpunitario' => $price,
+                'dtoimporte' => $discount,
+                'pvptotal' => $amount,
+                'iva' => 0,
+            ];
+        }
+
+        $normalized = $this->validator->normalize([
+            'invoice' => ['subtotal' => 29.63, 'tax_amount' => 0, 'total' => 29.63],
+            'lines' => $lines,
+        ]);
+
+        $sum = 0.0;
+        foreach ($normalized['lines'] as $i => $line) {
+            $net = round($line['cantidad'] * $line['pvpunitario'] * (1 - $line['dtopor'] / 100), 2);
+            $this->assertEqualsWithDelta($rows[$i][3], $net, 0.001, 'Línea ' . ($i + 1));
+            $this->assertEqualsWithDelta($rows[$i][1], $line['pvpunitario'], 0.000001, 'Precio ' . ($i + 1));
+            $sum += $net;
+        }
+        $this->assertEqualsWithDelta(29.63, $sum, 0.001);
+        $this->assertEqualsWithDelta(0.39, $normalized['lines'][3]['dtoimporte'], 0.001);
+    }
+
+    public function testNormalizeKeepsLineDiscountWhenPrintedAmountIsFarOff(): void
+    {
+        $normalized = $this->validator->normalize([
+            'invoice' => ['subtotal' => 1.20, 'tax_amount' => 0, 'total' => 1.20],
+            'lines' => [[
+                'descripcion' => 'Codo',
+                'cantidad' => 4,
+                'pvpunitario' => 0.40,
+                'dtoimporte' => 0.40,
+                // Importe por unidad leído de otra columna, no es un redondeo.
+                'pvptotal' => 0.30,
+            ]],
+        ]);
+
+        $this->assertEqualsWithDelta(25.0, $normalized['lines'][0]['dtopor'], 0.000001);
+        $this->assertEqualsWithDelta(0.40, $normalized['lines'][0]['dtoimporte'], 0.000001);
+    }
+
     // ── completeMatchedSupplierTaxId() (issue #111) ─────────
 
     public function testMatchedSupplierFillsMissingTaxIdAndDropsAiTaxIdWarnings(): void
