@@ -206,6 +206,46 @@ class SchemaValidator
         return $errors;
     }
 
+    /**
+     * Issue #111: si el proveedor se ha reconocido pero la IA no leyó su CIF/NIF,
+     * se completa con el de la ficha y se quitan los avisos de la IA sobre la
+     * identificación fiscal ausente, que ya no aplican.
+     */
+    public function completeMatchedSupplierTaxId(array $data, string $storedTaxId): array
+    {
+        $storedTaxId = trim($storedTaxId);
+        $supplier = is_array($data['supplier'] ?? null) ? $data['supplier'] : [];
+        if (
+            $storedTaxId === ''
+            || trim((string) ($supplier['matched_supplier_id'] ?? '')) === ''
+            || trim((string) ($supplier['tax_id'] ?? '')) !== ''
+        ) {
+            return $data;
+        }
+
+        $data['supplier']['tax_id'] = $storedTaxId;
+        if (is_array($data['confidence'] ?? null)) {
+            $data['confidence']['supplier_tax_id'] = 1.0;
+        }
+
+        if (is_array($data['warnings'] ?? null)) {
+            $data['warnings'] = array_values(array_filter(
+                $data['warnings'],
+                fn ($warning) => !$this->isTaxIdWarning((string) $warning)
+            ));
+        }
+
+        return $data;
+    }
+
+    private function isTaxIdWarning(string $warning): bool
+    {
+        return 1 === preg_match(
+            '/\b(cif|nif|nie|vat|tax[\s_-]?id)\b|identificaci[oó]n\s+fiscal|fiscal\s+id/iu',
+            $warning
+        );
+    }
+
     private function translateInvoiceField(string $field): string
     {
         $translationKeys = [
