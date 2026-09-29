@@ -320,6 +320,7 @@ class SchemaValidator
                 }
 
                 $this->syncLineDiscount($line);
+                $this->fitRoundedLineDiscount($line);
             }
             unset($line);
 
@@ -650,6 +651,42 @@ class SchemaValidator
         unset($line);
 
         $data['_global_discount_applied'] = true;
+    }
+
+    /**
+     * Issue #112: some tickets (Leroy Merlin) print the per-unit discount
+     * rounded to cents ("Descu. unid 0,10") while the line amount uses the
+     * exact one (4 x 0,3025 = 1,21). Rebuilding the line from the rounded
+     * discount loses a few cents per line (1,20) and the invoice no longer
+     * matches its total.
+     *
+     * When a discounted line carries its printed amount (pvptotal) and the
+     * gap is only that rounding (at most half a cent per unit), the discount
+     * percentage is derived from the printed amount, keeping the unit price.
+     *
+     * @param array<string, mixed> $line
+     */
+    private function fitRoundedLineDiscount(array &$line): void
+    {
+        $percent = (float) ($line['dtopor'] ?? 0);
+        if ($percent <= 0 || !isset($line['pvptotal'])) {
+            return;
+        }
+
+        $qty = (float) ($line['cantidad'] ?? 1);
+        $base = $qty * (float) ($line['pvpunitario'] ?? 0);
+        $printed = (float) $line['pvptotal'];
+        if ($base <= 0 || $printed <= 0 || $printed >= $base) {
+            return;
+        }
+
+        $diff = abs($base * (1 - $percent / 100) - $printed);
+        if ($diff < 0.005 || $diff > abs($qty) * 0.005 + 0.005) {
+            return;
+        }
+
+        $line['dtopor'] = round((1 - $printed / $base) * 100, 6);
+        $line['dtoimporte'] = $base * $line['dtopor'] / 100;
     }
 
     /**
