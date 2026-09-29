@@ -32,7 +32,7 @@ Cada documento se procesa de forma independiente y el resultado se presenta en u
 - **Validación y normalización**: revisa el esquema devuelto por la IA antes de mapearlo a la factura
 - **Adjunta el original**: guarda el PDF o imagen subida como archivo adjunto de la factura; opcionalmente convierte fotos a PDF de una página antes de escanear y adjuntar
 - **Prompt base + instrucciones adicionales**: el prompt de extracción se mantiene actualizado con cada versión del plugin; el usuario puede añadir instrucciones propias que se concatenan al prompt base
-- **Compatibilidad**: FacturaScripts 2025 y PHP 8.1 o superior
+- **Compatibilidad**: FacturaScripts 2025.7 y PHP 8.1 o superior
 
 ## Configuración
 
@@ -102,7 +102,7 @@ También intenta reutilizar productos existentes a partir del SKU o de la descri
 
 ## Requisitos
 
-- FacturaScripts 2025 o superior
+- FacturaScripts 2025.7 o superior
 - PHP 8.1 o superior
 
 ## Solución de problemas

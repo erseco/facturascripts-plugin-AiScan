@@ -1,6 +1,6 @@
 ---
 name: facturascripts-plugin
-description: FacturaScripts 2025+ plugin architecture. Controller patterns, Extension closures, XMLView/Table XML, Model conventions, Init.php lifecycle, Settings API, AssetManager, Dinamic namespace.
+description: FacturaScripts 2025.7+ plugin architecture. Controller patterns, Extension closures, XMLView/Table XML, Model conventions, Init.php lifecycle, Settings API, AssetManager, Dinamic namespace.
 ---
 
 # FacturaScripts Plugin Expert — AiScan Architecture

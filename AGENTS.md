@@ -9,7 +9,7 @@ All other agent files (`CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.m
 
 **AiScan** is a FacturaScripts plugin that scans supplier invoices using AI (OpenAI, Google Gemini,
 Mistral, or any OpenAI-compatible endpoint) and maps the extracted data into a purchase invoice.
-Compatibility: **FacturaScripts 2025+**, **PHP 8.1+**, **PSR-12**.
+Compatibility: **FacturaScripts 2025.7+**, **PHP 8.1+**, **PSR-12**.
 
 ---
 
