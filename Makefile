@@ -128,8 +128,8 @@ rebuild: check-docker
 lint: check-docker upd
 	@echo "Running PHP CodeSniffer..."
 	@echo ""
-	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Installing phpcs if needed..." && if [ ! -f vendor/bin/phpcs ]; then php84 /usr/local/bin/composer require --dev squizlabs/php_codesniffer --no-interaction; fi'
-	@docker compose exec facturascripts sh -c 'cd /var/www/html && php84 vendor/bin/phpcs --standard=Plugins/AiScan/phpcs.xml Plugins/AiScan --colors'
+	@docker compose exec facturascripts sh -c 'mkdir -p /tmp/fs-devtools && cd /tmp/fs-devtools && echo "→ Installing phpcs if needed..." && if [ ! -f vendor/bin/phpcs ]; then php84 /usr/local/bin/composer require --dev squizlabs/php_codesniffer --no-interaction; fi'
+	@docker compose exec facturascripts sh -c 'cd /var/www/html && php84 /tmp/fs-devtools/vendor/bin/phpcs --standard=Plugins/AiScan/phpcs.xml Plugins/AiScan --colors'
 	@echo ""
 	@echo "✅ Lint check completed!"
 
@@ -137,8 +137,8 @@ lint: check-docker upd
 format: check-docker upd
 	@echo "Running PHP CS Fixer..."
 	@echo ""
-	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Installing php-cs-fixer if needed..." && if [ ! -f vendor/bin/php-cs-fixer ]; then php84 /usr/local/bin/composer require --dev friendsofphp/php-cs-fixer --no-interaction; fi'
-	@docker compose exec facturascripts sh -c 'cd /var/www/html/Plugins/AiScan && php84 /var/www/html/vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php --verbose'
+	@docker compose exec facturascripts sh -c 'mkdir -p /tmp/fs-devtools && cd /tmp/fs-devtools && echo "→ Installing php-cs-fixer if needed..." && if [ ! -f vendor/bin/php-cs-fixer ]; then php84 /usr/local/bin/composer require --dev friendsofphp/php-cs-fixer --no-interaction; fi'
+	@docker compose exec facturascripts sh -c 'cd /var/www/html/Plugins/AiScan && php84 /tmp/fs-devtools/vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php --verbose'
 	@echo ""
 	@echo "✅ Code formatting completed!"
 
@@ -146,7 +146,7 @@ format: check-docker upd
 test: check-docker upd
 	@echo "Running unit tests..."
 	@echo ""
-	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Installing PHPUnit if needed..." && if [ ! -f vendor/bin/phpunit ]; then php84 /usr/local/bin/composer require --dev phpunit/phpunit --no-interaction; fi'
+	@docker compose exec facturascripts sh -c 'mkdir -p /tmp/fs-devtools && cd /tmp/fs-devtools && echo "→ Installing PHPUnit if needed..." && if [ ! -f vendor/bin/phpunit ]; then php84 /usr/local/bin/composer require --dev phpunit/phpunit --no-interaction; fi'
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && echo "→ Setting up test environment..." && mkdir -p Test/Plugins && rm -rf Test/Plugins/* && cp -r Plugins/AiScan/Test/main/* Test/Plugins/ 2>/dev/null || true && cp Plugins/AiScan/Test/install-plugins.php Test/install-plugins.php 2>/dev/null || true && if [ -f Test/test-plugins.php ]; then echo "→ Using official Test/test-plugins.php bootstrap"; cp Plugins/AiScan/Test/bootstrap.php Test/bootstrap.php 2>/dev/null || true; else cp Plugins/AiScan/Test/bootstrap.php Test/bootstrap.php 2>/dev/null || true; fi'
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && test -f Test/Plugins/install-plugins.txt || (echo "❌ Error: No tests found in Test/main/" && exit 1)'
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && if [ -f Plugins/AiScan/docker/setup-aiscan.php ]; then echo "→ Ensuring AiScan plugin tables..." && php84 Plugins/AiScan/docker/setup-aiscan.php || true; fi'
@@ -154,7 +154,7 @@ test: check-docker upd
 	@docker compose exec facturascripts sh -c 'cd /var/www/html && if [ ! -f phpunit-plugins.xml ]; then if [ -f Test/test-plugins.php ]; then BOOT=Test/test-plugins.php; else BOOT=Test/bootstrap.php; fi; echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?><phpunit bootstrap=\"$$BOOT\" colors=\"true\"><testsuites><testsuite name=\"PluginTests\"><directory>Test/Plugins</directory></testsuite></testsuites></phpunit>" > phpunit-plugins.xml; fi'
 	@echo "→ Running PHPUnit tests..."
 	@echo ""
-	@docker compose exec facturascripts sh -c 'cd /var/www/html && php84 vendor/bin/phpunit -c phpunit-plugins.xml'
+	@docker compose exec facturascripts sh -c 'cd /var/www/html && php84 /tmp/fs-devtools/vendor/bin/phpunit -c phpunit-plugins.xml'
 	@echo ""
 	@echo "✅ Tests completed!"
 
