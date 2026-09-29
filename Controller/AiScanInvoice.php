@@ -30,6 +30,7 @@ use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\ImageToPdfConverter;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\MockFixtureResolver;
+use FacturaScripts\Plugins\AiScan\Lib\SchemaValidator;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
@@ -555,6 +556,10 @@ class AiScanInvoice extends Controller
                 if (!empty($matchResult['match_source'])) {
                     $extracted['supplier']['match_source'] = $matchResult['match_source'];
                 }
+                $extracted = (new SchemaValidator())->completeMatchedSupplierTaxId(
+                    $extracted,
+                    (string) $matchResult['supplier']->cifnif
+                );
             }
             if (!empty($matchResult['candidates'])) {
                 $extracted['supplier']['candidates'] = array_map(

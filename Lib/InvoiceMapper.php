@@ -127,7 +127,9 @@ class InvoiceMapper
             if (!empty($invoiceData['currency'])) {
                 $divisa = new Divisa();
                 if ($divisa->load(strtoupper($invoiceData['currency']))) {
-                    $invoice->coddivisa = $divisa->coddivisa;
+                    // Issue #109: setCurrency() aplica también el factor de
+                    // conversión (de compra) de la divisa, no solo el código.
+                    $invoice->setCurrency($divisa->coddivisa, true);
                 }
             }
 

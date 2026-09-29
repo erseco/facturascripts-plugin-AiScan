@@ -1503,4 +1503,48 @@ final class SchemaValidatorTest extends TestCase
 
         $this->assertEqualsWithDelta(0.7, (float) $normalized['confidence']['supplier_tax_id'], 0.001);
     }
+
+    // ── completeMatchedSupplierTaxId() (issue #111) ─────────
+
+    public function testMatchedSupplierFillsMissingTaxIdAndDropsAiTaxIdWarnings(): void
+    {
+        $data = $this->validator->completeMatchedSupplierTaxId([
+            'supplier' => [
+                'name' => 'Comercial Eléctrica CANARIAS, S.A.',
+                'tax_id' => '',
+                'matched_supplier_id' => '000012',
+            ],
+            'confidence' => ['supplier_tax_id' => 0],
+            'warnings' => [
+                'Falta la identificación fiscal del proveedor en el documento.',
+                'No se detecta el CIF/NIF del emisor.',
+                'Missing supplier tax ID.',
+                'La fecha de vencimiento no aparece en la factura.',
+            ],
+        ], 'A38123456');
+
+        $this->assertSame('A38123456', $data['supplier']['tax_id']);
+        $this->assertEqualsWithDelta(1.0, (float) $data['confidence']['supplier_tax_id'], 0.001);
+        $this->assertSame(['La fecha de vencimiento no aparece en la factura.'], $data['warnings']);
+    }
+
+    public function testMatchedSupplierKeepsExtractedTaxIdAndWarnings(): void
+    {
+        $input = [
+            'supplier' => ['tax_id' => 'B11111111', 'matched_supplier_id' => '000012'],
+            'warnings' => ['El CIF del documento es poco legible.'],
+        ];
+
+        $this->assertSame($input, $this->validator->completeMatchedSupplierTaxId($input, 'A38123456'));
+    }
+
+    public function testMatchedSupplierWithoutStoredTaxIdChangesNothing(): void
+    {
+        $input = [
+            'supplier' => ['tax_id' => '', 'matched_supplier_id' => '000012'],
+            'warnings' => ['Falta la identificación fiscal del proveedor en el documento.'],
+        ];
+
+        $this->assertSame($input, $this->validator->completeMatchedSupplierTaxId($input, '  '));
+    }
 }
