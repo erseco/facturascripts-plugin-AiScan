@@ -23,6 +23,7 @@ namespace FacturaScripts\Test\Plugins;
 use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
+use FacturaScripts\Dinamic\Model\FormaPago;
 use FacturaScripts\Dinamic\Model\Proveedor;
 use FacturaScripts\Dinamic\Model\Serie;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
@@ -42,6 +43,8 @@ final class InvoiceMapperCurrencyTest extends TestCase
     private ?Proveedor $supplier = null;
 
     private ?Divisa $currency = null;
+
+    private ?FormaPago $paymentMethod = null;
 
     public static function setUpBeforeClass(): void
     {
@@ -79,6 +82,10 @@ final class InvoiceMapperCurrencyTest extends TestCase
 
         if ($this->currency instanceof Divisa && $this->currency->exists()) {
             $this->currency->delete();
+        }
+
+        if ($this->paymentMethod instanceof FormaPago && $this->paymentMethod->exists()) {
+            $this->paymentMethod->delete();
         }
 
         MiniLog::clear();
@@ -148,6 +155,18 @@ final class InvoiceMapperCurrencyTest extends TestCase
         $this->currency = $currency;
     }
 
+    private function createPaymentMethod(): FormaPago
+    {
+        $method = new FormaPago();
+        $method->codpago = 'T' . mt_rand(1000, 9999);
+        $method->descripcion = 'AiScan Divisa test';
+        $method->activa = true;
+        $this->assertTrue($method->save(), 'No se pudo crear la forma de pago de prueba');
+        $this->paymentMethod = $method;
+
+        return $method;
+    }
+
     private function createSupplier(): Proveedor
     {
         $supplier = new Proveedor();
@@ -155,11 +174,18 @@ final class InvoiceMapperCurrencyTest extends TestCase
         $supplier->razonsocial = $supplier->nombre;
         $supplier->cifnif = 'Z' . mt_rand(10000000, 99999999);
         $supplier->personafisica = false;
+        // En una BD recién instalada (CI) no hay formas de pago y codpago es obligatorio.
+        $supplier->codpago = $this->createPaymentMethod()->codpago;
 
         $series = (new Serie())->all([], [], 0, 1);
-        if (!empty($series)) {
-            $supplier->codserie = $series[0]->codserie;
+        if (empty($series)) {
+            $newSerie = new Serie();
+            $newSerie->codserie = 'A';
+            $newSerie->descripcion = 'Serie A';
+            $newSerie->save();
+            $series = [$newSerie];
         }
+        $supplier->codserie = $series[0]->codserie;
 
         $this->assertTrue($supplier->save(), 'No se pudo crear el proveedor de prueba');
         $this->supplier = $supplier;
