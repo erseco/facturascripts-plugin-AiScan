@@ -268,6 +268,64 @@ final class AiScanRequestFlowTest extends TestCase
         self::assertSame(422, self::$status);
     }
 
+    public function testBatchRefusesExactDuplicateButAllowsDifferentTotal(): void
+    {
+        // Issue #115: same supplier + number + date + total must not be imported twice.
+        $id = $this->createImportableSupplier();
+        $data = [
+            'supplier' => ['matched_supplier_id' => $id, 'match_status' => 'matched'],
+            'invoice' => ['number' => 'DUP-' . bin2hex(random_bytes(5)), 'issue_date' => '2026-09-26',
+                'currency' => 'EUR', 'total' => 100],
+            'lines' => [['description' => 'Dup service', 'quantity' => 2, 'unit_price' => 50, 'tax_rate' => 0]],
+        ];
+        $first = $this->call('apply', [], $data);
+        self::assertTrue($first['success'] ?? false, json_encode($first));
+        $this->invoices[] = $first['invoice_id'];
+
+        $import = fn (array $extracted) => $this->call('import-batch', [], ['documents' => [[
+            'status' => 'ready', 'original_name' => 'dup.pdf', 'extracted_data' => $extracted,
+        ]]]);
+
+        $dup = $import($data);
+        $this->batches[] = $dup['batch_id'];
+        self::assertSame('error', $dup['results'][0]['status'], json_encode($dup));
+        self::assertNull($dup['results'][0]['invoice_id'] ?? null);
+        self::assertCount(1, (new FacturaProveedor())->all([
+            Where::eq('codproveedor', $id), Where::eq('numproveedor', $data['invoice']['number']),
+        ]));
+
+        $data['invoice']['total'] = 120;
+        $data['lines'][0]['unit_price'] = 60;
+        $changed = $import($data);
+        $this->batches[] = $changed['batch_id'];
+        self::assertSame('imported', $changed['results'][0]['status'], json_encode($changed));
+        $this->invoices[] = $changed['results'][0]['invoice_id'];
+    }
+
+    private function createImportableSupplier(): string
+    {
+        $supplier = $this->call('create-supplier', [], ['name' => 'Dup ' . bin2hex(random_bytes(5))]);
+        self::assertTrue($supplier['success']);
+        $id = $supplier['supplier']['id'];
+        $this->suppliers[] = $id;
+        $model = new Proveedor();
+        self::assertTrue($model->load($id));
+        $payments = (new FormaPago())->all([], [], 0, 1);
+        $series = (new Serie())->all([], [], 0, 1);
+        if (empty($series)) {
+            $serie = new Serie();
+            $serie->codserie = 'A';
+            $serie->descripcion = 'Test series';
+            self::assertTrue($serie->save());
+            $series[] = $serie;
+        }
+        self::assertNotEmpty($payments);
+        $model->codpago = $payments[0]->codpago;
+        $model->codserie = $series[0]->codserie;
+        self::assertTrue($model->save());
+        return $id;
+    }
+
     public function testSuccessfulImportProtectsPostedInvoiceAndPersistsBatchHistory(): void
     {
         $supplier = $this->call('create-supplier', [], ['name' => 'Import ' . bin2hex(random_bytes(5))]);

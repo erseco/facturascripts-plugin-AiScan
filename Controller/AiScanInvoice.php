@@ -1129,6 +1129,29 @@ class AiScanInvoice extends Controller
                 continue;
             }
 
+            $duplicate = $this->checkDuplicateInvoice($extracted);
+            if ($duplicate && $duplicate['same_total']) {
+                $this->persistHistoryDocument(
+                    $historyBatch->id,
+                    $doc,
+                    $invoice,
+                    $supplier,
+                    'failed',
+                    null,
+                    null,
+                    $duplicate['message'],
+                    $lines
+                );
+                $failed++;
+                $results[] = [
+                    'index' => $index,
+                    'status' => 'error',
+                    'error' => $duplicate['message'],
+                    'original_name' => $doc['original_name'] ?? '',
+                ];
+                continue;
+            }
+
             $extracted['_upload'] = [
                 'tmp_file' => $doc['tmp_file'] ?? '',
                 'mime_type' => $doc['mime_type'] ?? '',
@@ -1279,12 +1302,15 @@ class AiScanInvoice extends Controller
         }
 
         $existing = $matches[0];
+        // Issue #115: identical total means a true duplicate that must not be imported again.
+        $sameTotal = abs((float) $existing->total - $total) < 0.01;
         return [
             'type' => 'existing_invoice',
             'invoice_id' => $existing->idfactura,
             'invoice_code' => $existing->codigo,
+            'same_total' => $sameTotal,
             'message' => Tools::lang()->trans(
-                'aiscan-duplicate-invoice-exists',
+                $sameTotal ? 'aiscan-duplicate-invoice-blocked' : 'aiscan-duplicate-invoice-exists',
                 ['%code%' => $existing->codigo]
             ),
         ];

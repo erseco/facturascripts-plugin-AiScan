@@ -45,6 +45,7 @@
     "aiscan-drop-or-click": "o haz clic para seleccionar archivos",
     "aiscan-due-date-must-use-yyyy-mm-dd-format": "El vencimiento debe usar el formato AAAA-MM-DD.",
     "aiscan-duplicate-in-batch": "Esta factura ya fue analizada en esta importación (igual que %name%).",
+    "aiscan-duplicate-invoice-blocked": "Ya existe la factura de compra %code% con el mismo número, proveedor, fecha y total. No se volverá a importar.",
     "aiscan-duplicate-invoice-exists": "Ya existe una factura de compra con este número: %code%. Revisa antes de importar.",
     "aiscan-error": "Error",
     "aiscan-failed-to-calculate-invoice-lines": "No se pudieron calcular las líneas de la factura.",
