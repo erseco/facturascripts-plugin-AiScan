@@ -1264,3 +1264,16 @@ test('renderReanalyzeMenu no ofrece alternativas cuando solo hay un modelo (#89)
 
     assert.equal(elements['aiscan-reanalyze-menu'].innerHTML, '');
 });
+
+test('renderReanalyzeMenu bloquea Re-analizar mientras se analiza (#120)', () => {
+    const {elements, hooks} = loadTestHooks();
+    withModels(hooks);
+
+    hooks.renderReanalyzeMenu({status: hooks.STATUS.ANALYZING, extractedData: null});
+    assert.equal(elements['aiscan-reanalyze-btn'].disabled, true);
+    assert.equal(elements['aiscan-reanalyze-menu-btn'].disabled, true);
+
+    hooks.renderReanalyzeMenu({status: hooks.STATUS.NEEDS_REVIEW, extractedData: {_provider: 'openai', _model: 'gpt-5.2'}});
+    assert.equal(elements['aiscan-reanalyze-btn'].disabled, false);
+    assert.equal(elements['aiscan-reanalyze-menu-btn'].disabled, false);
+});

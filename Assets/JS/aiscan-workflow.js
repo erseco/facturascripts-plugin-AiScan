@@ -4629,6 +4629,14 @@
         if (!menu) {
             return;
         }
+        // Avoid launching a second analysis while one is running (#120).
+        const analyzing = !!doc && doc.status === STATUS.ANALYZING;
+        ['aiscan-reanalyze-btn', 'aiscan-reanalyze-menu-btn'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.disabled = analyzing;
+            }
+        });
         const current = modelChoiceForDoc(doc);
         const configured = state.configuredDefault;
         const items = (state.availableModels || []).map(choice => {
