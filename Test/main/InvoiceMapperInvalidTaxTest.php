@@ -272,7 +272,7 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $failed = (new InvoiceMapper())->mapToInvoice(
             $this->buildData(
                 $supplier,
-                ['iva' => 0, 'referencia' => 'REF-DEMASIADO-LARGA-PARA-LA-COLUMNA-DE-30'],
+                ['iva' => 0, 'pvpunitario' => INF],
                 [
                     'number' => 'NUMERO-QUE-NO-DEBE-PERSISTIR',
                     'issue_date' => '2026-09-30',
@@ -344,29 +344,32 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->assertSame('ES_20', $invoice->getLines()[0]->excepcioniva);
     }
 
-    public function testFailedLinesLeaveNoDraftInvoiceBehind(): void
+    /**
+     * Issue #121: la referencia del proveedor que lee la IA (p. ej.
+     * "vps-d308c160.vps.ovh.net-autobackup") no cabía en la columna de 30 y la
+     * importación fallaba con "No se pudieron calcular las líneas".
+     */
+    public function testOverlongSupplierReferenceIsTruncated(): void
     {
         $supplier = $this->createSupplier();
 
         $result = (new InvoiceMapper())->mapToInvoice(
             $this->buildData($supplier, [
                 'iva' => 0,
-                'referencia' => 'REF-DEMASIADO-LARGA-PARA-LA-COLUMNA-DE-30',
+                'referencia' => 'vps-d308c160.vps.ovh.net-autobackup',
             ]),
             null,
             'lines',
             false
         );
 
-        $this->assertFalse($result['success']);
-        $this->assertNull($result['invoice_id']);
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
 
-        $where = [Where::eq('codproveedor', $supplier->codproveedor)];
-        $this->assertSame(
-            0,
-            (new FacturaProveedor())->count($where),
-            'No debe quedar ninguna factura en boceto cuando fallan las líneas'
-        );
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $this->assertSame('vps-d308c160.vps.ovh.net-autob', $invoice->getLines()[0]->referencia);
     }
 
     private function buildData(Proveedor $supplier, array $line, array $invoice = []): array
