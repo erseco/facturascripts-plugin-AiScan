@@ -1705,6 +1705,35 @@
         renderSidebar();
     }
 
+    function nextRotation(current, delta) {
+        return (((current || 0) + delta) % 360 + 360) % 360;
+    }
+
+    /**
+     * Draws the preview image rotated on a canvas, always from the original
+     * file, so the zoom and pan keep working on the rotated image (#117).
+     */
+    function renderRotatedImage(img, doc) {
+        const deg = doc.previewRotation || 0;
+        if (!deg) {
+            img.src = doc.objectUrl;
+            return;
+        }
+        const source = new Image();
+        source.onload = () => {
+            const sideways = deg % 180 !== 0;
+            const canvas = document.createElement('canvas');
+            canvas.width = sideways ? source.naturalHeight : source.naturalWidth;
+            canvas.height = sideways ? source.naturalWidth : source.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(deg * Math.PI / 180);
+            ctx.drawImage(source, -source.naturalWidth / 2, -source.naturalHeight / 2);
+            img.src = canvas.toDataURL();
+        };
+        source.src = doc.objectUrl;
+    }
+
     function renderPreview(doc) {
         const area = document.getElementById('aiscan-preview-area');
         const title = document.getElementById('aiscan-preview-title');
@@ -1724,6 +1753,8 @@
                     <img src="${doc.objectUrl}" alt="${escapeAttr(doc.originalName)}" style="transform-origin:top left;transition:transform 0.2s" class="aiscan-zoom-img">
                 </div>
                 <div class="position-absolute bottom-0 end-0 m-2 d-flex gap-1" style="z-index:2">
+                    <button class="btn btn-sm btn-light shadow-sm aiscan-rotate-left" title="${escapeAttr(trans('aiscan-rotate-left'))}"><i class="fa-solid fa-rotate-left"></i></button>
+                    <button class="btn btn-sm btn-light shadow-sm aiscan-rotate-right" title="${escapeAttr(trans('aiscan-rotate-right'))}"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-out" title="Zoom -"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
                     <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-reset" title="Reset"><i class="fa-solid fa-expand"></i></button>
                     <button class="btn btn-sm btn-light shadow-sm aiscan-zoom-in" title="Zoom +"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
@@ -1742,6 +1773,16 @@
             area.querySelector('.aiscan-zoom-reset')?.addEventListener('click', () => {
                 zoomLevel = 1;
                 img.style.transform = 'scale(1)';
+            });
+            // Rotate upside-down or sideways photos for review (#117).
+            renderRotatedImage(img, doc);
+            area.querySelector('.aiscan-rotate-left')?.addEventListener('click', () => {
+                doc.previewRotation = nextRotation(doc.previewRotation, -90);
+                renderRotatedImage(img, doc);
+            });
+            area.querySelector('.aiscan-rotate-right')?.addEventListener('click', () => {
+                doc.previewRotation = nextRotation(doc.previewRotation, 90);
+                renderRotatedImage(img, doc);
             });
             // Drag to pan
             let isDragging = false;
@@ -4766,6 +4807,7 @@
             buildConfidenceBadge,
             choiceLabel,
             modelChoiceForDoc,
+            nextRotation,
             sameChoice,
             renderReanalyzeMenu,
             selectedModelChoice,

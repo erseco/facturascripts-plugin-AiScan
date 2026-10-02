@@ -1283,3 +1283,11 @@ test('renderReanalyzeMenu bloquea Re-analizar mientras se analiza (#120)', () =>
     assert.equal(elements['aiscan-reanalyze-btn'].disabled, false);
     assert.equal(elements['aiscan-reanalyze-menu-btn'].disabled, false);
 });
+
+test('nextRotation gira en pasos de 90 grados dentro de 0-359 (#117)', () => {
+    const {hooks} = loadTestHooks();
+    assert.equal(hooks.nextRotation(0, 90), 90);
+    assert.equal(hooks.nextRotation(270, 90), 0);
+    assert.equal(hooks.nextRotation(0, -90), 270);
+    assert.equal(hooks.nextRotation(undefined, -90), 270);
+});
