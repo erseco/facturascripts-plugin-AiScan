@@ -1311,7 +1311,11 @@ class AiScanInvoice extends Controller
             'same_total' => $sameTotal,
             'message' => Tools::lang()->trans(
                 $sameTotal ? 'aiscan-duplicate-invoice-blocked' : 'aiscan-duplicate-invoice-exists',
-                ['%code%' => $existing->codigo]
+                [
+                    '%code%' => $existing->codigo,
+                    '%date%' => $existing->fecha,
+                    '%total%' => Tools::money((float) $existing->total, $existing->coddivisa),
+                ]
             ),
         ];
     }
