@@ -46,7 +46,7 @@
     "aiscan-due-date-must-use-yyyy-mm-dd-format": "Due date must use YYYY-MM-DD format.",
     "aiscan-duplicate-in-batch": "This invoice was already analyzed in this batch (same as %name%).",
     "aiscan-duplicate-invoice-blocked": "Purchase invoice %code% already exists with the same number, supplier, date and total. It will not be imported again.",
-    "aiscan-duplicate-invoice-exists": "A purchase invoice with this number already exists: %code%. Review before importing.",
+    "aiscan-duplicate-invoice-exists": "Purchase invoice %code% from this supplier already has this number (date %date%, total %total%). Review before importing.",
     "aiscan-error": "Error",
     "aiscan-failed-to-calculate-invoice-lines": "Failed to calculate invoice lines.",
     "aiscan-failed-to-store-uploaded-file": "Failed to store uploaded file.",

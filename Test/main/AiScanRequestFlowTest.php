@@ -296,6 +296,18 @@ final class AiScanRequestFlowTest extends TestCase
 
         $data['invoice']['total'] = 120;
         $data['lines'][0]['unit_price'] = 60;
+
+        // Issue #118: the warning must show which existing invoice matched (date and total),
+        // so its code is not mistaken for the supplier's number.
+        $enrich = new ReflectionMethod(AiScanInvoice::class, 'enrichExtractedData');
+        $enrich->setAccessible(true);
+        $existing = new FacturaProveedor();
+        self::assertTrue($existing->load($first['invoice_id']));
+        $message = $enrich->invoke(new AiScanInvoice('AiScanInvoice'), $data)['_duplicate']['message'];
+        self::assertStringContainsString($existing->codigo, $message);
+        self::assertStringContainsString($existing->fecha, $message);
+        self::assertStringContainsString(Tools::money(100, 'EUR'), $message);
+
         $changed = $import($data);
         $this->batches[] = $changed['batch_id'];
         self::assertSame('imported', $changed['results'][0]['status'], json_encode($changed));
