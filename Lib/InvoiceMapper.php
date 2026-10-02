@@ -306,6 +306,11 @@ class InvoiceMapper
                 ? $lineData['referencia']
                 : $this->productMatcher->findReference($lineData, $suggestedReference);
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
+            // Issue #121: sin producto, la referencia es la del proveedor y puede
+            // pasar de los 30 caracteres de la columna; se recorta para poder grabar.
+            if (empty($line->idproducto) && !empty($line->referencia)) {
+                $line->referencia = mb_substr(Tools::noHtml((string) $line->referencia), 0, 30);
+            }
             $line->actualizastock = 0;
             $desc = $lineData['description'] ?? $lineData['descripcion'] ?? $line->descripcion;
             $line->descripcion = trim((string) $desc);
