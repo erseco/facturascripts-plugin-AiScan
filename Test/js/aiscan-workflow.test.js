@@ -183,11 +183,17 @@ test('batches without a valid ready invoice cannot proceed (#104)', () => {
     }
 });
 
-test('import summary counts only approved invoices in a mixed batch (#104)', () => {
+test('import summary lists only the invoices marked ready (#104, #119)', () => {
     const {elements, hooks} = loadTestHooks();
-    hooks.state.documents = ['ready', 'analyzed', 'needs_review', 'discarded', 'failed'].map(status => ({status}));
-    hooks.buildImportSummary();
-    assert.equal(elements['aiscan-import-count'].textContent, '1 / 5');
+    hooks.state.documents = ['ready', 'analyzed', 'needs_review', 'discarded', 'failed', 'ready']
+        .map((status, i) => ({status, originalName: 'doc-' + i + '.pdf'}));
+    hooks.openImportStep();
+    const html = elements['aiscan-import-body'].innerHTML;
+    assert.equal((html.match(/<tr>/g) || []).length, 2);
+    assert.match(html, /doc-0\.pdf/);
+    assert.match(html, /doc-5\.pdf/);
+    assert.doesNotMatch(html, /doc-2\.pdf/);
+    assert.equal(elements['aiscan-import-count'].textContent, '2 / 2');
 });
 
 test('handleMultiInvoiceResponse splits one document into multiple entries', () => {

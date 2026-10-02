@@ -1400,8 +1400,7 @@
                 return;
             }
 
-            showStep('import');
-            buildImportSummary();
+            openImportStep();
         });
 
         const manualEntryCheckbox = document.getElementById('aiscan-manual-entry');
@@ -4295,13 +4294,29 @@
         document.getElementById('aiscan-import-all-btn')?.addEventListener('click', executeImport);
     }
 
+    /**
+     * Only the invoices marked ready when proceeding go to the import step;
+     * the rest stay in review and are neither listed nor sent (#119).
+     */
+    function openImportStep() {
+        state.documents.forEach(doc => {
+            doc.inImport = doc.status === STATUS.READY;
+        });
+        showStep('import');
+        buildImportSummary();
+    }
+
+    function importDocs() {
+        return state.documents.filter(doc => doc.inImport);
+    }
+
     function buildImportSummary() {
         const tbody = document.getElementById('aiscan-import-body');
         if (!tbody) {
             return;
         }
 
-        tbody.innerHTML = state.documents.map((doc, i) => {
+        tbody.innerHTML = state.documents.map((doc, i) => ({doc, i})).filter(({doc}) => doc.inImport).map(({doc, i}, row) => {
             const invoice = doc.extractedData?.invoice || {};
             const supplier = doc.extractedData?.supplier || {};
             const info = STATUS_LABELS[doc.status] || STATUS_LABELS.pending;
@@ -4311,7 +4326,7 @@
                 : '';
             return `
                 <tr>
-                    <td>${i + 1}</td>
+                    <td>${row + 1}</td>
                     <td>${escapeHtml(doc.originalName)}</td>
                     <td>${escapeHtml(supplier.name || '-')}</td>
                     <td>${escapeHtml(invoice.number || '-')}</td>
@@ -4353,8 +4368,9 @@
 
         const countEl = document.getElementById('aiscan-import-count');
         if (countEl) {
-            const importable = state.documents.filter(d => d.status === STATUS.READY).length;
-            countEl.textContent = trans('aiscan-import-count', {'%count%': String(importable), '%total%': String(state.documents.length)});
+            const docs = importDocs();
+            const importable = docs.filter(d => d.status === STATUS.READY).length;
+            countEl.textContent = trans('aiscan-import-count', {'%count%': String(importable), '%total%': String(docs.length)});
         }
 
         const optionSummaryEl = document.getElementById('aiscan-import-option-summary');
@@ -4425,12 +4441,14 @@
         importBtn.disabled = true;
         importBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>${escapeHtml(trans('aiscan-importing'))}`;
 
+        const docs = importDocs();
+
         // Last-chance client gate (#78): demote READY docs missing vital fields.
-        state.documents.forEach(doc => {
+        docs.forEach(doc => {
             revokeReadyIfBlocked(doc, doc.extractedData);
         });
 
-        const documents = state.documents.map(doc => {
+        const documents = docs.map(doc => {
             const extracted = doc.extractedData ? JSON.parse(JSON.stringify(doc.extractedData)) : null;
             if (extracted && extracted.invoice && !extracted.invoice.codpago) {
                 extracted.invoice.codpago = state.codpago;
@@ -4471,7 +4489,7 @@
             }
 
             (data.results || []).forEach(result => {
-                const doc = state.documents[result.index];
+                const doc = docs[result.index];
                 if (!doc) {
                     return;
                 }
@@ -4761,6 +4779,7 @@
             getValidationWarnings,
             handleMultiInvoiceResponse,
             buildImportSummary,
+            openImportStep,
             isCreditorPartyType,
             normalizePartyType,
             openAllAsManualEntry,
