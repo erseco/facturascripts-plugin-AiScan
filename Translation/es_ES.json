@@ -96,6 +96,7 @@
     "aiscan-manual-entry-title": "Entrada manual disponible",
     "aiscan-cannot-mark-ready": "No se puede marcar como lista: completa primero los campos obligatorios.",
     "aiscan-mark-ready": "Marcar como lista para importar",
+    "aiscan-marked-ready": "Lista para importar",
     "aiscan-matched-with": "Coincide con: %name%",
     "aiscan-missing-invoice-section": "Falta la sección de factura.",
     "aiscan-missing-line-description-at-index": "Falta la descripción de la línea en el índice %index%",

@@ -1291,3 +1291,26 @@ test('nextRotation gira en pasos de 90 grados dentro de 0-359 (#117)', () => {
     assert.equal(hooks.nextRotation(0, -90), 270);
     assert.equal(hooks.nextRotation(undefined, -90), 270);
 });
+
+test('updateMarkReadyButton indica que la factura ya está lista y desactiva el botón (#127)', () => {
+    const {elements, hooks} = loadTestHooks();
+    hooks.state.documents = [{
+        status: hooks.STATUS.READY,
+        reviewDecision: 'approved',
+        extractedData: hooks.buildEmptyExtractedData(),
+    }];
+    hooks.state.currentIndex = 0;
+    const data = {supplier: {name: 'Proveedor', tax_id: 'B12345678'}, invoice: {number: 'F-1', issue_date: '2026-10-09'},
+        lines: [{description: 'Linea', quantity: 1, unit_price: 10}], taxes: [], totals: {total: 10}};
+
+    hooks.updateMarkReadyButton(data);
+    const btn = elements['aiscan-mark-ready-btn'];
+    assert.equal(btn.disabled, true);
+    assert.match(btn.innerHTML, /aiscan-marked-ready/);
+
+    hooks.state.documents[0].status = hooks.STATUS.NEEDS_REVIEW;
+    hooks.updateMarkReadyButton(data);
+    assert.equal(btn.disabled, false);
+    assert.match(btn.innerHTML, /aiscan-mark-ready/);
+    assert.doesNotMatch(btn.innerHTML, /aiscan-marked-ready/);
+});

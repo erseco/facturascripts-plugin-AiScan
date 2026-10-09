@@ -96,6 +96,7 @@
     "aiscan-manual-entry-title": "Manual entry available",
     "aiscan-cannot-mark-ready": "Cannot mark as ready: complete the required fields first.",
     "aiscan-mark-ready": "Mark as ready to import",
+    "aiscan-marked-ready": "Ready to import",
     "aiscan-matched-with": "Matched with: %name%",
     "aiscan-missing-invoice-section": "Missing invoice section.",
     "aiscan-missing-line-description-at-index": "Missing line description at index %index%",
