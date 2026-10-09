@@ -269,10 +269,14 @@
             return;
         }
 
-        btn.disabled = !canReady;
+        // Issue #127: show that the invoice is already marked as ready.
+        const isReady = canReady && doc?.status === STATUS.READY;
+        btn.disabled = !canReady || isReady;
         btn.title = canReady
             ? ''
             : (trans('aiscan-cannot-mark-ready') || blocking.join(' '));
+        btn.innerHTML = `<i class="fa-solid fa-check me-1"></i>${escapeHtml(
+            trans(isReady ? 'aiscan-marked-ready' : 'aiscan-mark-ready'))}`;
 
         if (hint) {
             if (canReady) {
@@ -4843,6 +4847,7 @@
             renderSidebar,
             sanitizeExtractedConfidence,
             STATUS,
+            updateMarkReadyButton,
             state,
         };
     }
