@@ -22,6 +22,7 @@ namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Core\DataSrc\Impuestos;
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\EstadoDocumento;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
@@ -177,7 +178,7 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertNull($result['invoice_id']);
-        $this->assertStringContainsString('3,17', implode('; ', $result['errors']));
+        $this->assertStringContainsString(Tools::number(3.17), implode('; ', $result['errors']));
     }
 
     /**
