@@ -82,14 +82,15 @@ class GeminiProvider implements ProviderInterface
         }
 
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
-            . $this->model . ':generateContent?key=' . $this->apiKey;
+            . $this->model . ':generateContent';
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            // Issue #130: la clave va en la cabecera para que no quede en los registros de URLs.
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-goog-api-key: ' . $this->apiKey],
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
