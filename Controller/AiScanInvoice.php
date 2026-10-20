@@ -196,7 +196,7 @@ class AiScanInvoice extends Controller
                         'error' => Tools::lang()->trans('aiscan-unknown-action', ['%action%' => (string) $action]),
                     ]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             http_response_code(500);
             $message = $e->getMessage();
             echo json_encode(['error' => $message]);

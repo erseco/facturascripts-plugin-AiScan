@@ -176,7 +176,10 @@ class InvoiceMapper
             // número, la fecha y las observaciones ya cambiados.
             //
             // Lo que va después del commit (recibos, adjunto, estado, stock) ya
-            // no entra en esa garantía.
+            // no entra en esa garantía: al pasar a «Recibida» se genera el asiento,
+            // y en una instalación nueva eso crea tablas, cosa que FacturaScripts
+            // no admite dentro de una transacción. Si algo falla ahí, una factura
+            // nueva se descarta en discardDraft() (issue #133).
             //
             // Las líneas se construyen antes de abrir la transacción para que la
             // creación diferida de tablas de FacturaScripts (que no admite DDL
@@ -243,8 +246,6 @@ class InvoiceMapper
                 $this->applyPaymentMethodToReceipts($invoice, $resolvedFormaPago, $invoiceData);
             }
 
-            $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
-
             $this->setReceivedStatus($invoice);
 
             // Total mode aggregates lines by tax and has no linked products,
@@ -256,15 +257,24 @@ class InvoiceMapper
                 $this->inventoryUpdater->revertAll($invoice);
             }
 
+            // Issue #133: el adjunto va el último porque mueve el archivo fuera de
+            // aiscan_tmp. Si algo fallaba antes, la factura se descartaba y el
+            // reintento ya no encontraba el documento escaneado.
+            $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
+
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             if ($inTransaction) {
                 $database->rollback();
             }
 
-            $this->discardDraft($invoiceId, $invoice);
             $result['errors'][] = $e->getMessage();
+            if (false === $this->discardDraft($invoiceId, $invoice)) {
+                $result['errors'][] = Tools::lang()->trans('aiscan-invoice-not-discarded', [
+                    '%code%' => (string) $invoice?->codigo,
+                ]);
+            }
         }
 
         return $result;
@@ -516,11 +526,45 @@ class InvoiceMapper
      * después, hay que deshacerla o quedaría un boceto a 0 € huérfano. Solo se
      * borra la factura que hemos creado nosotros; una existente no se toca.
      */
-    private function discardDraft(?int $invoiceId, ?FacturaProveedor $invoice): void
+    /**
+     * Devuelve false si la factura nueva sigue grabada tras intentar descartarla,
+     * para que el usuario no la duplique al reintentar.
+     */
+    private function discardDraft(?int $invoiceId, ?FacturaProveedor $invoice): bool
     {
-        if ($invoiceId === null && $invoice instanceof FacturaProveedor && $invoice->exists()) {
-            $invoice->delete();
+        if ($invoiceId !== null || !$invoice instanceof FacturaProveedor || empty($invoice->idfactura)) {
+            return true;
         }
+
+        // Issue #133: si el fallo llega después de marcarla como recibida, la
+        // factura ya no es editable y delete() se niega. Se devuelve antes a un
+        // estado editable (eso deshace el asiento y el stock) y se borra, para
+        // que un reintento no la duplique.
+        $draft = new FacturaProveedor();
+        if (false === $draft->load($invoice->idfactura)) {
+            return true;
+        }
+
+        if (!$draft->editable) {
+            $where = [Where::eq('tipodoc', 'FacturaProveedor'), Where::eq('editable', true)];
+            $order = ['predeterminado' => 'DESC', 'idestado' => 'ASC'];
+            foreach ((new EstadoDocumento())->all($where, $order, 0, 1) as $editable) {
+                $draft->idestado = $editable->idestado;
+                if (false === $draft->save()) {
+                    return false;
+                }
+            }
+        }
+
+        // Un recibo marcado como pagado (contado, #57) impide borrar la factura.
+        foreach ($draft->getReceipts() as $receipt) {
+            if ($receipt->pagado) {
+                $receipt->pagado = false;
+                $receipt->save();
+            }
+        }
+
+        return $draft->delete();
     }
 
     private function readLogDetail(): string
@@ -627,17 +671,24 @@ class InvoiceMapper
         return $base > 0 ? $base : $total;
     }
 
+    /**
+     * Issue #133: el nombre del estado («Recibida») depende del idioma de la
+     * instalación, así que se busca por sus propiedades: el estado de factura
+     * de proveedor que cierra la edición sin generar otro documento.
+     */
     private function setReceivedStatus(FacturaProveedor $invoice): void
     {
         $status = new EstadoDocumento();
         $where = [
-            Where::column('tipodoc', 'FacturaProveedor'),
-            Where::column('nombre', 'Recibida'),
+            Where::eq('tipodoc', 'FacturaProveedor'),
+            Where::eq('editable', false),
         ];
-        foreach ($status->all($where, [], 0, 1) as $received) {
-            $invoice->idestado = $received->idestado;
-            $invoice->save();
-            return;
+        foreach ($status->all($where, ['idestado' => 'ASC'], 0, 0) as $received) {
+            if (empty($received->generadoc) && !empty($received->activo ?? true)) {
+                $invoice->idestado = $received->idestado;
+                $invoice->save();
+                return;
+            }
         }
     }
 
