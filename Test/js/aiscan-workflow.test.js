@@ -85,6 +85,7 @@ function loadTestHooks() {
         {code: 'TAR', description: 'Tarjeta'},
     ];
     context.aiscanDefaultCodpago = 'CONT';
+    context.aiscanFormToken = 'sig|abc123';
     context.aiscanTaxExceptions = [
         {code: 'ES_20', description: 'Exenta art. 20 LIVA'},
         {code: 'ES_84', description: 'Inversión del sujeto pasivo'},
@@ -1313,4 +1314,14 @@ test('updateMarkReadyButton indica que la factura ya está lista y desactiva el 
     assert.equal(btn.disabled, false);
     assert.match(btn.innerHTML, /aiscan-mark-ready/);
     assert.doesNotMatch(btn.innerHTML, /aiscan-marked-ready/);
+});
+
+test('withFormToken adds a distinct multireqtoken to each request (#129)', () => {
+    const {hooks} = loadTestHooks();
+    const first = new URL('http://x/' + hooks.withFormToken('AiScanInvoice?action=upload'));
+    const second = new URL('http://x/' + hooks.withFormToken('AiScanInvoice?action=upload'));
+
+    assert.equal(first.searchParams.get('action'), 'upload');
+    assert.match(first.searchParams.get('multireqtoken'), /^sig\|abc123\d+$/);
+    assert.notEqual(first.searchParams.get('multireqtoken'), second.searchParams.get('multireqtoken'));
 });

@@ -22,6 +22,7 @@ namespace FacturaScripts\Plugins\AiScan\Model;
 
 use FacturaScripts\Core\Template\ModelClass;
 use FacturaScripts\Core\Template\ModelTrait;
+use FacturaScripts\Plugins\AiScan\Lib\HistoryText;
 
 class AiScanImportLine extends ModelClass
 {
@@ -60,5 +61,13 @@ class AiScanImportLine extends ModelClass
     public static function tableName(): string
     {
         return 'aiscan_import_lines';
+    }
+
+    public function test(): bool
+    {
+        // Issue #129: el historial pinta estos campos sin escapar.
+        $this->descripcion = HistoryText::clean($this->descripcion, 255);
+        $this->referencia = HistoryText::clean($this->referencia, 30);
+        return parent::test();
     }
 }

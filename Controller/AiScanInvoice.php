@@ -49,6 +49,17 @@ class AiScanInvoice extends Controller
         'webp' => 'image/webp',
     ];
 
+    // Issue #129: acciones que escriben datos o consumen la API de IA.
+    private const TOKEN_ACTIONS = [
+        'analyze',
+        'apply',
+        'create-supplier',
+        'import-batch',
+        'remember-supplier-alias',
+        'set-supplier-default-product',
+        'upload',
+    ];
+
     public function getPageData(): array
     {
         $data = parent::getPageData();
@@ -124,6 +135,12 @@ class AiScanInvoice extends Controller
         }
 
         header('Content-Type: application/json');
+
+        if (in_array($action, self::TOKEN_ACTIONS, true) && false === $this->validateFormToken()) {
+            http_response_code(403);
+            echo json_encode(['error' => Tools::lang()->trans('invalid-request')]);
+            return;
+        }
 
         try {
             switch ($action) {

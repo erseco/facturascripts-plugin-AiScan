@@ -71,6 +71,25 @@
 
     // ── Helpers ────────────────────────────────────────────────────────
 
+    let formTokenCounter = 0;
+
+    // Issue #129: el servidor rechaza un token ya usado, así que cada petición
+    // lleva el token de la página con un sufijo distinto (solo se firma la
+    // primera parte del token).
+    function withFormToken(url) {
+        const token = window.aiscanFormToken || '';
+        if (!token) {
+            return url;
+        }
+        formTokenCounter += 1;
+        const separator = url.indexOf('?') === -1 ? '?' : '&';
+        return url + separator + 'multireqtoken=' + encodeURIComponent(token + formTokenCounter);
+    }
+
+    function apiFetch(url, options) {
+        return fetch(withFormToken(url), options);
+    }
+
     function trans(key, replacements) {
         let value = key;
         if (window.i18n && typeof window.i18n.trans === 'function') {
@@ -850,7 +869,7 @@
                 const convertToPdf = document.getElementById('aiscan-convert-to-pdf');
                 formData.append('convert_to_pdf', convertToPdf && convertToPdf.checked ? '1' : '0');
 
-                const response = await fetch('AiScanInvoice?action=upload', {
+                const response = await apiFetch('AiScanInvoice?action=upload', {
                     method: 'POST',
                     body: formData,
                 });
@@ -1092,7 +1111,7 @@
                     model: choice.model,
                 });
 
-                const response = await fetch('AiScanInvoice?' + params.toString());
+                const response = await apiFetch('AiScanInvoice?' + params.toString());
                 let data;
                 try {
                     data = await response.json();
@@ -1157,7 +1176,7 @@
                         provider: choice.provider,
                         model: choice.model,
                     });
-                    const reResponse = await fetch('AiScanInvoice?' + reParams.toString());
+                    const reResponse = await apiFetch('AiScanInvoice?' + reParams.toString());
                     const reData = await reResponse.json();
                     if (reData && reData.scan_failed) {
                         // Keep first extraction; history re-scan failure is non-blocking.
@@ -2335,7 +2354,7 @@
     async function loadDefaultProduct(codproveedor) {
         try {
             const params = new URLSearchParams({action: 'get-supplier-default-product', codproveedor});
-            const response = await fetch('AiScanInvoice?' + params.toString());
+            const response = await apiFetch('AiScanInvoice?' + params.toString());
             const data = await response.json();
             if (data.found) {
                 setDefaultProductPickerValue(data.referencia, data.description || '', codproveedor);
@@ -2496,7 +2515,7 @@
             }
 
             const currentRequestId = ++requestId;
-            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
                 .then(r => r.json())
                 .then(data => {
                     if (currentRequestId !== requestId) {
@@ -2644,7 +2663,7 @@
         }
 
         try {
-            const response = await fetch('AiScanInvoice?action=set-supplier-default-product', {
+            const response = await apiFetch('AiScanInvoice?action=set-supplier-default-product', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -2692,7 +2711,7 @@
         }
 
         try {
-            const response = await fetch('AiScanInvoice?action=set-supplier-default-product', {
+            const response = await apiFetch('AiScanInvoice?action=set-supplier-default-product', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -3161,7 +3180,7 @@
                 resultsDiv.innerHTML = '';
                 return;
             }
-            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
                 .then(r => r.json())
                 .then(data => {
                     const items = data.results || [];
@@ -3455,7 +3474,7 @@
             }
 
             const currentRequestId = ++requestId;
-            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
+            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
                 .then(r => r.json())
                 .then(data => {
                     if (currentRequestId !== requestId) {
@@ -3794,7 +3813,7 @@
                 resultsDiv.innerHTML = '';
                 return;
             }
-            fetch('AiScanInvoice?' + new URLSearchParams({action: 'search-suppliers', query}))
+            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-suppliers', query}))
                 .then(r => r.json())
                 .then(data => {
                     const items = data.results || [];
@@ -3916,7 +3935,7 @@
             return;
         }
         try {
-            await fetch('AiScanInvoice?action=remember-supplier-alias', {
+            await apiFetch('AiScanInvoice?action=remember-supplier-alias', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -3940,7 +3959,7 @@
             return;
         }
         try {
-            const response = await fetch(
+            const response = await apiFetch(
                 'AiScanInvoice?' + new URLSearchParams({
                     action: 'suggest-supplier-products',
                     codproveedor,
@@ -3997,7 +4016,7 @@
         try {
             const doc = currentDoc();
             const partyType = resolveDocPartyType(doc);
-            const response = await fetch('AiScanInvoice?action=create-supplier', {
+            const response = await apiFetch('AiScanInvoice?action=create-supplier', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -4209,7 +4228,7 @@
                     model: target.model,
                 });
 
-                const response = await fetch('AiScanInvoice?' + params.toString());
+                const response = await apiFetch('AiScanInvoice?' + params.toString());
                 const data = await response.json();
                 applyAnalyzeResponse(doc, data);
             } catch (error) {
@@ -4251,7 +4270,7 @@
                 model: target.model,
             });
 
-            const response = await fetch('AiScanInvoice?' + params.toString());
+            const response = await apiFetch('AiScanInvoice?' + params.toString());
             const data = await response.json();
             applyAnalyzeResponse(doc, data);
         } catch (error) {
@@ -4517,7 +4536,7 @@
         });
 
         try {
-            const response = await fetch('AiScanInvoice?action=import-batch', {
+            const response = await apiFetch('AiScanInvoice?action=import-batch', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -4813,6 +4832,7 @@
             modelChoiceForDoc,
             nextRotation,
             sameChoice,
+            withFormToken,
             renderReanalyzeMenu,
             selectedModelChoice,
             buildEmptyExtractedData,

@@ -35,6 +35,7 @@ function move_uploaded_file(string $source, string $destination): bool
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Lib\MultiRequestProtection;
 use FacturaScripts\Core\Request;
 use FacturaScripts\Core\Session;
 use FacturaScripts\Core\Tools;
@@ -176,6 +177,20 @@ final class AiScanRequestFlowTest extends TestCase
         Tools::settingsSet('AiScan', 'debug_mode', false);
         self::assertArrayHasKey('error', $this->call('list-mock-fixtures'));
         self::assertSame(403, self::$status);
+    }
+
+    public function testWriteActionsRequireFormToken(): void
+    {
+        $actions = ['upload', 'analyze', 'apply', 'import-batch', 'create-supplier',
+            'set-supplier-default-product', 'remember-supplier-alias'];
+        foreach ($actions as $action) {
+            $result = $this->call($action, [], ['name' => 'Token Supplier'], [], false);
+            self::assertArrayHasKey('error', $result, $action);
+            self::assertSame(403, self::$status, $action);
+        }
+
+        // Las consultas de solo lectura no necesitan token.
+        self::assertSame(['results' => []], $this->call('search-suppliers', ['query' => 'x'], [], [], false));
     }
 
     public function testPostParametersTakePrecedenceOverQueryParameters(): void
@@ -591,8 +606,16 @@ final class AiScanRequestFlowTest extends TestCase
         self::assertSame($id > 0, $page->views['EditAiScanImportBatch']->model->exists());
     }
 
-    private function call(string $action, array $query = [], $body = [], array $form = []): array
-    {
+    private function call(
+        string $action,
+        array $query = [],
+        $body = [],
+        array $form = [],
+        bool $withToken = true
+    ): array {
+        if ($withToken) {
+            $query['multireqtoken'] = (new MultiRequestProtection())->newToken();
+        }
         self::$body = is_string($body) ? $body : json_encode($body);
         self::$headers = [];
         self::$status = 200;
