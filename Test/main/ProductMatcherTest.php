@@ -20,16 +20,55 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Dinamic\Model\Producto;
 use FacturaScripts\Plugins\AiScan\Lib\ProductMatcher;
 use PHPUnit\Framework\TestCase;
 
 final class ProductMatcherTest extends TestCase
 {
     private ProductMatcher $matcher;
+    private ?Producto $product = null;
 
     protected function setUp(): void
     {
         $this->matcher = new ProductMatcher();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->product?->delete();
+    }
+
+    /**
+     * Issue #132: las líneas llegan con las claves de FacturaScripts
+     * (referencia, descripcion) y el matcher solo leía sku y description, así que
+     * toda línea acababa en el producto habitual del proveedor.
+     */
+    public function testMatchesFacturaScriptsLineKeysBeforeTheSuggestion(): void
+    {
+        $this->product = new Producto();
+        $this->product->referencia = 'PM-' . bin2hex(random_bytes(4));
+        $this->product->descripcion = 'Matcher unique ' . bin2hex(random_bytes(6));
+        $this->assertTrue($this->product->save());
+
+        $byDescription = $this->matcher->findReference(
+            ['referencia' => '', 'descripcion' => $this->product->descripcion],
+            'SUGGESTED-REF'
+        );
+        $byReference = $this->matcher->findReference(
+            ['referencia' => $this->product->referencia, 'descripcion' => 'ab'],
+            'SUGGESTED-REF'
+        );
+
+        $emptyFsKey = $this->matcher->findReference(
+            ['referencia' => '', 'sku' => $this->product->referencia],
+            'SUGGESTED-REF'
+        );
+
+        $this->assertSame($this->product->referencia, $byDescription);
+        $this->assertSame($this->product->referencia, $emptyFsKey);
+        $this->assertSame(0, ProductMatcher::lineValue(['cantidad' => 0, 'quantity' => 5], ['cantidad', 'quantity']));
+        $this->assertSame($this->product->referencia, $byReference);
     }
 
     public function testFallsBackToSuggestionWhenNoSkuOrDescriptionMatch(): void

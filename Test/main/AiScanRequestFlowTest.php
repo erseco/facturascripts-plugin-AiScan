@@ -283,6 +283,28 @@ final class AiScanRequestFlowTest extends TestCase
         self::assertSame(422, self::$status);
     }
 
+    public function testBatchHistoryKeepsLinesSentWithFacturaScriptsKeys(): void
+    {
+        // Issue #132: la revisión envía referencia/descripcion/cantidad/pvpunitario/iva,
+        // y el historial solo leía las claves en inglés, así que guardaba líneas vacías.
+        $line = ['referencia' => 'REF-132', 'descripcion' => 'Reviewed line', 'cantidad' => 3,
+            'pvpunitario' => 12.5, 'dtopor' => 10, 'iva' => 21];
+        $batch = $this->call('import-batch', [], ['documents' => [
+            ['status' => 'discarded', 'original_name' => 'fs-keys.pdf', 'extracted_data' => ['lines' => [$line]]],
+        ]]);
+        self::assertTrue($batch['success']);
+        $this->batches[] = $batch['batch_id'];
+        $history = new AiScanImportBatch();
+        self::assertTrue($history->load($batch['batch_id']));
+        $saved = $history->getDocuments()[0]->getLines()[0];
+        self::assertSame('Reviewed line', $saved->descripcion);
+        self::assertSame('REF-132', $saved->referencia);
+        self::assertEquals(3, $saved->cantidad);
+        self::assertEquals(12.5, $saved->pvpunitario);
+        self::assertEquals(10, $saved->dtopor);
+        self::assertEquals(21, $saved->iva);
+    }
+
     public function testBatchRefusesExactDuplicateButAllowsDifferentTotal(): void
     {
         // Issue #115: same supplier + number + date + total must not be imported twice.
