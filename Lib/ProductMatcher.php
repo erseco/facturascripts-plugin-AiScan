@@ -36,7 +36,8 @@ class ProductMatcher
      */
     public function findReference(array $lineData, ?string $suggestedReference = null): ?string
     {
-        $sku = trim((string) ($lineData['sku'] ?? ''));
+        // Issue #132: la revisión envía las claves de FacturaScripts; la IA, las inglesas.
+        $sku = trim((string) ($lineData['referencia'] ?? $lineData['sku'] ?? ''));
         if (!empty($sku)) {
             $variant = new Variante();
             $whereReference = [Where::eq('referencia', $sku)];
@@ -46,7 +47,7 @@ class ProductMatcher
             }
         }
 
-        $description = trim((string) ($lineData['description'] ?? ''));
+        $description = trim((string) ($lineData['descripcion'] ?? $lineData['description'] ?? ''));
         if (mb_strlen($description) >= 4) {
             $variant = new Variante();
             $results = $variant->codeModelSearch($description, 'referencia');

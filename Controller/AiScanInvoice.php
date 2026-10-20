@@ -1269,13 +1269,14 @@ class AiScanInvoice extends Controller
             $histLine = new AiScanImportLine();
             $histLine->iddocument = $histDoc->id;
             $histLine->sortorder = $idx + 1;
-            $histLine->descripcion = trim((string) ($line['description'] ?? ''));
-            $histLine->cantidad = (float) ($line['quantity'] ?? 1);
-            $histLine->pvpunitario = (float) ($line['unit_price'] ?? 0);
-            $histLine->dtopor = (float) ($line['discount'] ?? 0);
-            $histLine->iva = (float) ($line['tax_rate'] ?? 0);
+            // Issue #132: la revisión envía las claves de FacturaScripts; la IA, las inglesas.
+            $histLine->descripcion = trim((string) ($line['descripcion'] ?? $line['description'] ?? ''));
+            $histLine->cantidad = (float) ($line['cantidad'] ?? $line['quantity'] ?? 1);
+            $histLine->pvpunitario = (float) ($line['pvpunitario'] ?? $line['unit_price'] ?? 0);
+            $histLine->dtopor = (float) ($line['dtopor'] ?? $line['discount'] ?? 0);
+            $histLine->iva = (float) ($line['iva'] ?? $line['tax_rate'] ?? 0);
             $histLine->pvptotal = $histLine->cantidad * $histLine->pvpunitario;
-            $histLine->referencia = $line['sku'] ?? null;
+            $histLine->referencia = $line['referencia'] ?? $line['sku'] ?? null;
             $histLine->save();
         }
     }
