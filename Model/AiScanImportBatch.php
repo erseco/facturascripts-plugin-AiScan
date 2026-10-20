@@ -24,6 +24,7 @@ use FacturaScripts\Core\Session;
 use FacturaScripts\Core\Template\ModelClass;
 use FacturaScripts\Core\Template\ModelTrait;
 use FacturaScripts\Core\Where;
+use FacturaScripts\Plugins\AiScan\Lib\HistoryText;
 
 class AiScanImportBatch extends ModelClass
 {
@@ -60,6 +61,15 @@ class AiScanImportBatch extends ModelClass
     public static function tableName(): string
     {
         return 'aiscan_import_batches';
+    }
+
+    public function test(): bool
+    {
+        // Issue #129: el historial pinta estos campos sin escapar.
+        $this->nick = HistoryText::clean($this->nick, 50);
+        $this->importmode = HistoryText::clean($this->importmode, 20);
+        $this->provider = HistoryText::clean($this->provider, 50);
+        return parent::test();
     }
 
     public function getDocuments(): array

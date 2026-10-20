@@ -21,6 +21,7 @@
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
 use FacturaScripts\Core\Lib\ExtendedController\PanelController;
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportDocument;
 
@@ -64,6 +65,25 @@ class EditAiScanImportBatch extends PanelController
         );
         $this->setSettings('EditAiScanImportLine', 'btnDelete', false);
         $this->setSettings('EditAiScanImportLine', 'btnNew', false);
+    }
+
+    protected function execPreviousAction($action)
+    {
+        // Issue #129: el historial es de solo lectura; ocultar los botones no basta,
+        // porque un POST con estas acciones seguiría guardando o borrando.
+        switch ($action) {
+            case 'delete':
+            case 'delete-document':
+                Tools::log()->warning('not-allowed-delete');
+                return true;
+
+            case 'edit':
+            case 'insert':
+                Tools::log()->warning('not-allowed-modify');
+                return true;
+        }
+
+        return parent::execPreviousAction($action);
     }
 
     protected function loadData($viewName, $view)

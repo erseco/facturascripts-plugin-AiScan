@@ -330,6 +330,7 @@
         {% endfor %}
     ];
     window.aiscanDefaultCodpago = '{{ defaultCodpago|e('js') }}';
+    window.aiscanFormToken = '{{ formToken(false)|e('js') }}';
     window.aiscanDebugMode = {{ debugMode ? 'true' : 'false' }};
     window.aiscanMockFixtures = [
         {% for name in mockFixtures %}
