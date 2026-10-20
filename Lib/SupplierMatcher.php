@@ -37,6 +37,9 @@ class SupplierMatcher
      */
     private const TAX_ID_SCAN_LIMIT = 500;
 
+    /** Candidatos por nombre que se comparan enteros en PHP (issue #134). */
+    private const NAME_SCAN_LIMIT = 20;
+
     public function findMatch(array $supplierData): array
     {
         $result = [
@@ -82,18 +85,27 @@ class SupplierMatcher
         }
 
         if (!empty($supplierData['name'])) {
-            $supplier = new Proveedor();
-            $normalizedName = $this->normalizeName($supplierData['name']);
-            $where = [Where::like('nombre', '%' . $normalizedName . '%')];
-            $candidates = $supplier->all($where, [], 0, 5);
-            if (count($candidates) === 1) {
+            // Issue #134: LIKE %nombre% solo trae candidatos. Para emparejar solo, el
+            // nombre tiene que coincidir entero (sin forma jurídica, mayúsculas ni
+            // puntuación); si no, se ofrecen como sugerencia para que elija el usuario.
+            $key = $this->nameKey((string) $supplierData['name']);
+            $search = rtrim($this->normalizeName((string) $supplierData['name']), " \t.,;:");
+            $where = [Where::like('nombre', '%' . $search . '%')];
+            $candidates = $key === '' ? [] : (new Proveedor())->all($where, [], 0, self::NAME_SCAN_LIMIT);
+            $exact = array_values(array_filter(
+                $candidates,
+                fn ($row): bool => $this->nameKey((string) $row->nombre) === $key
+                    || $this->nameKey((string) $row->razonsocial) === $key
+            ));
+            if (count($exact) === 1) {
                 $result['match_status'] = 'matched';
-                $result['supplier'] = $candidates[0];
+                $result['supplier'] = $exact[0];
                 $result['match_source'] = 'name';
                 return $result;
-            } elseif (count($candidates) > 1) {
+            }
+            if (!empty($candidates)) {
                 $result['match_status'] = 'ambiguous';
-                $result['candidates'] = $candidates;
+                $result['candidates'] = empty($exact) ? array_slice($candidates, 0, 5) : $exact;
                 $result['match_source'] = 'name';
                 return $result;
             }
@@ -138,7 +150,7 @@ class SupplierMatcher
      *
      * @return Proveedor[]
      */
-    private function findByTaxId(string $taxId): array
+    public function findByTaxId(string $taxId): array
     {
         $taxId = trim($taxId);
         if ($taxId === '') {
@@ -186,7 +198,14 @@ class SupplierMatcher
 
     private function normalizeName(string $name): string
     {
-        $name = preg_replace(self::LEGAL_FORM_PATTERN, '', $name);
+        $name = preg_replace(self::LEGAL_FORM_PATTERN, ' ', $name);
         return trim($name);
+    }
+
+    private function nameKey(string $name): string
+    {
+        $name = preg_replace('/[.,;:"\'()]+/u', ' ', $this->normalizeName($name)) ?? '';
+        $name = preg_replace('/\s+/u', ' ', $name) ?? '';
+        return mb_strtolower(trim($name));
     }
 }

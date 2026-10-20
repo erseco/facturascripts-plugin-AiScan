@@ -55,6 +55,13 @@ class SupplierService
             return null;
         }
 
+        // Issue #134: no se crea un segundo proveedor con un CIF que ya existe
+        // (por ejemplo, cuando hay varios y el emparejamiento es ambiguo).
+        $taxId = trim((string) ($supplierData['tax_id'] ?? ''));
+        if ($taxId !== '' && !empty($matcher->findByTaxId($taxId))) {
+            return null;
+        }
+
         $supplier = new Proveedor();
         $supplier->nombre = trim((string) ($supplierData['name'] ?? ''));
         $supplier->razonsocial = $supplier->nombre;

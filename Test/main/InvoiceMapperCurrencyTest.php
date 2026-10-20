@@ -111,10 +111,38 @@ final class InvoiceMapperCurrencyTest extends TestCase
         $this->assertEqualsWithDelta(4.3215, (float) $invoice->tasaconv, 0.00001);
     }
 
+    /**
+     * Issue #134: una divisa que no existe se ignoraba sin avisar y la factura
+     * se grababa en la divisa predeterminada.
+     */
+    public function testUnknownCurrencyIsReportedAsWarning(): void
+    {
+        $result = $this->mapWithCurrency('XQZ');
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+        $this->assertStringContainsString('XQZ', implode('; ', $result['warnings']));
+    }
+
     private function importInvoice(string $currency): FacturaProveedor
     {
+        $result = $this->mapWithCurrency($currency);
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']), 'No se pudo recargar la factura');
+        $this->invoicesToDelete[] = $invoice;
+
+        return $invoice;
+    }
+
+    private function mapWithCurrency(string $currency): array
+    {
         $mapper = new InvoiceMapper();
-        $result = $mapper->mapToInvoice([
+        return $mapper->mapToInvoice([
             'invoice' => [
                 'number' => 'CUR-' . mt_rand(10000, 99999),
                 'issue_date' => '2026-06-01',
@@ -131,14 +159,6 @@ final class InvoiceMapperCurrencyTest extends TestCase
                 'tax_rate' => 0,
             ]],
         ], null, 'lines', false);
-
-        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
-
-        $invoice = new FacturaProveedor();
-        $this->assertTrue($invoice->loadFromCode($result['invoice_id']), 'No se pudo recargar la factura');
-        $this->invoicesToDelete[] = $invoice;
-
-        return $invoice;
     }
 
     private function createCurrency(float $rate, ?float $purchaseRate): void

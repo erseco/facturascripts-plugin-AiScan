@@ -750,6 +750,21 @@ class AiScanInvoice extends Controller
             return;
         }
 
+        // Issue #134: no se crea un proveedor con un CIF que ya existe.
+        $taxId = trim((string) ($data['tax_id'] ?? ''));
+        $existing = $taxId === '' ? [] : (new SupplierMatcher())->findByTaxId($taxId);
+        if (!empty($existing)) {
+            http_response_code(409);
+            echo json_encode([
+                'error' => Tools::lang()->trans('aiscan-supplier-tax-id-exists', [
+                    '%taxId%' => $taxId,
+                    '%name%' => $existing[0]->nombre,
+                ]),
+                'existing_supplier' => self::supplierToArray($existing[0]),
+            ]);
+            return;
+        }
+
         $supplierService = new SupplierService();
         $isCreditor = $supplierService->resolveIsCreditor($data);
 

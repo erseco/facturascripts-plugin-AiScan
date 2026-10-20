@@ -130,6 +130,12 @@ class InvoiceMapper
                     // Issue #109: setCurrency() aplica también el factor de
                     // conversión (de compra) de la divisa, no solo el código.
                     $invoice->setCurrency($divisa->coddivisa, true);
+                } else {
+                    // Issue #134: antes se ignoraba sin avisar.
+                    $result['warnings'][] = Tools::lang()->trans('aiscan-unknown-currency', [
+                        '%currency%' => strtoupper((string) $invoiceData['currency']),
+                        '%default%' => (string) $invoice->coddivisa,
+                    ]);
                 }
             }
 
@@ -252,7 +258,7 @@ class InvoiceMapper
             // so stock/purchase-data updates do not apply (skip to avoid noise).
             if ($updateStockPurchaseData && $importMode !== 'total') {
                 $updateResult = $this->inventoryUpdater->update($invoice, $lines);
-                $result['warnings'] = $updateResult['warnings'];
+                $result['warnings'] = array_merge($result['warnings'], $updateResult['warnings']);
             } else {
                 $this->inventoryUpdater->revertAll($invoice);
             }
