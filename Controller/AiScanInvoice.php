@@ -30,6 +30,7 @@ use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\ImageToPdfConverter;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\MockFixtureResolver;
+use FacturaScripts\Plugins\AiScan\Lib\ProductMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SchemaValidator;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
@@ -1270,13 +1271,14 @@ class AiScanInvoice extends Controller
             $histLine->iddocument = $histDoc->id;
             $histLine->sortorder = $idx + 1;
             // Issue #132: la revisión envía las claves de FacturaScripts; la IA, las inglesas.
-            $histLine->descripcion = trim((string) ($line['descripcion'] ?? $line['description'] ?? ''));
-            $histLine->cantidad = (float) ($line['cantidad'] ?? $line['quantity'] ?? 1);
-            $histLine->pvpunitario = (float) ($line['pvpunitario'] ?? $line['unit_price'] ?? 0);
-            $histLine->dtopor = (float) ($line['dtopor'] ?? $line['discount'] ?? 0);
-            $histLine->iva = (float) ($line['iva'] ?? $line['tax_rate'] ?? 0);
+            $descripcion = ProductMatcher::lineValue($line, ['descripcion', 'description'], '');
+            $histLine->descripcion = trim((string) $descripcion);
+            $histLine->cantidad = (float) ProductMatcher::lineValue($line, ['cantidad', 'quantity'], 1);
+            $histLine->pvpunitario = (float) ProductMatcher::lineValue($line, ['pvpunitario', 'unit_price'], 0);
+            $histLine->dtopor = (float) ProductMatcher::lineValue($line, ['dtopor', 'discount'], 0);
+            $histLine->iva = (float) ProductMatcher::lineValue($line, ['iva', 'tax_rate'], 0);
             $histLine->pvptotal = $histLine->cantidad * $histLine->pvpunitario;
-            $histLine->referencia = $line['referencia'] ?? $line['sku'] ?? null;
+            $histLine->referencia = ProductMatcher::lineValue($line, ['referencia', 'sku']);
             $histLine->save();
         }
     }

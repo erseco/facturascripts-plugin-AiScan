@@ -37,7 +37,7 @@ class ProductMatcher
     public function findReference(array $lineData, ?string $suggestedReference = null): ?string
     {
         // Issue #132: la revisión envía las claves de FacturaScripts; la IA, las inglesas.
-        $sku = trim((string) ($lineData['referencia'] ?? $lineData['sku'] ?? ''));
+        $sku = trim((string) self::lineValue($lineData, ['referencia', 'sku'], ''));
         if (!empty($sku)) {
             $variant = new Variante();
             $whereReference = [Where::eq('referencia', $sku)];
@@ -47,7 +47,7 @@ class ProductMatcher
             }
         }
 
-        $description = trim((string) ($lineData['descripcion'] ?? $lineData['description'] ?? ''));
+        $description = trim((string) self::lineValue($lineData, ['descripcion', 'description'], ''));
         if (mb_strlen($description) >= 4) {
             $variant = new Variante();
             $results = $variant->codeModelSearch($description, 'referencia');
@@ -58,5 +58,23 @@ class ProductMatcher
 
         $suggestion = trim((string) ($suggestedReference ?? ''));
         return $suggestion !== '' ? $suggestion : null;
+    }
+
+    /**
+     * Issue #132: la revisión envía las claves de FacturaScripts y la IA las
+     * inglesas, a veces las dos con una vacía ({referencia: '', sku: 'ABC'}).
+     * Devuelve el primer valor que no sea nulo ni una cadena vacía; un 0 sí
+     * cuenta (cantidad 0 en #82).
+     */
+    public static function lineValue(array $line, array $keys, mixed $default = null): mixed
+    {
+        foreach ($keys as $key) {
+            $value = $line[$key] ?? null;
+            if ($value !== null && trim((string) $value) !== '') {
+                return $value;
+            }
+        }
+
+        return $default;
     }
 }

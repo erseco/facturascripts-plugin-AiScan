@@ -60,7 +60,14 @@ final class ProductMatcherTest extends TestCase
             'SUGGESTED-REF'
         );
 
+        $emptyFsKey = $this->matcher->findReference(
+            ['referencia' => '', 'sku' => $this->product->referencia],
+            'SUGGESTED-REF'
+        );
+
         $this->assertSame($this->product->referencia, $byDescription);
+        $this->assertSame($this->product->referencia, $emptyFsKey);
+        $this->assertSame(0, ProductMatcher::lineValue(['cantidad' => 0, 'quantity' => 5], ['cantidad', 'quantity']));
         $this->assertSame($this->product->referencia, $byReference);
     }
 
