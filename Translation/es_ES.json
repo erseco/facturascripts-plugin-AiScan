@@ -55,6 +55,7 @@
     "aiscan-file-uploaded-select-provider": "Archivo subido. Selecciona un proveedor y pulsa Analizar.",
     "aiscan-filename-required": "El nombre de archivo es obligatorio",
     "aiscan-files-selected": "%count% archivo(s) seleccionado(s)",
+    "aiscan-invoice-not-discarded": "No se ha podido descartar la factura %code%: revísala antes de reintentar para no duplicarla.",
     "aiscan-remove-file": "Quitar %name%",
     "aiscan-finish": "Finalizar",
     "aiscan-fix-rounding": "Ajustar",

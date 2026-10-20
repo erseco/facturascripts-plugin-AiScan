@@ -55,6 +55,7 @@
     "aiscan-file-uploaded-select-provider": "File uploaded. Select a provider and click Analyze.",
     "aiscan-filename-required": "Filename is required",
     "aiscan-files-selected": "%count% file(s) selected",
+    "aiscan-invoice-not-discarded": "Invoice %code% could not be discarded: check it before retrying so it is not duplicated.",
     "aiscan-remove-file": "Remove %name%",
     "aiscan-finish": "Finish",
     "aiscan-fix-rounding": "Fix",

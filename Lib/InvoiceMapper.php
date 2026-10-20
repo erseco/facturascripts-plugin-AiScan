@@ -246,8 +246,6 @@ class InvoiceMapper
                 $this->applyPaymentMethodToReceipts($invoice, $resolvedFormaPago, $invoiceData);
             }
 
-            $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
-
             $this->setReceivedStatus($invoice);
 
             // Total mode aggregates lines by tax and has no linked products,
@@ -259,6 +257,11 @@ class InvoiceMapper
                 $this->inventoryUpdater->revertAll($invoice);
             }
 
+            // Issue #133: el adjunto va el último porque mueve el archivo fuera de
+            // aiscan_tmp. Si algo fallaba antes, la factura se descartaba y el
+            // reintento ya no encontraba el documento escaneado.
+            $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
+
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
         } catch (\Throwable $e) {
@@ -266,8 +269,12 @@ class InvoiceMapper
                 $database->rollback();
             }
 
-            $this->discardDraft($invoiceId, $invoice);
             $result['errors'][] = $e->getMessage();
+            if (false === $this->discardDraft($invoiceId, $invoice)) {
+                $result['errors'][] = Tools::lang()->trans('aiscan-invoice-not-discarded', [
+                    '%code%' => (string) $invoice?->codigo,
+                ]);
+            }
         }
 
         return $result;
@@ -519,10 +526,14 @@ class InvoiceMapper
      * después, hay que deshacerla o quedaría un boceto a 0 € huérfano. Solo se
      * borra la factura que hemos creado nosotros; una existente no se toca.
      */
-    private function discardDraft(?int $invoiceId, ?FacturaProveedor $invoice): void
+    /**
+     * Devuelve false si la factura nueva sigue grabada tras intentar descartarla,
+     * para que el usuario no la duplique al reintentar.
+     */
+    private function discardDraft(?int $invoiceId, ?FacturaProveedor $invoice): bool
     {
         if ($invoiceId !== null || !$invoice instanceof FacturaProveedor || empty($invoice->idfactura)) {
-            return;
+            return true;
         }
 
         // Issue #133: si el fallo llega después de marcarla como recibida, la
@@ -531,7 +542,7 @@ class InvoiceMapper
         // que un reintento no la duplique.
         $draft = new FacturaProveedor();
         if (false === $draft->load($invoice->idfactura)) {
-            return;
+            return true;
         }
 
         if (!$draft->editable) {
@@ -539,11 +550,21 @@ class InvoiceMapper
             $order = ['predeterminado' => 'DESC', 'idestado' => 'ASC'];
             foreach ((new EstadoDocumento())->all($where, $order, 0, 1) as $editable) {
                 $draft->idestado = $editable->idestado;
-                $draft->save();
+                if (false === $draft->save()) {
+                    return false;
+                }
             }
         }
 
-        $draft->delete();
+        // Un recibo marcado como pagado (contado, #57) impide borrar la factura.
+        foreach ($draft->getReceipts() as $receipt) {
+            if ($receipt->pagado) {
+                $receipt->pagado = false;
+                $receipt->save();
+            }
+        }
+
+        return $draft->delete();
     }
 
     private function readLogDetail(): string

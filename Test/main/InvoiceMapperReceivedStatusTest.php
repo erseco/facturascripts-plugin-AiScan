@@ -105,7 +105,24 @@ final class InvoiceMapperReceivedStatusTest extends TestCase
             $supplier = $this->createSupplier();
             $mapper = new InvoiceMapper(inventoryUpdater: $updater);
 
-            $result = $mapper->mapToInvoice($this->buildData($supplier), null, 'lines', false);
+            $tmpDir = FS_FOLDER . '/MyFiles/aiscan_tmp';
+            if (!is_dir($tmpDir)) {
+                mkdir($tmpDir, 0700, true);
+            }
+            $tmpName = 'aiscan_retry_' . bin2hex(random_bytes(4)) . '.pdf';
+            file_put_contents($tmpDir . '/' . $tmpName, '%PDF-1.4 retry');
+            $data = $this->buildData($supplier);
+            $data['_upload'] = ['tmp_file' => $tmpName, 'original_name' => 'retry.pdf'];
+
+            try {
+                $result = $mapper->mapToInvoice($data, null, 'lines', false);
+                // El reintento necesita el documento escaneado.
+                $this->assertFileExists($tmpDir . '/' . $tmpName, get_class($error));
+            } finally {
+                if (is_file($tmpDir . '/' . $tmpName)) {
+                    unlink($tmpDir . '/' . $tmpName);
+                }
+            }
 
             $this->assertFalse($result['success'], get_class($error));
             $this->assertContains($error->getMessage(), $result['errors']);
