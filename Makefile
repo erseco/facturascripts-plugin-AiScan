@@ -1,6 +1,6 @@
 # Makefile to facilitate the use of Docker for FacturaScripts plugin development
 
-.PHONY: help up upd down pull build shell clean package enable-plugin rebuild lint format test logs ps fresh check-docker
+.PHONY: help up upd down pull build shell clean package enable-plugin rebuild lint format test logs ps fresh check-docker js
 
 # Define SED_INPLACE based on the operating system
 ifeq ($(shell uname), Darwin)
@@ -92,6 +92,7 @@ package:
 		-x "*docker-compose.override.yml" \
 		-x "*docker/*" \
 		-x "*FORJA.md" \
+		-x "*Assets/JS/workflow/*" \
 		-x "*examples/*" \
 		-x "*Makefile" \
 		-x "*node_modules/*" \
@@ -126,6 +127,10 @@ rebuild: check-docker
 	@echo "Rebuilding FacturaScripts..."
 	@docker compose exec facturascripts sh -c "curl -s http://localhost:8080/deploy?action=rebuild > /dev/null"
 	@echo "Rebuild complete!"
+
+# Build Assets/JS/aiscan-workflow.js from the fragments in Assets/JS/workflow/ (#137)
+js:
+	cat Assets/JS/workflow/*.js > Assets/JS/aiscan-workflow.js
 
 # Run PHP CodeSniffer to check code style
 lint: check-docker upd
@@ -192,6 +197,7 @@ help:
 	@echo "Code Quality:"
 	@echo "  lint              - Run PHP CodeSniffer to check code style"
 	@echo "  format            - Run PHP CS Fixer to automatically fix code style"
+	@echo "  js                - Rebuild Assets/JS/aiscan-workflow.js from Assets/JS/workflow/"
 	@echo ""
 	@echo "Testing:"
 	@echo "  test              - Run unit tests inside container"
