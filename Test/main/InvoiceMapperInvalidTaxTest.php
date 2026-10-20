@@ -162,6 +162,24 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->assertEqualsWithDelta(9.87, (float) $line->iva, 0.001);
     }
 
+    public function testRateWithoutTaxCodeAndNoMatchingTaxAbortsTheImport(): void
+    {
+        $supplier = $this->createSupplier();
+
+        // 3,17 % no existe en ninguna instalación: mejor cortar que grabar un
+        // asiento con la subcuenta de otro impuesto.
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 3.17], ['tax_amount' => 0.95, 'total' => 30.95]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertNull($result['invoice_id']);
+        $this->assertStringContainsString('3,17', implode('; ', $result['errors']));
+    }
+
     /**
      * Con varios impuestos al mismo tipo, buscar «el primero que coincida» elegía
      * por orden alfabético y podía cruzar regímenes (IVA4 -> IPSI4).
