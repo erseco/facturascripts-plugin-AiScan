@@ -105,6 +105,18 @@ final class ProviderTransportTest extends TestCase
         }
     }
 
+    public function testGeminiSendsApiKeyInHeaderInsteadOfUrl(): void
+    {
+        // Issue #130: la clave en la URL acaba en los registros de proxies y servidores.
+        self::$response = json_encode(['candidates' => [['content' => ['parts' => [['text' => '{"ok":true}']]]]]]);
+        Tools::settingsSet('AiScan', 'gemini_api_key', 'gemini-secret-not-real');
+        (new GeminiProvider())->analyzeDocument('fixture-content', 'text/plain', 'Read this invoice');
+
+        self::assertStringNotContainsString('gemini-secret-not-real', self::$request->url);
+        self::assertStringNotContainsString('key=', self::$request->url);
+        self::assertContains('x-goog-api-key: gemini-secret-not-real', self::$request->options[CURLOPT_HTTPHEADER]);
+    }
+
     public function testExtractionNormalizesSingleAndMultipleInvoicesAndRejectsInvalidJson(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'aiscan-extraction-');
