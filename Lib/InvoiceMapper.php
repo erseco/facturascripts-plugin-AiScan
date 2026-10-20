@@ -175,15 +175,15 @@ class InvoiceMapper
             // podían grabar, así que un fallo la dejaba sin líneas y con el
             // número, la fecha y las observaciones ya cambiados.
             //
-            // Lo que va después del commit (recibos, adjunto, estado, stock) ya
-            // no entra en esa garantía.
+            // Issue #133: la transacción cubre también los recibos, el adjunto, el
+            // estado y el stock, y se abre igual para una factura nueva. Una vez
+            // recibida, la factura ya no es editable ni se puede borrar, así que
+            // si algo fallaba después se quedaba grabada y el reintento la
+            // duplicaba. Con el rollback vuelve a ser un boceto y se borra.
             //
             // Las líneas se construyen antes de abrir la transacción para que la
             // creación diferida de tablas de FacturaScripts (que no admite DDL
-            // dentro de una transacción) no la rompa. En una factura nueva no
-            // hace falta transacción: si algo falla se borra la cabecera y la
-            // clave ajena se lleva por delante las líneas que se hubieran
-            // grabado.
+            // dentro de una transacción) no la rompa.
             $oldLines = $invoiceId ? $invoice->getLines() : [];
             $inTransaction = false;
 
@@ -191,7 +191,7 @@ class InvoiceMapper
             // ni la empezamos ni la cerramos, pero nos protege igual. Si no hay
             // y no se puede abrir, se aborta antes de tocar nada: sin ella los
             // cambios dejarían de ser reversibles.
-            if ($invoiceId && false === $database->inTransaction()) {
+            if (false === $database->inTransaction()) {
                 if (false === $database->beginTransaction()) {
                     throw new RuntimeException(Tools::lang()->trans('aiscan-transaction-error'));
                 }
@@ -228,15 +228,6 @@ class InvoiceMapper
                 return $result;
             }
 
-            if ($inTransaction) {
-                $inTransaction = false;
-                if (false === $database->commit()) {
-                    $database->rollback();
-                    $result['errors'][] = Tools::lang()->trans('aiscan-transaction-error');
-                    return $result;
-                }
-            }
-
             // Tras calcular líneas FS genera recibos. Ajustamos vencimiento y
             // pagado según la forma de pago (issue #57: contado/tarjeta).
             if ($resolvedFormaPago instanceof FormaPago) {
@@ -256,9 +247,19 @@ class InvoiceMapper
                 $this->inventoryUpdater->revertAll($invoice);
             }
 
+            if ($inTransaction) {
+                $inTransaction = false;
+                if (false === $database->commit()) {
+                    $database->rollback();
+                    $this->discardDraft($invoiceId, $invoice);
+                    $result['errors'][] = Tools::lang()->trans('aiscan-transaction-error');
+                    return $result;
+                }
+            }
+
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             if ($inTransaction) {
                 $database->rollback();
             }
@@ -518,8 +519,15 @@ class InvoiceMapper
      */
     private function discardDraft(?int $invoiceId, ?FacturaProveedor $invoice): void
     {
-        if ($invoiceId === null && $invoice instanceof FacturaProveedor && $invoice->exists()) {
-            $invoice->delete();
+        if ($invoiceId !== null || !$invoice instanceof FacturaProveedor || empty($invoice->idfactura)) {
+            return;
+        }
+
+        // Issue #133: tras el rollback el objeto aún puede creerse «recibido» (no
+        // editable) y negarse a borrar; se borra lo que de verdad hay grabado.
+        $draft = new FacturaProveedor();
+        if ($draft->load($invoice->idfactura)) {
+            $draft->delete();
         }
     }
 
@@ -627,17 +635,24 @@ class InvoiceMapper
         return $base > 0 ? $base : $total;
     }
 
+    /**
+     * Issue #133: el nombre del estado («Recibida») depende del idioma de la
+     * instalación, así que se busca por sus propiedades: el estado de factura
+     * de proveedor que cierra la edición sin generar otro documento.
+     */
     private function setReceivedStatus(FacturaProveedor $invoice): void
     {
         $status = new EstadoDocumento();
         $where = [
-            Where::column('tipodoc', 'FacturaProveedor'),
-            Where::column('nombre', 'Recibida'),
+            Where::eq('tipodoc', 'FacturaProveedor'),
+            Where::eq('editable', false),
         ];
-        foreach ($status->all($where, [], 0, 1) as $received) {
-            $invoice->idestado = $received->idestado;
-            $invoice->save();
-            return;
+        foreach ($status->all($where, ['idestado' => 'ASC'], 0, 0) as $received) {
+            if (empty($received->generadoc) && !empty($received->activo ?? true)) {
+                $invoice->idestado = $received->idestado;
+                $invoice->save();
+                return;
+            }
         }
     }
 
