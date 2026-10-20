@@ -4030,6 +4030,29 @@
             });
             const data = await response.json();
 
+            // Issue #134: el CIF ya existe; se enlaza ese proveedor en vez de dejar
+            // el documento sin proveedor y obligar a buscarlo a mano.
+            if (data.existing_supplier && doc?.extractedData?.supplier) {
+                const existing = data.existing_supplier;
+                Object.assign(doc.extractedData.supplier, {
+                    matched_supplier_id: existing.id,
+                    matched_name: existing.name,
+                    match_status: 'selected',
+                    name: existing.name,
+                    tax_id: existing.tax_id,
+                });
+                applyPartyTypeToSupplier(doc.extractedData.supplier, partyType);
+                rememberSupplierAlias(doc.extractedData.supplier, existing.id);
+                await applySupplierProductSuggestion(doc, existing.id);
+                renderReviewPanel(doc);
+                const linkedStatusEl = document.getElementById('aiscan-create-supplier-status');
+                if (linkedStatusEl) {
+                    linkedStatusEl.className = 'small text-warning';
+                    linkedStatusEl.textContent = data.error || '';
+                }
+                return;
+            }
+
             if (data.error) {
                 throw new Error(data.error);
             }

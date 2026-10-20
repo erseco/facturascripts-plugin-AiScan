@@ -38,7 +38,7 @@ class SupplierMatcher
     private const TAX_ID_SCAN_LIMIT = 500;
 
     /** Candidatos por nombre que se comparan enteros en PHP (issue #134). */
-    private const NAME_SCAN_LIMIT = 20;
+    private const NAME_SCAN_LIMIT = 50;
 
     public function findMatch(array $supplierData): array
     {
@@ -90,8 +90,9 @@ class SupplierMatcher
             // puntuación); si no, se ofrecen como sugerencia para que elija el usuario.
             $key = $this->nameKey((string) $supplierData['name']);
             $search = rtrim($this->normalizeName((string) $supplierData['name']), " \t.,;:");
-            $where = [Where::like('nombre', '%' . $search . '%')];
-            $candidates = $key === '' ? [] : (new Proveedor())->all($where, [], 0, self::NAME_SCAN_LIMIT);
+            $where = [Where::like('nombre|razonsocial', '%' . $search . '%')];
+            $order = ['nombre' => 'ASC'];
+            $candidates = $key === '' ? [] : (new Proveedor())->all($where, $order, 0, self::NAME_SCAN_LIMIT);
             $exact = array_values(array_filter(
                 $candidates,
                 fn ($row): bool => $this->nameKey((string) $row->nombre) === $key

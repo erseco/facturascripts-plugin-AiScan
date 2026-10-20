@@ -211,7 +211,7 @@
     "aiscan-transaction-error": "Database transaction error while replacing the invoice lines.",
     "aiscan-undecided-remaining": "%count% invoice(s) still need a review decision",
     "aiscan-unknown-action": "Unknown action: %action%",
-    "aiscan-unknown-currency": "Currency \"%currency%\" does not exist; the invoice was saved in %default%.",
+    "aiscan-unknown-currency": "Currency \"%currency%\" does not exist in FacturaScripts; the default currency is used.",
     "aiscan-unresolved-tax-code": "Could not determine the tax for line \"%description%\": code \"%code%\" does not exist and several taxes share %rate%%. Please review the line tax before importing.",
     "aiscan-unresolved-tax-rate": "Could not determine the tax for line \"%description%\": there is no single tax at %rate%%. Please review the line tax before importing.",
     "aiscan-unsupported-file-extension": "Unsupported file extension: %extension%",

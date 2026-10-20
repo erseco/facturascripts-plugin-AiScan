@@ -134,7 +134,6 @@ class InvoiceMapper
                     // Issue #134: antes se ignoraba sin avisar.
                     $result['warnings'][] = Tools::lang()->trans('aiscan-unknown-currency', [
                         '%currency%' => strtoupper((string) $invoiceData['currency']),
-                        '%default%' => (string) $invoice->coddivisa,
                     ]);
                 }
             }

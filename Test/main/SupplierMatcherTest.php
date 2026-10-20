@@ -267,6 +267,19 @@ final class SupplierMatcherTest extends TestCase
         $this->assertSame($stored->codproveedor, $result['supplier']->codproveedor);
     }
 
+    public function testLegalNameMatchesWhenTheTradeNameDiffers(): void
+    {
+        $suffix = (string) mt_rand(10000, 99999);
+        $stored = $this->createSupplier('Marca Comercial ' . $suffix, '');
+        $stored->razonsocial = 'Sociedad Legal ' . $suffix . ' SAU';
+        $this->assertTrue($stored->save());
+
+        $result = $this->matcher->findMatch(['name' => 'Sociedad Legal ' . $suffix . ' S.A.U.']);
+
+        $this->assertSame('matched', $result['match_status']);
+        $this->assertSame($stored->codproveedor, $result['supplier']->codproveedor);
+    }
+
     /** @var Proveedor[] */
     private array $suppliersToDelete = [];
 
