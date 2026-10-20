@@ -1,27 +1,37 @@
 ---
 name: javascript-expert
-description: JavaScript patterns for AiScan plugin. UMD modules (aiscan-flow.js), IIFE pattern (aiscan.js), jQuery integration, no bundler, no ES modules, Node --test runner for tests.
+description: JavaScript patterns for AiScan plugin. One IIFE bundle (aiscan-workflow.js) built from fragments in Assets/JS/workflow/ with `make js`, no ES modules, Node --test runner for tests.
 ---
 
 # JavaScript Expert — AiScan Frontend Patterns
 
 ## Module Architecture
 
-AiScan uses **two JS files** loaded via `<script>` tags — no bundler, no ES modules.
+The review/import page loads **one script**, `Assets/JS/aiscan-workflow.js`, through
+`AssetManager::addJs()` in `AiScanInvoice::loadPageAssets()`. The settings page loads
+`Assets/JS/aiscan-config.js`. No bundler, no ES modules.
 
-### aiscan-flow.js (UMD Library)
-- **Path:** `Assets/JS/aiscan-flow.js`
-- **Pattern:** UMD (Universal Module Definition) — works in browser and Node.js
-- **Purpose:** Pure state management functions, zero DOM dependency
-- **Exports:** `normalizeUploadResponse`, `createWizardEntries`, `getWizardMeta`, `markEntrySaved`, `getSaveInvoiceId`, `cloneValue`
-- **Rule:** No jQuery, no `document`, no `window` references (except UMD boilerplate)
+### aiscan-workflow.js is generated (issue #137)
+- **Never edit `Assets/JS/aiscan-workflow.js` by hand.** Edit the fragments in
+  `Assets/JS/workflow/` and run `make js` (plain `cat` in name order).
+- The fragments are consecutive pieces of a single IIFE: `00-state.js` opens it and
+  holds `state`/`STATUS`; `99-test-hooks.js` exposes `__aiscanWorkflowTestHooks` and
+  closes it. Every other file is a group of functions in that shared scope, so any
+  function can call any other; there is no import/export between fragments.
+- Pick the fragment by area: `01-helpers` (trans, escaping, `apiFetch`,
+  `readJsonResponse`, validation), `03-upload`, `04-analysis`, `05-review-sidebar`,
+  `06-preview`, `07-review-panel`, `08-default-product`, `09-taxes-and-totals`,
+  `10-line-products`, `11-lines-section`, `12-supplier`, `13-form-actions`,
+  `14-import`, `15-ui-navigation`, `16-split-handle`.
+- New fragments need a two-digit prefix that puts them in the right place; a
+  fragment must not open or close the IIFE.
+- `Test/js/bundle.test.js` fails when the bundle is out of date.
+- `Assets/JS/workflow/` is `export-ignore`d: the release ZIP only ships the bundle.
 
-### aiscan.js (IIFE UI Controller)
-- **Path:** `Assets/JS/aiscan.js`
-- **Pattern:** IIFE (Immediately Invoked Function Expression)
-- **Purpose:** DOM interaction, event handling, AJAX calls, modal lifecycle
-- **Dependencies:** jQuery (global `$`), aiscan-flow.js (global `AiScanFlow`)
-- **Rule:** All DOM access goes here, never in aiscan-flow.js
+### Network calls
+- Use `apiFetch(url, options)` (adds the `multireqtoken`, #129) and parse with
+  `readJsonResponse(response)` (treats 4xx/5xx as errors, #135). Never call
+  `fetch` directly for `AiScanInvoice` actions.
 
 ## Coding Rules
 
@@ -31,34 +41,22 @@ AiScan uses **two JS files** loaded via `<script>` tags — no bundler, no ES mo
 import { foo } from './bar.js';
 export function baz() {}
 
-// CORRECT — UMD or IIFE patterns
-(function(root, factory) {
-    if (typeof module === 'object') module.exports = factory();
-    else root.MyLib = factory();
-})(typeof self !== 'undefined' ? self : this, function() { ... });
-```
-
-### jQuery for DOM and AJAX
-```javascript
-// Use jQuery — consistent with FacturaScripts core
-$.ajax({ url: actionUrl, method: 'POST', data: formData });
-$(document).on('click', '.aiscan-btn', handler);
-
-// NOT vanilla fetch/addEventListener (compatibility)
+// CORRECT — plain functions inside the shared IIFE scope of the fragments
+function renderSomething(doc) { ... }
 ```
 
 ### State Management
 - State is a plain object — no class instances, no Proxy
-- Deep clone via `cloneValue(obj)` → `JSON.parse(JSON.stringify(obj))`
+- Deep clone via `JSON.parse(JSON.stringify(obj))` (see `collectFormData`)
 - Never mutate function arguments — clone first, modify clone, return clone
 
 ### Event Handling
-- Use **event delegation** via `$(document).on(event, selector, handler)`
-- Keeps handlers working for dynamically inserted DOM elements
+- Bind with `addEventListener` after each render, or delegate on a stable parent
+  for dynamically inserted DOM elements
 - Clean up handlers when modal closes to prevent leaks
 
 ### Error Handling
-- Wrap AJAX calls in `.fail()` handlers
+- Wrap `apiFetch` calls in `try/catch` (or `.catch()`)
 - Show user-facing errors in the modal UI — never silent failures
 - Console.log for debug info only when `debug_mode` is enabled
 
@@ -66,11 +64,14 @@ $(document).on('click', '.aiscan-btn', handler);
 
 - **Runner:** `node --test Test/js/*.test.js`
 - **Assert:** Node.js built-in `assert` module (no mocha/jest)
-- **Files:** `Test/js/aiscan-flow.test.js`, `Test/js/aiscan-fallback.test.js`
-- **Coverage:** Test pure functions from aiscan-flow.js; IIFE logic tested via fallback tests
+- **Files:** `Test/js/aiscan-workflow.test.js` loads the bundle in a `vm` context with
+  a minimal fake DOM and uses `__aiscanWorkflowTestHooks`; `Test/js/bundle.test.js`
+  checks the bundle matches the fragments
+- **Rule:** to test a new function, add it to the hooks in `99-test-hooks.js`
 - **Rule:** Tests must run without browser environment (no jsdom)
 
 ## Reference Files
-- `Assets/JS/aiscan-flow.js` — UMD state management library
-- `Assets/JS/aiscan.js` — IIFE UI controller
+- `Assets/JS/workflow/` — source fragments of the review/import page
+- `Assets/JS/aiscan-workflow.js` — generated bundle (`make js`)
+- `Assets/JS/aiscan-config.js` — settings page
 - `Test/js/` — JavaScript test files

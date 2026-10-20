@@ -43,6 +43,7 @@ Inspect these files before making assumptions:
 | `.github/workflows/ci.yml` | CI pipeline (Docker lint+test, then PHP matrix 8.1-8.5) |
 | `Test/main/` | Unit tests |
 | `Lib/` | Core business logic (matchers, mappers, services) |
+| `Assets/JS/workflow/` | Source of `Assets/JS/aiscan-workflow.js` — edit here, then `make js` |
 | `docs/adr/` | Architecture Decision Records |
 
 ---
@@ -56,6 +57,10 @@ make format   # PHP CS Fixer – auto-fixes style issues
 make lint     # PHPCS – reports remaining violations (must be clean)
 make test     # PHPUnit – all tests must pass
 ```
+
+When you touch the review/import page JavaScript, edit `Assets/JS/workflow/*.js`
+(never the generated `Assets/JS/aiscan-workflow.js`), then run `make js` and
+`node --test Test/js/*.test.js`.
 
 All three require Docker (`make upd` starts the container automatically).
 

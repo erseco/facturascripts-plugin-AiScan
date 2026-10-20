@@ -6,6 +6,9 @@
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
+ *
+ * GENERATED FILE: do not edit Assets/JS/aiscan-workflow.js by hand. Edit the
+ * fragments in Assets/JS/workflow/ and run `make js` (issue #137).
  */
 
 'use strict';
