@@ -6,37 +6,6 @@
         document.getElementById('aiscan-step-import').classList.toggle('d-none', step !== 'import');
     }
 
-    function resetUploadUI() {
-        state.documents.forEach(doc => {
-            if (doc.objectUrl) {
-                URL.revokeObjectURL(doc.objectUrl);
-            }
-        });
-        state.documents = [];
-        state.currentIndex = 0;
-        state.selectedIndices.clear();
-        state.selectionAnchorIndex = null;
-
-        const dropZone = document.getElementById('aiscan-drop-zone');
-        dropZone.innerHTML = `
-            <div>
-                <div class="fs-2 mb-2 text-muted"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-                <div class="fw-semibold">${escapeHtml(trans('aiscan-document-and-image-drop'))}</div>
-                <div class="small text-muted mt-1">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
-                <div class="small text-muted mt-1">PDF, JPG, PNG, WebP</div>
-            </div>
-        `;
-
-        document.getElementById('aiscan-file-input').value = '';
-        document.getElementById('aiscan-upload-btn').disabled = true;
-        document.getElementById('aiscan-upload-btn').innerHTML = `<i class="fa-solid fa-cloud-arrow-up me-1"></i>${escapeHtml(trans('aiscan-upload-and-analyze'))}`;
-
-        const fileList = document.getElementById('aiscan-file-list');
-        if (fileList) {
-            fileList.classList.add('d-none');
-        }
-    }
-
     function buildProviderSelect() {
         const select = document.getElementById('aiscan-provider-select');
         if (!select) {

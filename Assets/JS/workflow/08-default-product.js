@@ -192,7 +192,7 @@
 
         let timer = null;
         let activeIndex = -1;
-        let requestId = 0;
+        const search = createLatestSearch('search-products');
         const resultsId = resultsDiv.id;
 
         const setStatus = (message, kind) => {
@@ -207,46 +207,22 @@
         };
 
         const closeResults = () => {
-            resultsDiv.innerHTML = '';
-            resultsDiv.classList.add('d-none');
-            input.setAttribute('aria-expanded', 'false');
-            input.removeAttribute('aria-activedescendant');
+            closeAutocomplete(resultsDiv, input);
             activeIndex = -1;
         };
 
-        const updateHighlight = () => {
-            const options = Array.from(resultsDiv.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR));
-            options.forEach((option, index) => {
-                const isActive = index === activeIndex;
-                option.classList.toggle('active', isActive);
-                option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                if (isActive) {
-                    input.setAttribute('aria-activedescendant', option.id);
-                    if (typeof option.scrollIntoView === 'function') {
-                        option.scrollIntoView({block: 'nearest'});
-                    }
-                }
-            });
-            if (activeIndex < 0 || !options[activeIndex]) {
-                input.removeAttribute('aria-activedescendant');
-            }
-            return options;
-        };
+        const updateHighlight = () => highlightAutocompleteOption(resultsDiv, input, activeIndex);
 
         const renderResults = (items) => {
             if (!items.length) {
-                resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                resultsDiv.innerHTML = autocompleteNoResultsHtml();
                 resultsDiv.classList.remove('d-none');
                 input.setAttribute('aria-expanded', 'true');
                 activeIndex = -1;
                 return;
             }
 
-            resultsDiv.innerHTML = items.map((p, index) =>
-                `<button type="button" class="list-group-item list-group-item-action small py-1" id="${resultsId}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
-                    <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
-                </button>`
-            ).join('');
+            resultsDiv.innerHTML = buildProductOptionsHtml(items, resultsId);
             resultsDiv.classList.remove('d-none');
             input.setAttribute('aria-expanded', 'true');
             activeIndex = 0;
@@ -260,20 +236,13 @@
                 return;
             }
 
-            const currentRequestId = ++requestId;
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    if (currentRequestId !== requestId) {
-                        return;
+            search(query)
+                .then(items => {
+                    if (items !== null) {
+                        renderResults(items);
                     }
-                    renderResults(Array.isArray(data.results) ? data.results : []);
                 })
-                .catch(() => {
-                    if (currentRequestId === requestId) {
-                        closeResults();
-                    }
-                });
+                .catch(closeResults);
         };
 
         const selectProduct = async (referencia, description) => {

@@ -440,6 +440,91 @@
         return null;
     }
 
+    // ── Autocomplete ───────────────────────────────────────────────────
+    // Issue #147: piezas comunes de los buscadores de producto (predeterminado,
+    // modal y línea) y de proveedor, que antes repetía cada uno.
+
+    function autocompleteNoResultsHtml() {
+        return `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+    }
+
+    // Botones de resultado de producto. Con idPrefix son opciones navegables con
+    // el teclado (role="option" + id para aria-activedescendant).
+    function buildProductOptionsHtml(items, idPrefix = '', extraClass = '') {
+        return items.map((item, index) => {
+            const aria = idPrefix
+                ? ` id="${idPrefix}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1"`
+                : '';
+            const cls = extraClass ? ' ' + extraClass : '';
+            return `<button type="button" class="list-group-item list-group-item-action small py-1${cls}"${aria} data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
+                    <strong>${escapeHtml(item.referencia)}</strong> <span class="text-muted">${escapeHtml(item.description)}</span>
+                </button>`;
+        }).join('');
+    }
+
+    // Busca en una acción de AiScanInvoice y descarta las respuestas que llegan
+    // tarde: solo la última consulta resuelve con resultados, las anteriores con
+    // null (también si fallan), para no pintar una lista vieja encima de la nueva.
+    function createLatestSearch(action) {
+        let requestId = 0;
+        return query => {
+            const current = ++requestId;
+            return apiFetch('AiScanInvoice?' + new URLSearchParams({action, query}))
+                .then(readJsonResponse)
+                .then(data => {
+                    if (current !== requestId) {
+                        return null;
+                    }
+                    return Array.isArray(data.results) ? data.results : [];
+                })
+                .catch(error => {
+                    if (current !== requestId) {
+                        return null;
+                    }
+                    throw error;
+                });
+        };
+    }
+
+    function closeAutocomplete(resultsDiv, input) {
+        resultsDiv.innerHTML = '';
+        resultsDiv.classList.add('d-none');
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+    }
+
+    // Marca la opción activa y la anuncia con aria-activedescendant.
+    function highlightAutocompleteOption(resultsDiv, input, activeIndex) {
+        const options = Array.from(resultsDiv?.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR) || []);
+        options.forEach((option, index) => {
+            const isActive = index === activeIndex;
+            option.classList.toggle('active', isActive);
+            option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            if (isActive && input) {
+                input.setAttribute('aria-activedescendant', option.id);
+            }
+            if (isActive && typeof option.scrollIntoView === 'function') {
+                option.scrollIntoView({block: 'nearest'});
+            }
+        });
+        if (input && (activeIndex < 0 || !options[activeIndex])) {
+            input.removeAttribute('aria-activedescendant');
+        }
+        return options;
+    }
+
+    // Issue #147: datos del proveedor elegido, venga de la búsqueda, de la
+    // desambiguación, del alta o de un CIF que ya existía.
+    function applySelectedSupplier(supplier, selected, matchStatus) {
+        return Object.assign(supplier, {
+            matched_supplier_id: selected.id,
+            matched_name: selected.name,
+            match_status: matchStatus,
+            name: selected.name,
+            tax_id: selected.tax_id || '',
+        });
+    }
+
     // ── Initialization ─────────────────────────────────────────────────
 
     document.addEventListener('DOMContentLoaded', init);
@@ -2514,7 +2599,7 @@
 
         let timer = null;
         let activeIndex = -1;
-        let requestId = 0;
+        const search = createLatestSearch('search-products');
         const resultsId = resultsDiv.id;
 
         const setStatus = (message, kind) => {
@@ -2529,46 +2614,22 @@
         };
 
         const closeResults = () => {
-            resultsDiv.innerHTML = '';
-            resultsDiv.classList.add('d-none');
-            input.setAttribute('aria-expanded', 'false');
-            input.removeAttribute('aria-activedescendant');
+            closeAutocomplete(resultsDiv, input);
             activeIndex = -1;
         };
 
-        const updateHighlight = () => {
-            const options = Array.from(resultsDiv.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR));
-            options.forEach((option, index) => {
-                const isActive = index === activeIndex;
-                option.classList.toggle('active', isActive);
-                option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                if (isActive) {
-                    input.setAttribute('aria-activedescendant', option.id);
-                    if (typeof option.scrollIntoView === 'function') {
-                        option.scrollIntoView({block: 'nearest'});
-                    }
-                }
-            });
-            if (activeIndex < 0 || !options[activeIndex]) {
-                input.removeAttribute('aria-activedescendant');
-            }
-            return options;
-        };
+        const updateHighlight = () => highlightAutocompleteOption(resultsDiv, input, activeIndex);
 
         const renderResults = (items) => {
             if (!items.length) {
-                resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                resultsDiv.innerHTML = autocompleteNoResultsHtml();
                 resultsDiv.classList.remove('d-none');
                 input.setAttribute('aria-expanded', 'true');
                 activeIndex = -1;
                 return;
             }
 
-            resultsDiv.innerHTML = items.map((p, index) =>
-                `<button type="button" class="list-group-item list-group-item-action small py-1" id="${resultsId}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
-                    <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
-                </button>`
-            ).join('');
+            resultsDiv.innerHTML = buildProductOptionsHtml(items, resultsId);
             resultsDiv.classList.remove('d-none');
             input.setAttribute('aria-expanded', 'true');
             activeIndex = 0;
@@ -2582,20 +2643,13 @@
                 return;
             }
 
-            const currentRequestId = ++requestId;
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    if (currentRequestId !== requestId) {
-                        return;
+            search(query)
+                .then(items => {
+                    if (items !== null) {
+                        renderResults(items);
                     }
-                    renderResults(Array.isArray(data.results) ? data.results : []);
                 })
-                .catch(() => {
-                    if (currentRequestId === requestId) {
-                        closeResults();
-                    }
-                });
+                .catch(closeResults);
         };
 
         const selectProduct = async (referencia, description) => {
@@ -3274,26 +3328,22 @@
         const searchBtn = document.getElementById('aiscan-product-modal-search-btn');
         const resultsDiv = document.getElementById('aiscan-product-modal-results');
         let timer = null;
+        const search = createLatestSearch('search-products');
 
         const doSearch = () => {
             const query = input.value.trim();
-            if (query.length < 2) {
+            if (query.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) {
                 resultsDiv.innerHTML = '';
                 return;
             }
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    const items = data.results || [];
-                    if (items.length === 0) {
-                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
-                    } else {
-                        resultsDiv.innerHTML = items.map(p =>
-                            `<button type="button" class="list-group-item list-group-item-action small py-1 aiscan-product-modal-pick" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
-                                <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
-                            </button>`
-                        ).join('');
+            search(query)
+                .then(items => {
+                    if (items === null) {
+                        return;
                     }
+                    resultsDiv.innerHTML = items.length
+                        ? buildProductOptionsHtml(items, '', 'aiscan-product-modal-pick')
+                        : autocompleteNoResultsHtml();
                 })
                 .catch(() => { resultsDiv.innerHTML = ''; });
         };
@@ -3504,26 +3554,6 @@
         }
     }
 
-    function updateLineAutocompleteHighlight(resultsDiv, activeIndex) {
-        const options = Array.from(resultsDiv?.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR) || []);
-        const input = resultsDiv?.closest('.aiscan-product-cell')?.querySelector('.aiscan-product-autocomplete-input');
-        options.forEach((option, index) => {
-            const isActive = index === activeIndex;
-            option.classList.toggle('active', isActive);
-            option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-            if (isActive && input) {
-                input.setAttribute('aria-activedescendant', option.id);
-            }
-            if (isActive && typeof option.scrollIntoView === 'function') {
-                option.scrollIntoView({block: 'nearest'});
-            }
-        });
-        if (input && (activeIndex < 0 || !options[activeIndex])) {
-            input.removeAttribute('aria-activedescendant');
-        }
-        return options;
-    }
-
     function bindLineProductAutocomplete(row) {
         if (!row || row.dataset.productAutocompleteBound === '1') {
             return;
@@ -3539,14 +3569,11 @@
 
         let timer = null;
         let activeIndex = -1;
-        let requestId = 0;
+        const search = createLatestSearch('search-products');
         const resultsId = resultsDiv.id;
 
         const closeResults = () => {
-            resultsDiv.innerHTML = '';
-            resultsDiv.classList.add('d-none');
-            input.setAttribute('aria-expanded', 'false');
-            input.removeAttribute('aria-activedescendant');
+            closeAutocomplete(resultsDiv, input);
             activeIndex = -1;
         };
 
@@ -3556,15 +3583,11 @@
                 return;
             }
 
-            resultsDiv.innerHTML = items.map((item, index) =>
-                `<button type="button" class="list-group-item list-group-item-action small py-1" id="${resultsId}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
-                    <strong>${escapeHtml(item.referencia)}</strong> <span class="text-muted">${escapeHtml(item.description)}</span>
-                </button>`
-            ).join('');
+            resultsDiv.innerHTML = buildProductOptionsHtml(items, resultsId);
             resultsDiv.classList.remove('d-none');
             input.setAttribute('aria-expanded', 'true');
             activeIndex = 0;
-            updateLineAutocompleteHighlight(resultsDiv, activeIndex);
+            highlightAutocompleteOption(resultsDiv, input, activeIndex);
         };
 
         const doSearch = () => {
@@ -3574,21 +3597,13 @@
                 return;
             }
 
-            const currentRequestId = ++requestId;
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    if (currentRequestId !== requestId) {
-                        return;
+            search(query)
+                .then(items => {
+                    if (items !== null) {
+                        renderResults(items);
                     }
-
-                    renderResults(Array.isArray(data.results) ? data.results : []);
                 })
-                .catch(() => {
-                    if (currentRequestId === requestId) {
-                        closeResults();
-                    }
-                });
+                .catch(closeResults);
         };
 
         const selectOption = (option, moveFocus = false) => {
@@ -3635,7 +3650,7 @@
 
             if (action.type === 'highlight') {
                 activeIndex = action.index;
-                updateLineAutocompleteHighlight(resultsDiv, activeIndex);
+                highlightAutocompleteOption(resultsDiv, input, activeIndex);
                 return;
             }
 
@@ -3908,18 +3923,20 @@
         }
 
         let timer = null;
+        const search = createLatestSearch('search-suppliers');
         const doSearch = () => {
             const query = searchInput.value.trim();
-            if (query.length < 2) {
+            if (query.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) {
                 resultsDiv.innerHTML = '';
                 return;
             }
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-suppliers', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    const items = data.results || [];
+            search(query)
+                .then(items => {
+                    if (items === null) {
+                        return;
+                    }
                     if (items.length === 0) {
-                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                        resultsDiv.innerHTML = autocompleteNoResultsHtml();
                         return;
                     }
                     resultsDiv.innerHTML = items.map(s => {
@@ -3962,11 +3979,11 @@
             // Update document supplier data and re-render collapsed
             const doc = currentDoc();
             if (doc?.extractedData?.supplier) {
-                doc.extractedData.supplier.matched_supplier_id = item.dataset.id;
-                doc.extractedData.supplier.matched_name = item.dataset.name;
-                doc.extractedData.supplier.match_status = 'selected';
-                doc.extractedData.supplier.name = item.dataset.name;
-                doc.extractedData.supplier.tax_id = item.dataset.taxid;
+                applySelectedSupplier(doc.extractedData.supplier, {
+                    id: item.dataset.id,
+                    name: item.dataset.name,
+                    tax_id: item.dataset.taxid,
+                }, 'selected');
                 // Keep the import party type selected by the user (page 1 / review),
                 // not the historical type of the matched record. On import, that
                 // choice updates Proveedor.acreedor when it differs.
@@ -4008,11 +4025,11 @@
                 if (doc?.extractedData?.supplier) {
                     const text = opt.textContent.trim();
                     const nameMatch = text.match(/^(.+?)\s*\(([^)]*)\)$/);
-                    doc.extractedData.supplier.matched_supplier_id = opt.value;
-                    doc.extractedData.supplier.matched_name = nameMatch ? nameMatch[1] : text;
-                    doc.extractedData.supplier.match_status = 'selected';
-                    doc.extractedData.supplier.tax_id = nameMatch ? nameMatch[2] : '';
-                    doc.extractedData.supplier.name = doc.extractedData.supplier.matched_name;
+                    applySelectedSupplier(doc.extractedData.supplier, {
+                        id: opt.value,
+                        name: nameMatch ? nameMatch[1] : text,
+                        tax_id: nameMatch ? nameMatch[2] : '',
+                    }, 'selected');
                     // Issue #71: desambiguación = elección explícita
                     rememberSupplierAlias(doc.extractedData.supplier, opt.value);
                 }
@@ -4135,13 +4152,7 @@
             // el documento sin proveedor y obligar a buscarlo a mano.
             if (data.existing_supplier && doc?.extractedData?.supplier) {
                 const existing = data.existing_supplier;
-                Object.assign(doc.extractedData.supplier, {
-                    matched_supplier_id: existing.id,
-                    matched_name: existing.name,
-                    match_status: 'selected',
-                    name: existing.name,
-                    tax_id: existing.tax_id,
-                });
+                applySelectedSupplier(doc.extractedData.supplier, existing, 'selected');
                 applyPartyTypeToSupplier(doc.extractedData.supplier, partyType);
                 rememberSupplierAlias(doc.extractedData.supplier, existing.id);
                 await applySupplierProductSuggestion(doc, existing.id);
@@ -4160,11 +4171,7 @@
 
             // Update current document's supplier data
             if (doc?.extractedData?.supplier) {
-                doc.extractedData.supplier.matched_supplier_id = data.supplier.id;
-                doc.extractedData.supplier.matched_name = data.supplier.name;
-                doc.extractedData.supplier.match_status = 'created';
-                doc.extractedData.supplier.name = data.supplier.name;
-                doc.extractedData.supplier.tax_id = data.supplier.tax_id;
+                applySelectedSupplier(doc.extractedData.supplier, data.supplier, 'created');
                 applyPartyTypeToSupplier(
                     doc.extractedData.supplier,
                     data.supplier.party_type || partyType
@@ -4762,37 +4769,6 @@
         document.getElementById('aiscan-step-import').classList.toggle('d-none', step !== 'import');
     }
 
-    function resetUploadUI() {
-        state.documents.forEach(doc => {
-            if (doc.objectUrl) {
-                URL.revokeObjectURL(doc.objectUrl);
-            }
-        });
-        state.documents = [];
-        state.currentIndex = 0;
-        state.selectedIndices.clear();
-        state.selectionAnchorIndex = null;
-
-        const dropZone = document.getElementById('aiscan-drop-zone');
-        dropZone.innerHTML = `
-            <div>
-                <div class="fs-2 mb-2 text-muted"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-                <div class="fw-semibold">${escapeHtml(trans('aiscan-document-and-image-drop'))}</div>
-                <div class="small text-muted mt-1">${escapeHtml(trans('aiscan-drop-or-click'))}</div>
-                <div class="small text-muted mt-1">PDF, JPG, PNG, WebP</div>
-            </div>
-        `;
-
-        document.getElementById('aiscan-file-input').value = '';
-        document.getElementById('aiscan-upload-btn').disabled = true;
-        document.getElementById('aiscan-upload-btn').innerHTML = `<i class="fa-solid fa-cloud-arrow-up me-1"></i>${escapeHtml(trans('aiscan-upload-and-analyze'))}`;
-
-        const fileList = document.getElementById('aiscan-file-list');
-        if (fileList) {
-            fileList.classList.add('d-none');
-        }
-    }
-
     function buildProviderSelect() {
         const select = document.getElementById('aiscan-provider-select');
         if (!select) {
@@ -4956,6 +4932,18 @@
             modelChoiceForDoc,
             nextRotation,
             sameChoice,
+            applySelectedSupplier,
+            buildAnalyzeParams,
+            buildProductOptionsHtml,
+            checkInBatchDuplicate,
+            checkTotalMismatch,
+            createLatestSearch,
+            escapeAttr,
+            escapeHtml,
+            formatDiscountValue,
+            highlightAutocompleteOption,
+            taxCodeToRate,
+            trans,
             parseLocaleNumber,
             readJsonResponse,
             resolveReviewRefresh,

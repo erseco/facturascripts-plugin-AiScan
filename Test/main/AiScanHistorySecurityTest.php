@@ -101,6 +101,11 @@ final class AiScanHistorySecurityTest extends TestCase
             self::assertContains(Tools::lang()->trans($warning), $messages, $name);
         }
 
+        // Sin botón de guardar: el historial es de solo lectura.
+        foreach ($page->views as $name => $view) {
+            self::assertFalse($view->settings['btnSave'], $name);
+        }
+
         $batch = new AiScanImportBatch();
         self::assertTrue($batch->load($this->batch->id));
         self::assertSame($this->batch->provider, $batch->provider);

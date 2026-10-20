@@ -47,6 +47,7 @@ class EditAiScanImportBatch extends PanelController
         );
         $this->setSettings('EditAiScanImportBatch', 'btnDelete', false);
         $this->setSettings('EditAiScanImportBatch', 'btnNew', false);
+        $this->setSettings('EditAiScanImportBatch', 'btnSave', false);
 
         $this->addEditListView(
             'EditAiScanImportDocument',
@@ -56,6 +57,7 @@ class EditAiScanImportBatch extends PanelController
         );
         $this->setSettings('EditAiScanImportDocument', 'btnDelete', false);
         $this->setSettings('EditAiScanImportDocument', 'btnNew', false);
+        $this->setSettings('EditAiScanImportDocument', 'btnSave', false);
 
         $this->addEditListView(
             'EditAiScanImportLine',
@@ -65,6 +67,7 @@ class EditAiScanImportBatch extends PanelController
         );
         $this->setSettings('EditAiScanImportLine', 'btnDelete', false);
         $this->setSettings('EditAiScanImportLine', 'btnNew', false);
+        $this->setSettings('EditAiScanImportLine', 'btnSave', false);
     }
 
     protected function execPreviousAction($action)

@@ -7,18 +7,20 @@
         }
 
         let timer = null;
+        const search = createLatestSearch('search-suppliers');
         const doSearch = () => {
             const query = searchInput.value.trim();
-            if (query.length < 2) {
+            if (query.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) {
                 resultsDiv.innerHTML = '';
                 return;
             }
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-suppliers', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    const items = data.results || [];
+            search(query)
+                .then(items => {
+                    if (items === null) {
+                        return;
+                    }
                     if (items.length === 0) {
-                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
+                        resultsDiv.innerHTML = autocompleteNoResultsHtml();
                         return;
                     }
                     resultsDiv.innerHTML = items.map(s => {
@@ -61,11 +63,11 @@
             // Update document supplier data and re-render collapsed
             const doc = currentDoc();
             if (doc?.extractedData?.supplier) {
-                doc.extractedData.supplier.matched_supplier_id = item.dataset.id;
-                doc.extractedData.supplier.matched_name = item.dataset.name;
-                doc.extractedData.supplier.match_status = 'selected';
-                doc.extractedData.supplier.name = item.dataset.name;
-                doc.extractedData.supplier.tax_id = item.dataset.taxid;
+                applySelectedSupplier(doc.extractedData.supplier, {
+                    id: item.dataset.id,
+                    name: item.dataset.name,
+                    tax_id: item.dataset.taxid,
+                }, 'selected');
                 // Keep the import party type selected by the user (page 1 / review),
                 // not the historical type of the matched record. On import, that
                 // choice updates Proveedor.acreedor when it differs.
@@ -107,11 +109,11 @@
                 if (doc?.extractedData?.supplier) {
                     const text = opt.textContent.trim();
                     const nameMatch = text.match(/^(.+?)\s*\(([^)]*)\)$/);
-                    doc.extractedData.supplier.matched_supplier_id = opt.value;
-                    doc.extractedData.supplier.matched_name = nameMatch ? nameMatch[1] : text;
-                    doc.extractedData.supplier.match_status = 'selected';
-                    doc.extractedData.supplier.tax_id = nameMatch ? nameMatch[2] : '';
-                    doc.extractedData.supplier.name = doc.extractedData.supplier.matched_name;
+                    applySelectedSupplier(doc.extractedData.supplier, {
+                        id: opt.value,
+                        name: nameMatch ? nameMatch[1] : text,
+                        tax_id: nameMatch ? nameMatch[2] : '',
+                    }, 'selected');
                     // Issue #71: desambiguación = elección explícita
                     rememberSupplierAlias(doc.extractedData.supplier, opt.value);
                 }
@@ -234,13 +236,7 @@
             // el documento sin proveedor y obligar a buscarlo a mano.
             if (data.existing_supplier && doc?.extractedData?.supplier) {
                 const existing = data.existing_supplier;
-                Object.assign(doc.extractedData.supplier, {
-                    matched_supplier_id: existing.id,
-                    matched_name: existing.name,
-                    match_status: 'selected',
-                    name: existing.name,
-                    tax_id: existing.tax_id,
-                });
+                applySelectedSupplier(doc.extractedData.supplier, existing, 'selected');
                 applyPartyTypeToSupplier(doc.extractedData.supplier, partyType);
                 rememberSupplierAlias(doc.extractedData.supplier, existing.id);
                 await applySupplierProductSuggestion(doc, existing.id);
@@ -259,11 +255,7 @@
 
             // Update current document's supplier data
             if (doc?.extractedData?.supplier) {
-                doc.extractedData.supplier.matched_supplier_id = data.supplier.id;
-                doc.extractedData.supplier.matched_name = data.supplier.name;
-                doc.extractedData.supplier.match_status = 'created';
-                doc.extractedData.supplier.name = data.supplier.name;
-                doc.extractedData.supplier.tax_id = data.supplier.tax_id;
+                applySelectedSupplier(doc.extractedData.supplier, data.supplier, 'created');
                 applyPartyTypeToSupplier(
                     doc.extractedData.supplier,
                     data.supplier.party_type || partyType

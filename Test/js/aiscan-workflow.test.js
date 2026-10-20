@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function loadTestHooks() {
+function loadTestHooks(overrides = {}) {
     const scriptPath = path.join(__dirname, '..', '..', 'Assets', 'JS', 'aiscan-workflow.js');
     const script = fs.readFileSync(scriptPath, 'utf8');
     const elements = {};
@@ -37,6 +37,7 @@ function loadTestHooks() {
         console,
         setTimeout,
         clearTimeout,
+        URLSearchParams,
         URL: {
             createObjectURL() {
                 return 'blob:test';
@@ -64,8 +65,12 @@ function loadTestHooks() {
             createElement() {
                 return {
                     innerHTML: '',
+                    // Igual que un navegador: textContent -> innerHTML escapa &, < y >.
                     set textContent(value) {
-                        this.innerHTML = value === null || value === undefined ? '' : String(value);
+                        this.innerHTML = (value === null || value === undefined ? '' : String(value))
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;');
                     },
                 };
             },
@@ -91,6 +96,7 @@ function loadTestHooks() {
         {code: 'ES_84', description: 'Inversión del sujeto pasivo'},
     ];
 
+    Object.assign(context, overrides);
     vm.createContext(context);
     vm.runInContext(script, context);
 
@@ -1398,4 +1404,177 @@ test('handleMultiInvoiceResponse keeps the open document selected (#135)', () =>
 
     assert.equal(hooks.state.documents.length, 5);
     assert.equal(hooks.state.documents[hooks.state.currentIndex], open);
+});
+
+test('buildProductOptionsHtml escapes values and only adds ARIA options when asked (#147)', () => {
+    const {hooks} = loadTestHooks();
+    const items = [{referencia: 'A"1', description: '<b>Tornillo</b> & tuerca'}];
+
+    const navigable = hooks.buildProductOptionsHtml(items, 'line-3');
+    assert.match(navigable, /id="line-3-option-0" role="option"/);
+    assert.match(navigable, /data-autocomplete-option="1"/);
+    assert.match(navigable, /data-ref="A&quot;1"/);
+    assert.match(navigable, /&lt;b&gt;Tornillo&lt;\/b&gt; &amp; tuerca/);
+    assert.doesNotMatch(navigable, /<b>/);
+
+    const modal = hooks.buildProductOptionsHtml(items, '', 'aiscan-product-modal-pick');
+    assert.match(modal, /class="[^"]*aiscan-product-modal-pick"/);
+    assert.doesNotMatch(modal, /role="option"/);
+    assert.equal(hooks.buildProductOptionsHtml([], 'x'), '');
+});
+
+test('createLatestSearch only resolves the newest query and ignores late answers (#147)', async () => {
+    const pending = [];
+    const fetch = url => new Promise(resolve => pending.push({url, resolve}));
+    const {hooks} = loadTestHooks({fetch});
+    const search = hooks.createLatestSearch('search-products');
+    const reply = (index, results) => pending[index].resolve({ok: true, status: 200, json: async () => ({results})});
+
+    const first = search('tor');
+    const second = search('tornillo');
+    reply(1, [{referencia: 'T-2'}]);
+    reply(0, [{referencia: 'T-1'}]);
+
+    assert.equal(await first, null);
+    assert.deepEqual(await second, [{referencia: 'T-2'}]);
+    const url = new URL('http://x/' + pending[1].url);
+    assert.equal(url.searchParams.get('action'), 'search-products');
+    assert.equal(url.searchParams.get('query'), 'tornillo');
+    assert.ok(url.searchParams.get('multireqtoken'));
+});
+
+test('createLatestSearch rejects only when the newest query fails (#147)', async () => {
+    let calls = 0;
+    const fetch = () => {
+        calls++;
+        return calls === 1
+            ? Promise.reject(new Error('offline'))
+            : Promise.resolve({ok: true, status: 200, json: async () => ({})});
+    };
+    const {hooks} = loadTestHooks({fetch});
+    const search = hooks.createLatestSearch('search-suppliers');
+
+    const stale = search('ac');
+    const latest = search('acme');
+    assert.equal(await stale, null);
+    assert.equal(JSON.stringify(await latest), '[]');
+
+    const offline = loadTestHooks({fetch: () => Promise.reject(new Error('offline'))}).hooks;
+    await assert.rejects(offline.createLatestSearch('search-suppliers')('acme'), /offline/);
+});
+
+test('highlightAutocompleteOption marks the active option and updates aria-activedescendant (#147)', () => {
+    const {hooks} = loadTestHooks();
+    const option = id => ({
+        id,
+        attributes: {},
+        classes: new Set(),
+        classList: {toggle(name, on) { on ? this.owner.classes.add(name) : this.owner.classes.delete(name); }},
+        setAttribute(name, value) { this.attributes[name] = value; },
+    });
+    const options = [option('o-0'), option('o-1')];
+    options.forEach(o => { o.classList.owner = o; });
+    const resultsDiv = {querySelectorAll: () => options};
+    const input = {
+        attributes: {},
+        setAttribute(name, value) { this.attributes[name] = value; },
+        removeAttribute(name) { delete this.attributes[name]; },
+    };
+
+    hooks.highlightAutocompleteOption(resultsDiv, input, 1);
+    assert.equal(input.attributes['aria-activedescendant'], 'o-1');
+    assert.equal(options[1].attributes['aria-selected'], 'true');
+    assert.equal(options[0].attributes['aria-selected'], 'false');
+    assert.ok(options[1].classes.has('active'));
+
+    hooks.highlightAutocompleteOption(resultsDiv, input, -1);
+    assert.equal(input.attributes['aria-activedescendant'], undefined);
+});
+
+test('applySelectedSupplier fills every matched field (#147)', () => {
+    const {hooks} = loadTestHooks();
+    const supplier = {name: 'Extraído', tax_id: 'B1', iban: 'ES00'};
+
+    hooks.applySelectedSupplier(supplier, {id: '42', name: 'Acme SL', tax_id: null}, 'created');
+
+    assert.deepEqual({...supplier}, {
+        name: 'Acme SL', tax_id: '', iban: 'ES00',
+        matched_supplier_id: '42', matched_name: 'Acme SL', match_status: 'created',
+    });
+});
+
+test('escapeHtml and escapeAttr neutralise markup (#147)', () => {
+    const {hooks} = loadTestHooks();
+
+    assert.equal(hooks.escapeHtml('<script>&'), '&lt;script&gt;&amp;');
+    assert.equal(hooks.escapeHtml(null), '');
+    assert.equal(hooks.escapeAttr('a"b<'), 'a&quot;b&lt;');
+});
+
+test('trans falls back to aiscanI18n and applies replacements (#147)', () => {
+    const {hooks} = loadTestHooks({aiscanI18n: {'aiscan-x': 'Hola %name% y %name%'}});
+
+    assert.equal(hooks.trans('aiscan-x', {'%name%': 'Ana'}), 'Hola Ana y Ana');
+    assert.equal(hooks.trans('aiscan-missing'), 'aiscan-missing');
+});
+
+test('checkTotalMismatch flags differences and tells rounding apart (#147)', () => {
+    const {hooks} = loadTestHooks();
+    const data = total => ({
+        invoice: {total},
+        lines: [{cantidad: 2, pvpunitario: 50, dtopor: 10, iva: 21}],
+    });
+
+    assert.equal(hooks.checkTotalMismatch(data(108.9)), null);
+    assert.equal(hooks.checkTotalMismatch(data(108.93)).isRounding, true);
+    assert.equal(hooks.checkTotalMismatch(data(120)).isRounding, false);
+    assert.equal(hooks.checkTotalMismatch({invoice: {total: 10}, lines: []}), null);
+});
+
+test('checkInBatchDuplicate finds the same invoice twice in the batch (#147)', () => {
+    const {hooks} = loadTestHooks();
+    const {STATUS, state} = hooks;
+    const doc = (name, total, status = STATUS.ANALYZED) => ({
+        originalName: name,
+        status,
+        extractedData: {
+            invoice: {number: 'F-1', issue_date: '2026-01-02', total},
+            supplier: {matched_supplier_id: 'P1'},
+        },
+    });
+    const original = doc('a.pdf', 100);
+    const copy = doc('b.pdf', 100.01);
+    state.documents = [original, copy, doc('c.pdf', 250)];
+
+    assert.match(hooks.checkInBatchDuplicate(copy), /a\.pdf|aiscan-duplicate-in-batch/);
+    assert.equal(hooks.checkInBatchDuplicate(state.documents[2]), null);
+
+    original.status = STATUS.DISCARDED;
+    assert.equal(hooks.checkInBatchDuplicate(copy), null);
+});
+
+test('buildAnalyzeParams sends the document and the mock fixture only for mock (#147)', () => {
+    const {hooks} = loadTestHooks();
+    hooks.state.mockFixture = 'F-2024-011';
+    const doc = {tmpFile: 'aiscan_x.pdf', mimeType: 'application/pdf'};
+
+    const real = hooks.buildAnalyzeParams(doc, {provider: 'openai', import_mode: 'lines'});
+    assert.equal(real.get('action'), 'analyze');
+    assert.equal(real.get('tmp_file'), 'aiscan_x.pdf');
+    assert.equal(real.get('import_mode'), 'lines');
+    assert.equal(real.get('mock_fixture'), null);
+
+    const mock = hooks.buildAnalyzeParams(doc, {provider: 'mock'});
+    assert.equal(mock.get('mock_fixture'), 'F-2024-011');
+});
+
+test('taxCodeToRate and discount helpers (#147)', () => {
+    const {hooks} = loadTestHooks({aiscanTaxTypes: [{code: 'IVA21', rate: 21}, {code: 'IGIC7', rate: 7}]});
+
+    assert.equal(hooks.taxCodeToRate('IGIC7'), 7);
+    assert.equal(hooks.taxCodeToRate('NOPE'), 0);
+    assert.equal(hooks.formatDiscountValue(12.3456789), '12.345679');
+    assert.equal(hooks.formatDiscountValue(NaN), '0');
+    assert.equal(hooks.sameChoice({provider: 'gemini', model: ''}, {provider: 'gemini'}), true);
+    assert.equal(hooks.sameChoice({provider: 'gemini', model: 'a'}, {provider: 'gemini', model: 'b'}), false);
 });

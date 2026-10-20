@@ -12,7 +12,10 @@
                 <widget type="text" fieldname="nick" readonly="true"/>
             </column>
             <column name="aiscan-import-mode" numcolumns="2" order="40">
-                <widget type="text" fieldname="importmode" readonly="true"/>
+                <widget type="select" fieldname="importmode" readonly="true" translate="true">
+                    <values title="aiscan-mode-lines">lines</values>
+                    <values title="aiscan-mode-total">total</values>
+                </widget>
             </column>
             <column name="aiscan-provider" numcolumns="2" order="50">
                 <widget type="text" fieldname="provider" readonly="true"/>

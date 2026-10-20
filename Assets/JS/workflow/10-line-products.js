@@ -60,26 +60,22 @@
         const searchBtn = document.getElementById('aiscan-product-modal-search-btn');
         const resultsDiv = document.getElementById('aiscan-product-modal-results');
         let timer = null;
+        const search = createLatestSearch('search-products');
 
         const doSearch = () => {
             const query = input.value.trim();
-            if (query.length < 2) {
+            if (query.length < MIN_AUTOCOMPLETE_QUERY_LENGTH) {
                 resultsDiv.innerHTML = '';
                 return;
             }
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    const items = data.results || [];
-                    if (items.length === 0) {
-                        resultsDiv.innerHTML = `<div class="list-group-item small text-muted">${escapeHtml(trans('aiscan-no-results'))}</div>`;
-                    } else {
-                        resultsDiv.innerHTML = items.map(p =>
-                            `<button type="button" class="list-group-item list-group-item-action small py-1 aiscan-product-modal-pick" data-ref="${escapeAttr(p.referencia)}" data-desc="${escapeAttr(p.description)}">
-                                <strong>${escapeHtml(p.referencia)}</strong> <span class="text-muted">${escapeHtml(p.description)}</span>
-                            </button>`
-                        ).join('');
+            search(query)
+                .then(items => {
+                    if (items === null) {
+                        return;
                     }
+                    resultsDiv.innerHTML = items.length
+                        ? buildProductOptionsHtml(items, '', 'aiscan-product-modal-pick')
+                        : autocompleteNoResultsHtml();
                 })
                 .catch(() => { resultsDiv.innerHTML = ''; });
         };
@@ -290,26 +286,6 @@
         }
     }
 
-    function updateLineAutocompleteHighlight(resultsDiv, activeIndex) {
-        const options = Array.from(resultsDiv?.querySelectorAll(AUTOCOMPLETE_OPTION_SELECTOR) || []);
-        const input = resultsDiv?.closest('.aiscan-product-cell')?.querySelector('.aiscan-product-autocomplete-input');
-        options.forEach((option, index) => {
-            const isActive = index === activeIndex;
-            option.classList.toggle('active', isActive);
-            option.setAttribute('aria-selected', isActive ? 'true' : 'false');
-            if (isActive && input) {
-                input.setAttribute('aria-activedescendant', option.id);
-            }
-            if (isActive && typeof option.scrollIntoView === 'function') {
-                option.scrollIntoView({block: 'nearest'});
-            }
-        });
-        if (input && (activeIndex < 0 || !options[activeIndex])) {
-            input.removeAttribute('aria-activedescendant');
-        }
-        return options;
-    }
-
     function bindLineProductAutocomplete(row) {
         if (!row || row.dataset.productAutocompleteBound === '1') {
             return;
@@ -325,14 +301,11 @@
 
         let timer = null;
         let activeIndex = -1;
-        let requestId = 0;
+        const search = createLatestSearch('search-products');
         const resultsId = resultsDiv.id;
 
         const closeResults = () => {
-            resultsDiv.innerHTML = '';
-            resultsDiv.classList.add('d-none');
-            input.setAttribute('aria-expanded', 'false');
-            input.removeAttribute('aria-activedescendant');
+            closeAutocomplete(resultsDiv, input);
             activeIndex = -1;
         };
 
@@ -342,15 +315,11 @@
                 return;
             }
 
-            resultsDiv.innerHTML = items.map((item, index) =>
-                `<button type="button" class="list-group-item list-group-item-action small py-1" id="${resultsId}-option-${index}" role="option" aria-selected="false" data-autocomplete-option="1" data-ref="${escapeAttr(item.referencia)}" data-desc="${escapeAttr(item.description)}">
-                    <strong>${escapeHtml(item.referencia)}</strong> <span class="text-muted">${escapeHtml(item.description)}</span>
-                </button>`
-            ).join('');
+            resultsDiv.innerHTML = buildProductOptionsHtml(items, resultsId);
             resultsDiv.classList.remove('d-none');
             input.setAttribute('aria-expanded', 'true');
             activeIndex = 0;
-            updateLineAutocompleteHighlight(resultsDiv, activeIndex);
+            highlightAutocompleteOption(resultsDiv, input, activeIndex);
         };
 
         const doSearch = () => {
@@ -360,21 +329,13 @@
                 return;
             }
 
-            const currentRequestId = ++requestId;
-            apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(readJsonResponse)
-                .then(data => {
-                    if (currentRequestId !== requestId) {
-                        return;
+            search(query)
+                .then(items => {
+                    if (items !== null) {
+                        renderResults(items);
                     }
-
-                    renderResults(Array.isArray(data.results) ? data.results : []);
                 })
-                .catch(() => {
-                    if (currentRequestId === requestId) {
-                        closeResults();
-                    }
-                });
+                .catch(closeResults);
         };
 
         const selectOption = (option, moveFocus = false) => {
@@ -421,7 +382,7 @@
 
             if (action.type === 'highlight') {
                 activeIndex = action.index;
-                updateLineAutocompleteHighlight(resultsDiv, activeIndex);
+                highlightAutocompleteOption(resultsDiv, input, activeIndex);
                 return;
             }
 
