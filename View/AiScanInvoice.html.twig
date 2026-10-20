@@ -18,7 +18,7 @@
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-lg-8">
-                                <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone">
+                                <div class="aiscan-drop-area d-flex align-items-center justify-content-center text-center" id="aiscan-drop-zone" role="button" tabindex="0" aria-controls="aiscan-file-input" aria-label="{{ i18n.trans('aiscan-document-and-image-drop') }}">
                                     <div>
                                         <div class="fs-2 mb-2 text-muted"><i class="fa-solid fa-cloud-arrow-up"></i></div>
                                         <div class="fw-semibold">{{ i18n.trans('aiscan-document-and-image-drop') }}</div>
@@ -433,6 +433,7 @@
         'aiscan-scan-failed-manual-entry': '{{ i18n.trans('aiscan-scan-failed-manual-entry')|e('js') }}',
         'aiscan-scan-failed-no-provider': '{{ i18n.trans('aiscan-scan-failed-no-provider')|e('js') }}',
         'aiscan-scan-failed-network': '{{ i18n.trans('aiscan-scan-failed-network')|e('js') }}',
+        'aiscan-request-failed': '{{ i18n.trans('aiscan-request-failed')|e('js') }}',
         'aiscan-scan-failed-invalid-response': '{{ i18n.trans('aiscan-scan-failed-invalid-response')|e('js') }}',
         'aiscan-scan-failed-provider-error': '{{ i18n.trans('aiscan-scan-failed-provider-error')|e('js') }}',
         'aiscan-uploading-file': '{{ i18n.trans('aiscan-uploading-file')|e('js') }}',

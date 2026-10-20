@@ -103,6 +103,7 @@
     "aiscan-missing-line-description-at-index": "Falta la descripción de la línea en el índice %index%",
     "aiscan-missing-required-invoice-field": "Falta el campo obligatorio de la factura: %field%",
     "aiscan-missing-supplier-tax-id": "No se ha detectado el CIF/NIF del proveedor. Revísalo antes de importar.",
+    "aiscan-request-failed": "La petición ha fallado (HTTP %status%). Vuelve a intentarlo.",
     "aiscan-rescan-hint": "Completa los datos que faltan manualmente, o usa Re-analizar (opcionalmente con otro proveedor de IA) para intentar detectarlos de nuevo.",
     "aiscan-mock-fixture": "Fixture de respuesta",
     "aiscan-mock-fixture-help": "Fixture actual:",
