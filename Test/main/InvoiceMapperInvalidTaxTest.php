@@ -134,6 +134,35 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
     }
 
     /**
+     * Issue #131: con el tipo y sin codimpuesto, la línea se quedaba con el
+     * impuesto predeterminado y el asiento usaba la subcuenta de otro tipo.
+     */
+    public function testRateWithoutTaxCodeUsesTheTaxOfThatRate(): void
+    {
+        $default = Impuestos::default();
+        $this->assertNotEmpty($default->operacion, 'El impuesto predeterminado debe tener operación');
+        $expected = $this->createTax('ZZZ9', $default->operacion);
+
+        $supplier = $this->createSupplier();
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 9.87], ['tax_amount' => 2.96, 'total' => 32.96]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $line = $invoice->getLines()[0];
+        $this->assertSame($expected->codimpuesto, $line->codimpuesto);
+        $this->assertEqualsWithDelta(9.87, (float) $line->iva, 0.001);
+    }
+
+    /**
      * Con varios impuestos al mismo tipo, buscar «el primero que coincida» elegía
      * por orden alfabético y podía cruzar regímenes (IVA4 -> IPSI4).
      */

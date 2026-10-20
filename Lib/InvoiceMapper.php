@@ -333,6 +333,13 @@ class InvoiceMapper
             $taxCode = trim((string) ($lineData['codimpuesto'] ?? $lineData['tax_code'] ?? ''));
             if ($taxCode !== '') {
                 $line->codimpuesto = $this->resolveTaxCode($taxCode, (float) $line->iva, $line->descripcion);
+            } elseif ($taxRate !== null && $taxRate !== '') {
+                // Issue #131: con el tipo y sin código, el impuesto de la línea tiene
+                // que ser el de ese tipo, o el asiento usa la subcuenta de otro.
+                $current = Impuestos::get((string) $line->codimpuesto);
+                if (empty($current->codimpuesto) || abs((float) $current->iva - (float) $line->iva) >= 0.001) {
+                    $line->codimpuesto = $this->resolveTaxCodeForRate((float) $line->iva, $line->descripcion);
+                }
             }
 
             $irpf = $lineData['irpf'] ?? null;
@@ -410,6 +417,43 @@ class InvoiceMapper
         $line->iva = !empty($taxes) ? (float) ($taxes[0]['rate'] ?? 0) : $this->computeTaxRate($invoiceData);
 
         return [$line];
+    }
+
+    /**
+     * Issue #131: la línea trae el tipo, pero no el código. A diferencia de un
+     * código inventado (#93), aquí el tipo es un dato de la factura: se prefiere
+     * el impuesto de ese tipo del régimen de la empresa y, si no hay ninguno, el
+     * único de la instalación con ese tipo (una factura con IVA en una empresa
+     * con IGIC). Si no hay ninguno, o hay varios, se corta el import.
+     *
+     * @throws RuntimeException si el impuesto no se puede determinar
+     */
+    private function resolveTaxCodeForRate(float $rate, string $description): string
+    {
+        $candidates = array_values(array_filter(
+            Impuestos::all(),
+            static fn ($tax): bool => abs((float) $tax->iva - $rate) < 0.001
+        ));
+
+        $operation = Impuestos::default()->operacion;
+        $sameRegime = empty($operation) ? $candidates : array_values(array_filter(
+            $candidates,
+            static fn ($tax): bool => $tax->operacion === $operation
+        ));
+
+        foreach ([$sameRegime, $candidates] as $options) {
+            if (count($options) === 1) {
+                return $options[0]->codimpuesto;
+            }
+            if (count($options) > 1) {
+                break;
+            }
+        }
+
+        throw new RuntimeException(Tools::lang()->trans('aiscan-unresolved-tax-rate', [
+            '%rate%' => Tools::number($rate),
+            '%description%' => $description,
+        ]));
     }
 
     /**
@@ -528,38 +572,8 @@ class InvoiceMapper
      */
     private function inferMissingTaxRate(array $lines, array $invoiceData, array $taxes): array
     {
-        if (count($taxes) !== 1) {
-            return $lines;
-        }
-
-        $tax = $taxes[0];
-        $rate = (float) ($tax['rate'] ?? 0);
-        $base = (float) ($tax['base'] ?? 0);
-        $amount = (float) ($tax['amount'] ?? 0);
-        $tolerance = 0.01;
-
-        if (abs($amount) < 0.001) {
-            return $lines;
-        }
-
-        $subtotal = (float) ($invoiceData['subtotal'] ?? 0);
-        $taxAmount = (float) ($invoiceData['tax_amount'] ?? 0);
-        if (abs($base - $subtotal) > $tolerance || abs($amount - $taxAmount) > $tolerance) {
-            return $lines;
-        }
-
-        $linesSubtotal = 0.0;
-        foreach ($lines as $line) {
-            if (!empty($line['suplido'] ?? false)) {
-                return $lines;
-            }
-            $quantity = (float) ($line['quantity'] ?? $line['cantidad'] ?? 1);
-            $unitPrice = (float) ($line['unit_price'] ?? $line['pvpunitario'] ?? 0);
-            $discount = (float) ($line['discount'] ?? $line['dtopor'] ?? 0);
-            $linesSubtotal += $quantity * $unitPrice * (1 - $discount / 100);
-        }
-
-        if (abs($linesSubtotal - $base) > $tolerance) {
+        $rate = SchemaValidator::inferSingleTaxRate($lines, $invoiceData, $taxes);
+        if ($rate === null) {
             return $lines;
         }
 
@@ -585,7 +599,7 @@ class InvoiceMapper
 
     private function computeTaxRate(array $invoiceData): float
     {
-        $subtotal = (float) ($invoiceData['subtotal'] ?? $invoiceData['total'] ?? 0);
+        $subtotal = $this->fallbackSubtotal($invoiceData);
         $taxAmount = (float) ($invoiceData['tax_amount'] ?? 0);
         return $subtotal > 0 && $taxAmount > 0
             ? round(($taxAmount / $subtotal) * 100, 2)
@@ -602,8 +616,15 @@ class InvoiceMapper
 
     private function fallbackSubtotal(array $invoiceData): float
     {
-        $subtotal = (float) ($invoiceData['subtotal'] ?? $invoiceData['total'] ?? 0);
-        return $subtotal > 0 ? $subtotal : (float) ($invoiceData['total'] ?? 0);
+        $subtotal = (float) ($invoiceData['subtotal'] ?? 0);
+        if ($subtotal > 0) {
+            return $subtotal;
+        }
+
+        // Issue #131: el total lleva el IVA y resta la retención; la base es lo que queda.
+        $total = (float) ($invoiceData['total'] ?? 0);
+        $base = $total - (float) ($invoiceData['tax_amount'] ?? 0) + (float) ($invoiceData['withholding_amount'] ?? 0);
+        return $base > 0 ? $base : $total;
     }
 
     private function setReceivedStatus(FacturaProveedor $invoice): void

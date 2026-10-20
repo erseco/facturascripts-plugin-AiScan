@@ -262,6 +262,51 @@ class SchemaValidator
         return Tools::lang()->trans($translationKeys[$field]);
     }
 
+    /**
+     * Issue #61: some AI extractions only report the tax rate in the invoice-level
+     * `taxes` breakdown, leaving it out of the individual lines. Calculator then
+     * books those lines at 0%, so the total looks right but the accounting entry
+     * (asiento) does not reflect the tax. Returns the rate to use for those lines
+     * only when it is unambiguous: a single tax entry whose base/amount reconcile
+     * with the invoice totals and with the sum of the lines, and no suplido lines
+     * (which are excluded from the taxable base).
+     */
+    public static function inferSingleTaxRate(array $lines, array $invoiceData, array $taxes): ?float
+    {
+        if (count($taxes) !== 1) {
+            return null;
+        }
+
+        $tax = $taxes[0];
+        $rate = (float) ($tax['rate'] ?? 0);
+        $base = (float) ($tax['base'] ?? 0);
+        $amount = (float) ($tax['amount'] ?? 0);
+        $tolerance = 0.01;
+
+        if (abs($amount) < 0.001) {
+            return null;
+        }
+
+        $subtotal = (float) ($invoiceData['subtotal'] ?? 0);
+        $taxAmount = (float) ($invoiceData['tax_amount'] ?? 0);
+        if (abs($base - $subtotal) > $tolerance || abs($amount - $taxAmount) > $tolerance) {
+            return null;
+        }
+
+        $linesSubtotal = 0.0;
+        foreach ($lines as $line) {
+            if (!empty($line['suplido'] ?? false)) {
+                return null;
+            }
+            $quantity = (float) ($line['quantity'] ?? $line['cantidad'] ?? 1);
+            $unitPrice = (float) ($line['unit_price'] ?? $line['pvpunitario'] ?? 0);
+            $discount = (float) ($line['discount'] ?? $line['dtopor'] ?? 0);
+            $linesSubtotal += $quantity * $unitPrice * (1 - $discount / 100);
+        }
+
+        return abs($linesSubtotal - $base) > $tolerance ? null : $rate;
+    }
+
     public function normalize(array $data): array
     {
         $data['supplier'] = is_array($data['supplier'] ?? null) ? $data['supplier'] : [];
@@ -307,7 +352,8 @@ class SchemaValidator
         }
 
         if (isset($data['lines']) && is_array($data['lines'])) {
-            foreach ($data['lines'] as &$line) {
+            $linesWithoutTax = [];
+            foreach ($data['lines'] as $key => &$line) {
                 // Map old field names to FS field names
                 $aliases = [
                     'description' => 'descripcion',
@@ -343,6 +389,10 @@ class SchemaValidator
                     $line['cantidad'] = 1.0;
                 }
 
+                if (!isset($line['iva']) && empty($line['codimpuesto'] ?? '')) {
+                    $linesWithoutTax[] = $key;
+                }
+
                 // Default numeric fields
                 $line['dtopor'] = (float) ($line['dtopor'] ?? 0);
                 $line['dtopor2'] = (float) ($line['dtopor2'] ?? 0);
@@ -367,6 +417,15 @@ class SchemaValidator
             // Rebuild unit prices from the printed line amounts when the
             // extracted unit prices do not add up to the invoice subtotal.
             $this->reconcileLineTotalsWithSubtotal($data);
+
+            // Issue #131: el IVA ausente ya vale 0 aquí, así que se infiere del
+            // desglose antes de que la línea se dé por exenta.
+            if (!empty($linesWithoutTax)) {
+                $rate = self::inferSingleTaxRate($data['lines'], $data['invoice'], $data['taxes']);
+                foreach ($rate === null ? [] : $linesWithoutTax as $key) {
+                    $data['lines'][$key]['iva'] = $rate;
+                }
+            }
 
             // Detect tax-inclusive line prices typical of "factura simplificada"
             // / tickets marked "IGIC INCLUIDO" or "IVA INCLUIDO" and convert

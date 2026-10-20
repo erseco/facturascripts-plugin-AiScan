@@ -35,6 +35,36 @@ final class SchemaValidatorTest extends TestCase
 
     // ── validate() ──────────────────────────────────────────
 
+    /**
+     * Issue #131: normalize() ponía 0 en el IVA ausente, así que la línea se
+     * importaba al 0 % aunque el desglose dijera otra cosa.
+     */
+    public function testNormalizeInfersMissingLineTaxRateFromSingleTaxBreakdown(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => ['subtotal' => 92.55, 'tax_amount' => 6.48, 'total' => 99.03],
+            'taxes' => [['rate' => 7, 'base' => 92.55, 'amount' => 6.48]],
+            'lines' => [
+                ['description' => 'Tarjetas de visita', 'quantity' => 1, 'unit_price' => 92.55],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(7.0, $data['lines'][0]['iva'], 0.001);
+    }
+
+    public function testNormalizeKeepsExplicitZeroLineTaxRate(): void
+    {
+        $data = $this->validator->normalize([
+            'invoice' => ['subtotal' => 92.55, 'tax_amount' => 6.48, 'total' => 99.03],
+            'taxes' => [['rate' => 7, 'base' => 92.55, 'amount' => 6.48]],
+            'lines' => [
+                ['description' => 'Tarjetas', 'quantity' => 1, 'unit_price' => 92.55, 'tax_rate' => 0],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(0.0, $data['lines'][0]['iva'], 0.001);
+    }
+
     public function testValidateReturnsMissingInvoiceSectionError(): void
     {
         $errors = $this->validator->validate([]);
