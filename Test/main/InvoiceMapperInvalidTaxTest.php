@@ -22,6 +22,7 @@ namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Core\DataSrc\Impuestos;
+use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\EstadoDocumento;
 use FacturaScripts\Dinamic\Model\FacturaProveedor;
@@ -131,6 +132,53 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         );
         $this->assertEqualsWithDelta(0.0, (float) $lines[0]->iva, 0.001);
         $this->assertEqualsWithDelta(30.0, (float) $invoice->total, 0.01);
+    }
+
+    /**
+     * Issue #131: con el tipo y sin codimpuesto, la línea se quedaba con el
+     * impuesto predeterminado y el asiento usaba la subcuenta de otro tipo.
+     */
+    public function testRateWithoutTaxCodeUsesTheTaxOfThatRate(): void
+    {
+        $default = Impuestos::default();
+        $this->assertNotEmpty($default->operacion, 'El impuesto predeterminado debe tener operación');
+        $expected = $this->createTax('ZZZ9', $default->operacion);
+
+        $supplier = $this->createSupplier();
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 9.87], ['tax_amount' => 2.96, 'total' => 32.96]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $line = $invoice->getLines()[0];
+        $this->assertSame($expected->codimpuesto, $line->codimpuesto);
+        $this->assertEqualsWithDelta(9.87, (float) $line->iva, 0.001);
+    }
+
+    public function testRateWithoutTaxCodeAndNoMatchingTaxAbortsTheImport(): void
+    {
+        $supplier = $this->createSupplier();
+
+        // 3,17 % no existe en ninguna instalación: mejor cortar que grabar un
+        // asiento con la subcuenta de otro impuesto.
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 3.17], ['tax_amount' => 0.95, 'total' => 30.95]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertNull($result['invoice_id']);
+        $this->assertStringContainsString(Tools::number(3.17), implode('; ', $result['errors']));
     }
 
     /**

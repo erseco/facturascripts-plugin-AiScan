@@ -245,6 +245,26 @@ final class InvoiceMapperTest extends TestCase
         $this->assertEqualsWithDelta(7.0, $inferredRate, 0.01);
     }
 
+    /**
+     * Issue #131: sin subtotal, el modo total tomaba el total (IVA incluido)
+     * como base y calculaba el tipo sobre él.
+     */
+    public function testPrepareLinesWithoutSubtotalUsesTheTaxBase(): void
+    {
+        $result = $this->callPrepareLines([], ['total' => 121.0, 'tax_amount' => 21.0]);
+
+        $this->assertEqualsWithDelta(100.0, $result[0]['unit_price'], 0.001);
+        $this->assertEqualsWithDelta(21.0, $result[0]['tax_rate'], 0.001);
+    }
+
+    public function testPrepareLinesWithoutSubtotalAddsBackTheWithholding(): void
+    {
+        $result = $this->callPrepareLines([], ['total' => 106.0, 'tax_amount' => 21.0, 'withholding_amount' => 15.0]);
+
+        $this->assertEqualsWithDelta(100.0, $result[0]['unit_price'], 0.001);
+        $this->assertEqualsWithDelta(21.0, $result[0]['tax_rate'], 0.001);
+    }
+
     // ── helpers ──────────────────────────────────────────────
 
     private function callBuildNotes(array $invoiceData): string
