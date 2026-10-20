@@ -10,7 +10,11 @@
 /.github/               export-ignore
 /.gitignore             export-ignore
 /.playwright-mcp/       export-ignore
+/.agents/               export-ignore
+/AGENTS.md              export-ignore
 /CLAUDE.md              export-ignore
+/FORJA.md               export-ignore
+/GEMINI.md              export-ignore
 /Test/                  export-ignore
 /tests/                 export-ignore
 
@@ -18,6 +22,7 @@
 /examples/              export-ignore
 /QUICKSTART.md          export-ignore
 /README.md              export-ignore
+/docs/                  export-ignore
 
 # Build and dependencies
 /vendor/                export-ignore
@@ -29,7 +34,9 @@
 /package-lock.json      export-ignore
 
 # Development tools
+/docker/                export-ignore
 /docker-compose.yml     export-ignore
+/docker-compose.override.yml export-ignore
 /Makefile               export-ignore
 /phpunit.xml            export-ignore
 /phpunit-plugins.xml    export-ignore

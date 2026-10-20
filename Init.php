@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Plugins\AiScan;
 
+use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\Template\InitClass;
 use FacturaScripts\Dinamic\Model\Settings;
 use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
@@ -32,6 +33,8 @@ class Init extends InitClass
 
     public function update(): void
     {
+        self::removeHistoryOrphans(new DataBase());
+
         $settings = new Settings();
         $settings->load('AiScan');
         $settings->name = 'AiScan';
@@ -51,6 +54,29 @@ class Init extends InitClass
         }
 
         $settings->save();
+    }
+
+    /**
+     * Issue #136: las tablas del historial y de alias tienen ahora claves
+     * foráneas. Las filas huérfanas que ya hubiera (por ejemplo, documentos de
+     * un lote borrado desde el listado) impedirían añadirlas, así que se borran
+     * antes de que FacturaScripts revise las tablas.
+     */
+    public static function removeHistoryOrphans(DataBase $db): void
+    {
+        $queries = [
+            'aiscan_import_documents' => 'DELETE FROM aiscan_import_documents WHERE idbatch NOT IN'
+                . ' (SELECT id FROM aiscan_import_batches);',
+            'aiscan_import_lines' => 'DELETE FROM aiscan_import_lines WHERE iddocument NOT IN'
+                . ' (SELECT id FROM aiscan_import_documents);',
+            'aiscan_supplier_aliases' => 'DELETE FROM aiscan_supplier_aliases WHERE codproveedor NOT IN'
+                . ' (SELECT codproveedor FROM proveedores);',
+        ];
+        foreach ($queries as $table => $sql) {
+            if ($db->tableExists($table)) {
+                $db->exec($sql);
+            }
+        }
     }
 
     public function uninstall(): void

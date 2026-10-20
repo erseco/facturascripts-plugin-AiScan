@@ -89,6 +89,9 @@ package:
 		-x "*composer.lock" \
 		-x "*dist/*" \
 		-x "*docker-compose.yml" \
+		-x "*docker-compose.override.yml" \
+		-x "*docker/*" \
+		-x "*FORJA.md" \
 		-x "*examples/*" \
 		-x "*Makefile" \
 		-x "*node_modules/*" \

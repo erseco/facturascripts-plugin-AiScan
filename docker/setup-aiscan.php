@@ -48,6 +48,9 @@ if (!in_array('AiScan', Plugins::enabled())) {
     echo "[AiScan] Plugin already enabled.\n";
 }
 
+// Remove orphan history rows first, or the new foreign keys cannot be added (#136)
+\FacturaScripts\Plugins\AiScan\Init::removeHistoryOrphans(new \FacturaScripts\Core\Base\DataBase());
+
 // Ensure all AiScan model tables exist by instantiating them
 // (FS creates tables on first model instantiation via DbUpdater)
 $aiscanModels = [
