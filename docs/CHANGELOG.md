@@ -5,6 +5,47 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [8.8] - 2026-10-20
+
+Correcciones de la revisión del equipo de FacturaScripts para el catálogo.
+
+### Security
+
+- El historial escapa el HTML de nombres de archivo, proveedores, números y descripciones, y recorta cada texto a la longitud de su columna (#129).
+- Las acciones de AiScan que escriben datos o llaman a la IA exigen el token del formulario (`multireqtoken`) (#129).
+- El historial de importaciones es de solo lectura también por POST: rechaza `save`, `insert` y `delete`, y ya no muestra el botón de guardar (#129, #147).
+- Gemini recibe la clave API en la cabecera `x-goog-api-key`, no en la URL (#130).
+
+### Added
+
+- Tarea cron que borra cada hora los temporales de `MyFiles/aiscan_tmp` de más de 24 horas (#130).
+- Claves foráneas e índices en el historial (lote → documentos → líneas) y en los alias de proveedor; al actualizar se borran antes las filas huérfanas (#136).
+- Aviso cuando la factura trae una divisa que no existe en FacturaScripts (#134).
+- Si se intenta crear un proveedor con un CIF que ya existe, se enlaza el existente (#134).
+- La zona de subida se puede usar con el teclado (#135).
+- `make js` y pruebas que comprueban que el JS publicado coincide con sus fuentes y que todas sus traducciones existen (#137, #147).
+
+### Changed
+
+- El JS de la pantalla de revisión se divide en fragmentos en `Assets/JS/workflow/` y se genera con `make js` (#137).
+- Los cuatro buscadores (producto predeterminado, modal de producto, producto de la línea y proveedor) comparten un único código, y ninguno pinta resultados viejos encima de los nuevos (#147).
+- El proveedor solo se empareja automáticamente si coincide el nombre o la razón social completa; los parecidos quedan como sugerencias (#134).
+- Se usan las clases `Dinamic\Lib` para `Calculator`, `ReceiptGenerator` y `RegimenIVA` (#136).
+- El ZIP de la release ya no incluye archivos de desarrollo (`.agents/`, `AGENTS.md`, `GEMINI.md`, `FORJA.md`, `docker/`, `docs/`) (#136).
+
+### Fixed
+
+- El IVA que falta en una línea se infiere del desglose; una línea con tipo y sin código usa el impuesto de ese tipo, y en modo total la base ya no es el total con IVA (#131).
+- `ProductMatcher` y el historial leen `referencia` y `descripcion`, así que las líneas sin referencia ya no acaban siempre en el producto habitual del proveedor (#132).
+- El estado «Recibida» se busca por sus propiedades y no por el nombre, que cambia con el idioma (#133).
+- Si la importación falla a medias, la factura se descarta en vez de quedarse grabada y duplicarse al reintentar; el documento escaneado sigue disponible (#133).
+- La pantalla de revisión ya no repinta el documento abierto mientras se analizan otros, ni rompe un modal abierto (#135).
+- Los importes se leen bien en cualquier idioma («1,234.56», «1 234,56»…) (#135).
+- Los errores HTTP de las peticiones se tratan como error en lugar de como respuesta válida (#135).
+- Traducciones que faltaban (`discarded`, `imported`, `permission-denied`, el enlace al historial) y el tipo de importación del historial (#136, #147).
+
+## [8.7] y anteriores
+
 ### Added
 
 - Añade pruebas de los endpoints, vistas, importación, adjuntos y proveedores con transporte simulado; exige 90 % de cobertura PHP en CI y publica el reporte en Codecov.
