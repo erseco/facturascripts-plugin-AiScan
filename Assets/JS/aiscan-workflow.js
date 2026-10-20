@@ -71,6 +71,42 @@
 
     // ── Helpers ────────────────────────────────────────────────────────
 
+    // Issue #135: un 4xx/5xx no se puede tratar como una respuesta buena. Si trae
+    // JSON se devuelve marcado como error (los llamantes ya miran success/error);
+    // si no, se lanza para que lo recoja el catch de quien llama.
+    async function readJsonResponse(response) {
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (e) {
+            data = null;
+        }
+        if (response.ok && data !== null) {
+            return data;
+        }
+        const message = data && data.error
+            ? data.error
+            : trans('aiscan-request-failed', {'%status%': String(response.status)});
+        if (!response.ok && data && typeof data === 'object') {
+            return {...data, success: false, error: message};
+        }
+        throw new Error(message);
+    }
+
+    // Issue #135: durante el análisis en paralelo, cada documento que terminaba
+    // repintaba el formulario del documento abierto y borraba lo que el usuario
+    // estaba escribiendo. Solo se repinta el documento que ha cambiado.
+    function resolveReviewRefresh(changedDoc, current, modalOpen) {
+        if (!current || (changedDoc && changedDoc !== current)) {
+            return 'skip';
+        }
+        const reviewable = [STATUS.ANALYZING, STATUS.ANALYZED, STATUS.NEEDS_REVIEW, STATUS.FAILED];
+        if (!reviewable.includes(current.status)) {
+            return 'skip';
+        }
+        return modalOpen ? 'defer' : 'render';
+    }
+
     let formTokenCounter = 0;
 
     // Issue #129: el servidor rechaza un token ya usado, así que cada petición
@@ -446,6 +482,16 @@
                 return;
             }
             fileInput.click();
+        });
+        // Issue #135: la zona de subida también se abre con el teclado.
+        dropZone.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') {
+                return;
+            }
+            e.preventDefault();
+            if (!isUploadQueueLocked()) {
+                fileInput.click();
+            }
         });
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -873,7 +919,7 @@
                     method: 'POST',
                     body: formData,
                 });
-                const data = await response.json();
+                const data = await readJsonResponse(response);
 
                 if (!data.success) {
                     throw new Error(data.error || trans('aiscan-no-file-uploaded'));
@@ -1087,11 +1133,23 @@
         let running = 0;
         let nextIdx = 0;
 
-        function refreshUI() {
+        function refreshUI(changedDoc) {
             renderSidebar();
             const cur = currentDoc();
-            if (cur && (cur.status === STATUS.ANALYZING || cur.status === STATUS.ANALYZED
-                || cur.status === STATUS.NEEDS_REVIEW || cur.status === STATUS.FAILED)) {
+            const openModal = document.querySelector('.modal.show');
+            const action = resolveReviewRefresh(changedDoc, cur, !!openModal);
+            if (action === 'defer') {
+                // Issue #135: repintar con un modal abierto lo destruye y deja el
+                // fondo bloqueando la página; se espera a que se cierre, con un
+                // único aviso aunque terminen varios análisis mientras tanto.
+                if (!openModal.dataset.aiscanRefreshPending) {
+                    openModal.dataset.aiscanRefreshPending = '1';
+                    openModal.addEventListener('hidden.bs.modal', () => {
+                        delete openModal.dataset.aiscanRefreshPending;
+                        refreshUI(currentDoc());
+                    }, {once: true});
+                }
+            } else if (action === 'render') {
                 renderPreview(cur);
                 renderReviewPanel(cur);
             }
@@ -1100,7 +1158,7 @@
         async function analyzeOne(doc) {
             doc.status = STATUS.ANALYZING;
             doc.analyzingChoice = choice;
-            refreshUI();
+            refreshUI(doc);
 
             try {
                 const params = buildAnalyzeParams(doc, {
@@ -1120,7 +1178,7 @@
                         message: trans('aiscan-scan-failed-invalid-response'),
                         scanFailureCode: 'invalid_json',
                     });
-                    refreshUI();
+                    refreshUI(doc);
                     return;
                 }
 
@@ -1131,7 +1189,7 @@
                         data: data.data,
                         scanFailureCode: data.scan_failure_code || 'unknown',
                     });
-                    refreshUI();
+                    refreshUI(doc);
                     return;
                 }
 
@@ -1141,14 +1199,14 @@
                         message: data.error || trans('aiscan-scan-failed-manual-entry'),
                         scanFailureCode: 'unknown',
                     });
-                    refreshUI();
+                    refreshUI(doc);
                     return;
                 }
 
                 // Multi-invoice: the AI found several invoices in one document
                 if (data._multi_invoice && Array.isArray(data.invoices) && data.invoices.length > 1) {
                     handleMultiInvoiceResponse(doc, data.invoices);
-                    refreshUI();
+                    refreshUI(doc);
                     return;
                 }
 
@@ -1157,7 +1215,7 @@
                         message: trans('aiscan-scan-failed-invalid-response'),
                         scanFailureCode: 'invalid_json',
                     });
-                    refreshUI();
+                    refreshUI(doc);
                     return;
                 }
 
@@ -1177,7 +1235,8 @@
                         model: choice.model,
                     });
                     const reResponse = await apiFetch('AiScanInvoice?' + reParams.toString());
-                    const reData = await reResponse.json();
+                    // Issue #135: si el reanálisis con historial falla, se conserva la primera extracción.
+                    const reData = reResponse.ok ? await reResponse.json().catch(() => null) : null;
                     if (reData && reData.scan_failed) {
                         // Keep first extraction; history re-scan failure is non-blocking.
                     } else if (reData && reData.success && reData.data) {
@@ -1197,7 +1256,7 @@
                 });
             }
 
-            refreshUI();
+            refreshUI(doc);
         }
 
         return new Promise(resolve => {
@@ -1366,9 +1425,15 @@
         // Insert additional documents right after the original
         const toInsert = newDocs.filter(d => d !== null);
         if (toInsert.length > 0) {
+            // Issue #135: refreshUI() ya no repinta documentos ajenos, así que el
+            // documento abierto tiene que seguir siendo el mismo tras insertar.
+            const openDoc = currentDoc();
             state.documents.splice(docIndex + 1, 0, ...toInsert);
             // Re-index all documents
             state.documents.forEach((d, i) => { d.index = i; });
+            if (openDoc && state.documents.indexOf(openDoc) !== -1) {
+                state.currentIndex = state.documents.indexOf(openDoc);
+            }
         }
 
         // Finalize status for the newly inserted documents
@@ -2355,7 +2420,7 @@
         try {
             const params = new URLSearchParams({action: 'get-supplier-default-product', codproveedor});
             const response = await apiFetch('AiScanInvoice?' + params.toString());
-            const data = await response.json();
+            const data = await readJsonResponse(response);
             if (data.found) {
                 setDefaultProductPickerValue(data.referencia, data.description || '', codproveedor);
                 // Issue #69: reaplicar el pin a las líneas del documento actual
@@ -2516,7 +2581,7 @@
 
             const currentRequestId = ++requestId;
             apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(r => r.json())
+                .then(readJsonResponse)
                 .then(data => {
                     if (currentRequestId !== requestId) {
                         return;
@@ -2672,7 +2737,7 @@
                     description: desc,
                 }),
             });
-            const data = await response.json();
+            const data = await readJsonResponse(response);
             if (statusEl) {
                 statusEl.textContent = data.success ? trans('aiscan-saved') : (data.error || 'Error');
                 statusEl.className = data.success ? 'small text-success mt-1' : 'small text-danger mt-1';
@@ -2720,7 +2785,7 @@
                     clear: true,
                 }),
             });
-            const data = await response.json();
+            const data = await readJsonResponse(response);
             if (statusEl) {
                 statusEl.textContent = data.success
                     ? trans('aiscan-default-product-cleared')
@@ -2881,10 +2946,43 @@
         return n.toLocaleString(document.documentElement.lang || 'es', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
-    function parseLocaleNumber(str) {
-        if (!str || str === '-') { return 0; }
-        // Remove thousands separators (.) and convert decimal comma to dot
-        return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    function localeDecimalSeparator(lang) {
+        try {
+            const part = new Intl.NumberFormat(lang || 'es').formatToParts(1.5).find(p => p.type === 'decimal');
+            return part ? part.value : ',';
+        } catch (e) {
+            return ',';
+        }
+    }
+
+    // Issue #135: los importes se pintan con fmtNumber() en el idioma de la página
+    // («1.234,56», «1,234.56», «1 234,56»), y el usuario puede teclear el decimal
+    // con punto o con coma. Un separador que aparece una sola vez y no agrupa de
+    // tres en tres es el decimal, aunque el idioma diga otra cosa.
+    function parseLocaleNumber(str, lang) {
+        let value = String(str ?? '').replace(/[\s\u00a0\u202f']/g, '');
+        if (value === '' || value === '-') {
+            return 0;
+        }
+        const lastComma = value.lastIndexOf(',');
+        const lastDot = value.lastIndexOf('.');
+        let decimal = null;
+        if (lastComma !== -1 && lastDot !== -1) {
+            decimal = lastComma > lastDot ? ',' : '.';
+        } else if (lastComma !== -1 || lastDot !== -1) {
+            const sep = lastComma !== -1 ? ',' : '.';
+            const grouped = new RegExp('^-?\\d{1,3}(\\' + sep + '\\d{3})+$').test(value);
+            const isLocaleDecimal = sep === localeDecimalSeparator(lang || document.documentElement.lang);
+            decimal = (isLocaleDecimal || !grouped) ? sep : null;
+        }
+        const group = decimal === ',' ? /\./g : /,/g;
+        value = value.replace(group, '');
+        if (decimal === null) {
+            value = value.replace(/[.,]/g, '');
+        } else if (decimal === ',') {
+            value = value.replace(',', '.');
+        }
+        return parseFloat(value) || 0;
     }
 
     function calcLineTotal(row) {
@@ -3181,7 +3279,7 @@
                 return;
             }
             apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(r => r.json())
+                .then(readJsonResponse)
                 .then(data => {
                     const items = data.results || [];
                     if (items.length === 0) {
@@ -3475,7 +3573,7 @@
 
             const currentRequestId = ++requestId;
             apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-products', query}))
-                .then(r => r.json())
+                .then(readJsonResponse)
                 .then(data => {
                     if (currentRequestId !== requestId) {
                         return;
@@ -3814,7 +3912,7 @@
                 return;
             }
             apiFetch('AiScanInvoice?' + new URLSearchParams({action: 'search-suppliers', query}))
-                .then(r => r.json())
+                .then(readJsonResponse)
                 .then(data => {
                     const items = data.results || [];
                     if (items.length === 0) {
@@ -3965,7 +4063,7 @@
                     codproveedor,
                 })
             );
-            const data = await response.json();
+            const data = await readJsonResponse(response);
             if (!data.found || !data.referencia) {
                 return;
             }
@@ -4028,7 +4126,7 @@
                     is_creditor: isCreditorPartyType(partyType),
                 }),
             });
-            const data = await response.json();
+            const data = await readJsonResponse(response);
 
             // Issue #134: el CIF ya existe; se enlaza ese proveedor en vez de dejar
             // el documento sin proveedor y obligar a buscarlo a mano.
@@ -4252,7 +4350,7 @@
                 });
 
                 const response = await apiFetch('AiScanInvoice?' + params.toString());
-                const data = await response.json();
+                const data = await readJsonResponse(response);
                 applyAnalyzeResponse(doc, data);
             } catch (error) {
                 applyManualEntryFallback(doc, {
@@ -4294,7 +4392,7 @@
             });
 
             const response = await apiFetch('AiScanInvoice?' + params.toString());
-            const data = await response.json();
+            const data = await readJsonResponse(response);
             applyAnalyzeResponse(doc, data);
         } catch (error) {
             applyManualEntryFallback(doc, {
@@ -4569,7 +4667,7 @@
                     update_stock_purchase_data: state.updateStockPurchaseData,
                 }),
             });
-            const data = await response.json();
+            const data = await readJsonResponse(response);
 
             if (!data.success) {
                 throw new Error(data.error || 'Import failed');
@@ -4855,6 +4953,9 @@
             modelChoiceForDoc,
             nextRotation,
             sameChoice,
+            parseLocaleNumber,
+            readJsonResponse,
+            resolveReviewRefresh,
             withFormToken,
             renderReanalyzeMenu,
             selectedModelChoice,

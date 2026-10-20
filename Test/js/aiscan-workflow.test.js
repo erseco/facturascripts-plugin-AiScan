@@ -1316,6 +1316,58 @@ test('updateMarkReadyButton indica que la factura ya está lista y desactiva el 
     assert.doesNotMatch(btn.innerHTML, /aiscan-marked-ready/);
 });
 
+test('parseLocaleNumber reads amounts formatted in Spanish, English and French (#135)', () => {
+    const {hooks} = loadTestHooks();
+    const {parseLocaleNumber} = hooks;
+
+    assert.equal(parseLocaleNumber('1.234,56', 'es'), 1234.56);
+    assert.equal(parseLocaleNumber('1.234', 'es'), 1234);
+    assert.equal(parseLocaleNumber('12,5', 'es'), 12.5);
+    assert.equal(parseLocaleNumber('12.5', 'es'), 12.5);
+    assert.equal(parseLocaleNumber('1,234.56', 'en'), 1234.56);
+    assert.equal(parseLocaleNumber('1,234', 'en'), 1234);
+    assert.equal(parseLocaleNumber('1.234', 'en'), 1.234);
+    assert.equal(parseLocaleNumber('1 234,56', 'fr'), 1234.56);
+    assert.equal(parseLocaleNumber('-15,00', 'es'), -15);
+    assert.equal(parseLocaleNumber('', 'es'), 0);
+    assert.equal(parseLocaleNumber('-', 'es'), 0);
+});
+
+test('readJsonResponse flags HTTP errors instead of treating them as success (#135)', async () => {
+    const {hooks} = loadTestHooks();
+    const {readJsonResponse} = hooks;
+    const response = (ok, status, body) => ({
+        ok,
+        status,
+        json: async () => {
+            if (body === undefined) {
+                throw new SyntaxError('Unexpected token <');
+            }
+            return body;
+        },
+    });
+
+    assert.deepEqual(await readJsonResponse(response(true, 200, {success: true})), {success: true});
+    const forbidden = await readJsonResponse(response(false, 403, {error: 'invalid-request'}));
+    assert.equal(forbidden.success, false);
+    assert.equal(forbidden.error, 'invalid-request');
+    await assert.rejects(readJsonResponse(response(false, 500)), /aiscan-request-failed/);
+    await assert.rejects(readJsonResponse(response(true, 200)));
+});
+
+test('resolveReviewRefresh only re-renders the document that changed (#135)', () => {
+    const {hooks} = loadTestHooks();
+    const {resolveReviewRefresh, STATUS} = hooks;
+    const current = {status: STATUS.NEEDS_REVIEW};
+    const other = {status: STATUS.ANALYZED};
+
+    assert.equal(resolveReviewRefresh(other, current, false), 'skip');
+    assert.equal(resolveReviewRefresh(current, current, false), 'render');
+    assert.equal(resolveReviewRefresh(current, current, true), 'defer');
+    assert.equal(resolveReviewRefresh(current, {status: STATUS.READY}, false), 'skip');
+    assert.equal(resolveReviewRefresh(null, null, false), 'skip');
+});
+
 test('withFormToken adds a distinct multireqtoken to each request (#129)', () => {
     const {hooks} = loadTestHooks();
     const first = new URL('http://x/' + hooks.withFormToken('AiScanInvoice?action=upload'));
@@ -1324,4 +1376,26 @@ test('withFormToken adds a distinct multireqtoken to each request (#129)', () =>
     assert.equal(first.searchParams.get('action'), 'upload');
     assert.match(first.searchParams.get('multireqtoken'), /^sig\|abc123\d+$/);
     assert.notEqual(first.searchParams.get('multireqtoken'), second.searchParams.get('multireqtoken'));
+});
+
+test('handleMultiInvoiceResponse keeps the open document selected (#135)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = (name, status) => ({
+        index: 0, file: null, originalName: name, mimeType: 'application/pdf', size: 1,
+        objectUrl: 'blob:' + name, tmpFile: name, status, extractedData: null, error: null, reviewDecision: null,
+    });
+    const multi = doc('multi.pdf', 'analyzing');
+    const open = doc('open.pdf', 'needs_review');
+    hooks.state.documents = [multi, doc('other.pdf', 'analyzed'), open];
+    hooks.state.documents.forEach((d, i) => { d.index = i; });
+    hooks.state.currentIndex = 2;
+
+    hooks.handleMultiInvoiceResponse(multi, [
+        {invoice: {number: 'A'}, lines: []},
+        {invoice: {number: 'B'}, lines: []},
+        {invoice: {number: 'C'}, lines: []},
+    ]);
+
+    assert.equal(hooks.state.documents.length, 5);
+    assert.equal(hooks.state.documents[hooks.state.currentIndex], open);
 });
