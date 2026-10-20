@@ -1140,8 +1140,15 @@
             const action = resolveReviewRefresh(changedDoc, cur, !!openModal);
             if (action === 'defer') {
                 // Issue #135: repintar con un modal abierto lo destruye y deja el
-                // fondo bloqueando la página; se espera a que se cierre.
-                openModal.addEventListener('hidden.bs.modal', () => refreshUI(cur), {once: true});
+                // fondo bloqueando la página; se espera a que se cierre, con un
+                // único aviso aunque terminen varios análisis mientras tanto.
+                if (!openModal.dataset.aiscanRefreshPending) {
+                    openModal.dataset.aiscanRefreshPending = '1';
+                    openModal.addEventListener('hidden.bs.modal', () => {
+                        delete openModal.dataset.aiscanRefreshPending;
+                        refreshUI(currentDoc());
+                    }, {once: true});
+                }
             } else if (action === 'render') {
                 renderPreview(cur);
                 renderReviewPanel(cur);
@@ -1418,9 +1425,15 @@
         // Insert additional documents right after the original
         const toInsert = newDocs.filter(d => d !== null);
         if (toInsert.length > 0) {
+            // Issue #135: refreshUI() ya no repinta documentos ajenos, así que el
+            // documento abierto tiene que seguir siendo el mismo tras insertar.
+            const openDoc = currentDoc();
             state.documents.splice(docIndex + 1, 0, ...toInsert);
             // Re-index all documents
             state.documents.forEach((d, i) => { d.index = i; });
+            if (openDoc && state.documents.indexOf(openDoc) !== -1) {
+                state.currentIndex = state.documents.indexOf(openDoc);
+            }
         }
 
         // Finalize status for the newly inserted documents

@@ -1377,3 +1377,25 @@ test('withFormToken adds a distinct multireqtoken to each request (#129)', () =>
     assert.match(first.searchParams.get('multireqtoken'), /^sig\|abc123\d+$/);
     assert.notEqual(first.searchParams.get('multireqtoken'), second.searchParams.get('multireqtoken'));
 });
+
+test('handleMultiInvoiceResponse keeps the open document selected (#135)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = (name, status) => ({
+        index: 0, file: null, originalName: name, mimeType: 'application/pdf', size: 1,
+        objectUrl: 'blob:' + name, tmpFile: name, status, extractedData: null, error: null, reviewDecision: null,
+    });
+    const multi = doc('multi.pdf', 'analyzing');
+    const open = doc('open.pdf', 'needs_review');
+    hooks.state.documents = [multi, doc('other.pdf', 'analyzed'), open];
+    hooks.state.documents.forEach((d, i) => { d.index = i; });
+    hooks.state.currentIndex = 2;
+
+    hooks.handleMultiInvoiceResponse(multi, [
+        {invoice: {number: 'A'}, lines: []},
+        {invoice: {number: 'B'}, lines: []},
+        {invoice: {number: 'C'}, lines: []},
+    ]);
+
+    assert.equal(hooks.state.documents.length, 5);
+    assert.equal(hooks.state.documents[hooks.state.currentIndex], open);
+});
