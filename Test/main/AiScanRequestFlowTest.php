@@ -228,6 +228,24 @@ final class AiScanRequestFlowTest extends TestCase
         self::assertArrayHasKey('results', $this->call('search-products', ['query' => 'coverage']));
     }
 
+    public function testCreateSupplierRefusesAnExistingTaxId(): void
+    {
+        // Issue #134: crear un proveedor no comprobaba si el CIF ya existía.
+        $tax = 'B' . mt_rand(10000000, 99999999);
+        $first = $this->call('create-supplier', [], ['name' => 'First ' . bin2hex(random_bytes(4)), 'tax_id' => $tax]);
+        self::assertTrue($first['success'], json_encode($first));
+        $this->suppliers[] = $first['supplier']['id'];
+
+        $second = $this->call('create-supplier', [], ['name' => 'Second', 'tax_id' => 'ES-' . $tax]);
+        if (!empty($second['supplier']['id']) && $second['supplier']['id'] !== $first['supplier']['id']) {
+            $this->suppliers[] = $second['supplier']['id'];
+        }
+
+        self::assertSame(409, self::$status);
+        self::assertArrayHasKey('error', $second);
+        self::assertSame($first['supplier']['id'], $second['existing_supplier']['id']);
+    }
+
     public function testUploadAnalysisManualFallbackAndTextExtraction(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'aiscan-coverage-');

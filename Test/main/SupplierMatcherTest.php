@@ -236,6 +236,50 @@ final class SupplierMatcherTest extends TestCase
         }
     }
 
+    /**
+     * Issue #134: LIKE %nombre% emparejaba cualquier proveedor cuyo nombre
+     * contuviera el extraído («Sol» con «Solar Energía»).
+     */
+    public function testPartialNameIsOnlyASuggestion(): void
+    {
+        $suffix = (string) mt_rand(10000, 99999);
+        $stored = $this->createSupplier('Solar Energia Canaria ' . $suffix, '');
+
+        $result = $this->matcher->findMatch(['name' => 'Energia Canaria ' . $suffix]);
+
+        $this->assertNotSame('matched', $result['match_status']);
+        $this->assertNull($result['supplier']);
+        $this->assertSame('ambiguous', $result['match_status']);
+        $this->assertSame(
+            [$stored->codproveedor],
+            array_map(static fn ($s) => $s->codproveedor, $result['candidates'])
+        );
+    }
+
+    public function testSameNameWithDifferentCaseAndLegalFormMatches(): void
+    {
+        $suffix = (string) mt_rand(10000, 99999);
+        $stored = $this->createSupplier('Talleres Hermanos ' . $suffix . ' S.L.', '');
+
+        $result = $this->matcher->findMatch(['name' => 'TALLERES HERMANOS ' . $suffix . ', SL']);
+
+        $this->assertSame('matched', $result['match_status']);
+        $this->assertSame($stored->codproveedor, $result['supplier']->codproveedor);
+    }
+
+    public function testLegalNameMatchesWhenTheTradeNameDiffers(): void
+    {
+        $suffix = (string) mt_rand(10000, 99999);
+        $stored = $this->createSupplier('Marca Comercial ' . $suffix, '');
+        $stored->razonsocial = 'Sociedad Legal ' . $suffix . ' SAU';
+        $this->assertTrue($stored->save());
+
+        $result = $this->matcher->findMatch(['name' => 'Sociedad Legal ' . $suffix . ' S.A.U.']);
+
+        $this->assertSame('matched', $result['match_status']);
+        $this->assertSame($stored->codproveedor, $result['supplier']->codproveedor);
+    }
+
     /** @var Proveedor[] */
     private array $suppliersToDelete = [];
 

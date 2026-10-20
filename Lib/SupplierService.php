@@ -55,6 +55,12 @@ class SupplierService
             return null;
         }
 
+        // Issue #134: no se crea un segundo proveedor con un CIF que ya existe
+        // (por ejemplo, cuando hay varios y el emparejamiento es ambiguo).
+        if ($this->findExistingByTaxId((string) ($supplierData['tax_id'] ?? '')) instanceof Proveedor) {
+            return null;
+        }
+
         $supplier = new Proveedor();
         $supplier->nombre = trim((string) ($supplierData['name'] ?? ''));
         $supplier->razonsocial = $supplier->nombre;
@@ -75,6 +81,21 @@ class SupplierService
         $supplierData['party_type'] = $isCreditor ? self::PARTY_CREDITOR : self::PARTY_SUPPLIER;
         $supplierData['is_creditor'] = $isCreditor;
         return $supplier;
+    }
+
+    /**
+     * Issue #134: proveedor que ya tiene este CIF/NIF (normalizado), si lo hay.
+     * Lo usan la creación automática y la acción create-supplier.
+     */
+    public function findExistingByTaxId(string $taxId): ?Proveedor
+    {
+        $taxId = trim($taxId);
+        if ($taxId === '') {
+            return null;
+        }
+
+        $matches = (new SupplierMatcher())->findByTaxId($taxId);
+        return $matches[0] ?? null;
     }
 
     /**
