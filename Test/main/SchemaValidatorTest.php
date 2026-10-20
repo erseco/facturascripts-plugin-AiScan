@@ -52,6 +52,21 @@ final class SchemaValidatorTest extends TestCase
         $this->assertEqualsWithDelta(7.0, $data['lines'][0]['iva'], 0.001);
     }
 
+    public function testInferSingleTaxRateOnlyAcceptsAnUnambiguousBreakdown(): void
+    {
+        $invoice = ['subtotal' => 100.0, 'tax_amount' => 21.0];
+        $tax = ['rate' => 21, 'base' => 100, 'amount' => 21];
+        $lines = [['cantidad' => 2, 'pvpunitario' => 50]];
+
+        $this->assertEqualsWithDelta(21.0, SchemaValidator::inferSingleTaxRate($lines, $invoice, [$tax]), 0.001);
+        $this->assertNull(SchemaValidator::inferSingleTaxRate($lines, $invoice, [$tax, $tax]));
+        $this->assertNull(SchemaValidator::inferSingleTaxRate($lines, $invoice, [['rate' => 0, 'base' => 100]]));
+        $this->assertNull(SchemaValidator::inferSingleTaxRate($lines, ['subtotal' => 90.0] + $invoice, [$tax]));
+        $this->assertNull(SchemaValidator::inferSingleTaxRate([['suplido' => true] + $lines[0]], $invoice, [$tax]));
+        $halfLines = [['cantidad' => 1, 'pvpunitario' => 50]];
+        $this->assertNull(SchemaValidator::inferSingleTaxRate($halfLines, $invoice, [$tax]));
+    }
+
     public function testNormalizeKeepsExplicitZeroLineTaxRate(): void
     {
         $data = $this->validator->normalize([
