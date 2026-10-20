@@ -54,4 +54,12 @@
         <name>aiscan_import_lines_pkey</name>
         <type>PRIMARY KEY (id)</type>
     </constraint>
+    <constraint>
+        <name>ca_aiscan_import_lines_documents</name>
+        <type>FOREIGN KEY (iddocument) REFERENCES aiscan_import_documents (id) ON DELETE CASCADE ON UPDATE CASCADE</type>
+    </constraint>
+    <index>
+        <name>aiscan_import_lines_iddocument</name>
+        <columns>iddocument</columns>
+    </index>
 </table>

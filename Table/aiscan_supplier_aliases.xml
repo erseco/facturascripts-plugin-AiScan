@@ -33,4 +33,12 @@
         <name>aiscan_supplier_aliases_fingerprint_unique</name>
         <type>UNIQUE (fingerprint)</type>
     </constraint>
+    <constraint>
+        <name>ca_aiscan_supplier_aliases_proveedores</name>
+        <type>FOREIGN KEY (codproveedor) REFERENCES proveedores (codproveedor) ON DELETE CASCADE ON UPDATE CASCADE</type>
+    </constraint>
+    <index>
+        <name>aiscan_supplier_aliases_codproveedor</name>
+        <columns>codproveedor</columns>
+    </index>
 </table>

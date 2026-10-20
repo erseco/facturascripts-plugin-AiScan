@@ -22,11 +22,11 @@ namespace FacturaScripts\Plugins\AiScan\Lib;
 
 use FacturaScripts\Core\Base\DataBase;
 use FacturaScripts\Core\DataSrc\Impuestos;
-use FacturaScripts\Core\Lib\Calculator;
-use FacturaScripts\Core\Lib\ReceiptGenerator;
-use FacturaScripts\Core\Lib\RegimenIVA;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
+use FacturaScripts\Dinamic\Lib\Calculator;
+use FacturaScripts\Dinamic\Lib\ReceiptGenerator;
+use FacturaScripts\Dinamic\Lib\RegimenIVA;
 use FacturaScripts\Dinamic\Model\Almacen;
 use FacturaScripts\Dinamic\Model\Divisa;
 use FacturaScripts\Dinamic\Model\EstadoDocumento;

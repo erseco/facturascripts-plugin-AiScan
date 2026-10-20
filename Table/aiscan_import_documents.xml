@@ -84,4 +84,12 @@
         <name>aiscan_import_documents_pkey</name>
         <type>PRIMARY KEY (id)</type>
     </constraint>
+    <constraint>
+        <name>ca_aiscan_import_documents_batches</name>
+        <type>FOREIGN KEY (idbatch) REFERENCES aiscan_import_batches (id) ON DELETE CASCADE ON UPDATE CASCADE</type>
+    </constraint>
+    <index>
+        <name>aiscan_import_documents_idbatch</name>
+        <columns>idbatch</columns>
+    </index>
 </table>

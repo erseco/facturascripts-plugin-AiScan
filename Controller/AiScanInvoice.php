@@ -20,10 +20,10 @@
 
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
-use FacturaScripts\Core\Lib\RegimenIVA;
 use FacturaScripts\Core\Template\Controller;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Lib\AssetManager;
+use FacturaScripts\Dinamic\Lib\RegimenIVA;
 use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
