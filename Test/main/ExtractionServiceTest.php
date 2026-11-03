@@ -67,6 +67,21 @@ final class ExtractionServiceTest extends TestCase
         \FacturaScripts\Core\Tools::settingsClear();
     }
 
+    /**
+     * Tools::settings() stores the default it is given. Building the prompt
+     * without a configured country must not leave an empty one behind: the
+     * core then seeds new tables (taxes, products) from the wrong country.
+     */
+    public function testExecutionPromptDoesNotStoreAnEmptyCountry(): void
+    {
+        \FacturaScripts\Core\Tools::settingsSet('default', 'codpais', null);
+
+        ExtractionService::getExecutionPrompt('invoice.pdf', 'application/pdf');
+
+        $this->assertSame('ESP', \FacturaScripts\Core\Tools::settings('default', 'codpais', 'ESP'));
+        \FacturaScripts\Core\Tools::settingsClear();
+    }
+
     public function testGetDefaultSystemPromptIsNotEmpty(): void
     {
         $prompt = ExtractionService::getDefaultSystemPrompt();

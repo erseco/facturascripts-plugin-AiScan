@@ -28,10 +28,10 @@ use FacturaScripts\Plugins\AiScan\Lib\AiScanSettings;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
 use FacturaScripts\Plugins\AiScan\Lib\ImageToPdfConverter;
+use FacturaScripts\Plugins\AiScan\Lib\InvoiceEnricher;
 use FacturaScripts\Plugins\AiScan\Lib\InvoiceMapper;
 use FacturaScripts\Plugins\AiScan\Lib\MockFixtureResolver;
 use FacturaScripts\Plugins\AiScan\Lib\ProductMatcher;
-use FacturaScripts\Plugins\AiScan\Lib\SchemaValidator;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierMatcher;
 use FacturaScripts\Plugins\AiScan\Lib\SupplierService;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
@@ -530,16 +530,18 @@ class AiScanInvoice extends Controller
                 'AiScan scan_failed: ' . $e->getMessage()
             );
             $failed = ExtractionService::buildScanFailedResult($e);
-            $failed['data'] = $this->enrichExtractedData($failed['data']);
+            $failed['data'] = (new InvoiceEnricher())->enrich($failed['data']);
             echo json_encode($failed);
             return;
         }
+
+        $enricher = new InvoiceEnricher();
 
         // Multi-invoice: the AI returned several invoices from one document
         if (!empty($extracted['_multi_invoice'])) {
             $invoices = [];
             foreach ($extracted['invoices'] as $single) {
-                $invoices[] = $this->enrichExtractedData($single);
+                $invoices[] = $enricher->enrich($single);
             }
             echo json_encode([
                 'success' => true,
@@ -550,113 +552,13 @@ class AiScanInvoice extends Controller
             return;
         }
 
-        $extracted = $this->enrichExtractedData($extracted);
+        $extracted = $enricher->enrich($extracted);
 
         echo json_encode([
             'success' => true,
             'scan_failed' => false,
             'data' => $extracted,
         ]);
-    }
-
-    /**
-     * Enrich a single extracted invoice with supplier matching and duplicate checks.
-     */
-    private function enrichExtractedData(array $extracted): array
-    {
-        if (!empty($extracted['supplier'])) {
-            $matcher = new SupplierMatcher();
-            $matchResult = $matcher->findMatch($extracted['supplier']);
-            $extracted['supplier']['match_status'] = $matchResult['match_status'];
-            if ($matchResult['supplier']) {
-                $extracted['supplier']['matched_supplier_id'] = $matchResult['supplier']->codproveedor;
-                $extracted['supplier']['matched_name'] = $matchResult['supplier']->nombre;
-                if (!empty($matchResult['match_source'])) {
-                    $extracted['supplier']['match_source'] = $matchResult['match_source'];
-                }
-                $extracted = (new SchemaValidator())->completeMatchedSupplierTaxId(
-                    $extracted,
-                    (string) $matchResult['supplier']->cifnif
-                );
-            }
-            if (!empty($matchResult['candidates'])) {
-                $extracted['supplier']['candidates'] = array_map(
-                    [self::class, 'supplierToArray'],
-                    $matchResult['candidates']
-                );
-            }
-
-            // issue #53: pre-fill lines without a product using the supplier's
-            // usual product (most repeated, ties broken by most recent).
-            if (!empty($extracted['supplier']['matched_supplier_id'])) {
-                $this->suggestSupplierProducts($extracted);
-            }
-        }
-
-        // Check for duplicate invoice already in FacturaScripts
-        $duplicateWarning = $this->checkDuplicateInvoice($extracted);
-        if ($duplicateWarning) {
-            $extracted['_duplicate'] = $duplicateWarning;
-            $extracted['_validation_errors'][] = $duplicateWarning['message'];
-        }
-
-        return $extracted;
-    }
-
-    /**
-     * Pre-fills extracted lines that have no *valid* product reference with the
-     * supplier's usual product, flagging them as a history suggestion so the
-     * review screen shows a distinct (editable) badge. Issue #53.
-     *
-     * Mejoras respecto a PR #55:
-     * - Limpia referencias inventadas por la IA que no existen en el catálogo.
-     * - Acepta sugerencia desde producto fijado, histórico por referencia o
-     *   histórico por descripción (facturas previas sin producto enlazado).
-     */
-    private function suggestSupplierProducts(array &$extracted): void
-    {
-        $codproveedor = (string) ($extracted['supplier']['matched_supplier_id'] ?? '');
-        if ($codproveedor === '') {
-            return;
-        }
-
-        $service = new HistoricalContextService();
-        $suggestion = $service->getSuggestedProduct($codproveedor);
-        if (empty($suggestion['referencia'])) {
-            $extracted['_product_suggestion'] = null;
-            return;
-        }
-
-        // Issue #69: exponer la sugerencia aunque no haya líneas (modo total),
-        // para que la UI y buildTotalLines puedan aplicar el producto fijado.
-        $extracted['_product_suggestion'] = $suggestion;
-
-        if (empty($extracted['lines']) || !is_array($extracted['lines'])) {
-            return;
-        }
-
-        $variant = new \FacturaScripts\Dinamic\Model\Variante();
-        foreach ($extracted['lines'] as &$line) {
-            $currentRef = trim((string) ($line['referencia'] ?? $line['sku'] ?? ''));
-            if ($currentRef !== '') {
-                // Mantener solo si el producto existe; si no, es basura de la IA.
-                if ($variant->loadWhere([\FacturaScripts\Core\Where::eq('referencia', $currentRef)])) {
-                    continue;
-                }
-                // También aceptar codbarras exacto
-                if ($variant->loadWhere([\FacturaScripts\Core\Where::eq('codbarras', $currentRef)])) {
-                    $line['referencia'] = $variant->referencia;
-                    continue;
-                }
-                // Referencia inválida → se puede sobrescribir con la sugerencia
-                $line['referencia'] = '';
-                unset($line['sku']);
-            }
-
-            $line['referencia'] = $suggestion['referencia'];
-            $line['referencia_source'] = 'history';
-        }
-        unset($line);
     }
 
     private function handleMatchSupplier(): void
@@ -1163,7 +1065,7 @@ class AiScanInvoice extends Controller
                 continue;
             }
 
-            $duplicate = $this->checkDuplicateInvoice($extracted);
+            $duplicate = (new InvoiceEnricher())->findDuplicateInvoice($extracted);
             if ($duplicate && $duplicate['same_total']) {
                 $this->persistHistoryDocument(
                     $historyBatch->id,
@@ -1297,63 +1199,6 @@ class AiScanInvoice extends Controller
             $histLine->referencia = ProductMatcher::lineValue($line, ['referencia', 'sku']);
             $histLine->save();
         }
-    }
-
-    private function checkDuplicateInvoice(array $extracted): ?array
-    {
-        $invoice = $extracted['invoice'] ?? [];
-        $supplier = $extracted['supplier'] ?? [];
-
-        $numproveedor = trim((string) ($invoice['number'] ?? ''));
-        $fecha = trim((string) ($invoice['issue_date'] ?? ''));
-        $codproveedor = $supplier['matched_supplier_id'] ?? '';
-        $total = (float) ($invoice['total'] ?? 0);
-
-        if (empty($numproveedor) || empty($codproveedor)) {
-            return null;
-        }
-
-        $factura = new \FacturaScripts\Dinamic\Model\FacturaProveedor();
-        $where = [
-            new \FacturaScripts\Core\Where(
-                'numproveedor',
-                $numproveedor
-            ),
-            new \FacturaScripts\Core\Where(
-                'codproveedor',
-                $codproveedor
-            ),
-        ];
-
-        if (!empty($fecha)) {
-            $where[] = new \FacturaScripts\Core\Where(
-                'fecha',
-                $fecha
-            );
-        }
-
-        $matches = $factura->all($where, [], 0, 1);
-        if (empty($matches)) {
-            return null;
-        }
-
-        $existing = $matches[0];
-        // Issue #115: identical total means a true duplicate that must not be imported again.
-        $sameTotal = abs((float) $existing->total - $total) < 0.01;
-        return [
-            'type' => 'existing_invoice',
-            'invoice_id' => $existing->idfactura,
-            'invoice_code' => $existing->codigo,
-            'same_total' => $sameTotal,
-            'message' => Tools::lang()->trans(
-                $sameTotal ? 'aiscan-duplicate-invoice-blocked' : 'aiscan-duplicate-invoice-exists',
-                [
-                    '%code%' => $existing->codigo,
-                    '%date%' => $existing->fecha,
-                    '%total%' => Tools::money((float) $existing->total, $existing->coddivisa),
-                ]
-            ),
-        ];
     }
 
     private function resolveInvoiceCode(?int $invoiceId): ?string

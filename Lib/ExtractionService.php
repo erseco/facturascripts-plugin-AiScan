@@ -381,7 +381,9 @@ PROMPT;
         $langName = str_starts_with($lang, 'es') ? 'Spanish' : 'English';
         $prompt = str_replace('{{LANG}}', $langName, $prompt);
 
-        $langCode = Tools::settings('default', 'codpais', '');
+        // A null default: Tools::settings() stores it, and an empty string would
+        // hide the core's own country fallback when it seeds new tables.
+        $langCode = (string) Tools::settings('default', 'codpais');
         $langMap = [
             'ESP' => 'Spanish', 'MEX' => 'Spanish', 'ARG' => 'Spanish', 'COL' => 'Spanish',
             'CHL' => 'Spanish', 'PER' => 'Spanish', 'ECU' => 'Spanish', 'VEN' => 'Spanish',
