@@ -121,6 +121,8 @@
     "aiscan-no-file-specified": "No file specified.",
     "aiscan-no-file-uploaded": "No file uploaded.",
     "aiscan-no-preview": "No preview available",
+    "aiscan-open-pdf": "Open the PDF",
+    "aiscan-pdf-preview-unavailable": "This browser cannot show the PDF here.",
     "aiscan-rotate-left": "Rotate left",
     "aiscan-rotate-right": "Rotate right",
     "aiscan-no-product": "No product assigned",

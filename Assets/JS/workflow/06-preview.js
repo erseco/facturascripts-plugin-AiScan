@@ -49,6 +49,28 @@
         source.src = doc.objectUrl;
     }
 
+    /**
+     * Los navegadores móviles (Chrome Android, Safari iOS) no traen visor de PDF
+     * embebido: el iframe acaba mostrando su propio "descargar" (#150).
+     */
+    function canInlinePdf() {
+        return typeof navigator === 'undefined' || navigator.pdfViewerEnabled !== false;
+    }
+
+    function buildPdfPreviewHtml(doc, inlineSupported) {
+        if (inlineSupported) {
+            return `<iframe src="${doc.objectUrl}#navpanes=0&toolbar=1&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
+        }
+
+        return `<div class="text-center text-muted p-3 h-100 overflow-auto">
+                <a class="btn btn-sm btn-primary mb-2" href="${doc.objectUrl}" target="_blank" rel="noopener"
+                   download="${escapeAttr(doc.originalName)}">
+                    <i class="fa-solid fa-file-pdf me-1"></i>${escapeHtml(trans('aiscan-open-pdf'))}
+                </a>
+                <p class="small mb-0">${escapeHtml(trans('aiscan-pdf-preview-unavailable'))}</p>
+            </div>`;
+    }
+
     function renderPreview(doc) {
         const area = document.getElementById('aiscan-preview-area');
         const title = document.getElementById('aiscan-preview-title');
@@ -60,7 +82,7 @@
         area.innerHTML = '';
 
         if (previewAsPdf(doc) && doc.objectUrl) {
-            area.innerHTML = `<iframe src="${doc.objectUrl}#navpanes=0&toolbar=1&scrollbar=1" title="${escapeAttr(doc.originalName)}"></iframe>`;
+            area.innerHTML = buildPdfPreviewHtml(doc, canInlinePdf());
         } else if (doc.objectUrl) {
             area.style.position = 'relative';
             area.innerHTML = `

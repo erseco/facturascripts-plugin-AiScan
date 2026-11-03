@@ -121,6 +121,8 @@
     "aiscan-no-file-specified": "No se ha especificado ningún archivo.",
     "aiscan-no-file-uploaded": "No se ha subido ningún archivo.",
     "aiscan-no-preview": "Vista previa no disponible",
+    "aiscan-open-pdf": "Abrir el PDF",
+    "aiscan-pdf-preview-unavailable": "Este navegador no muestra el PDF aquí.",
     "aiscan-rotate-left": "Girar a la izquierda",
     "aiscan-rotate-right": "Girar a la derecha",
     "aiscan-no-product": "Sin producto asociado",
