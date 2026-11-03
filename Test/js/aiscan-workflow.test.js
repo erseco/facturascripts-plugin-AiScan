@@ -1578,3 +1578,23 @@ test('taxCodeToRate and discount helpers (#147)', () => {
     assert.equal(hooks.sameChoice({provider: 'gemini', model: ''}, {provider: 'gemini'}), true);
     assert.equal(hooks.sameChoice({provider: 'gemini', model: 'a'}, {provider: 'gemini', model: 'b'}), false);
 });
+
+test('buildPdfPreviewHtml falls back to a link when the browser has no PDF viewer (#150)', () => {
+    const {hooks} = loadTestHooks();
+    const doc = {originalName: 'Factura "A".pdf', objectUrl: 'blob:test'};
+
+    const inline = hooks.buildPdfPreviewHtml(doc, true);
+    assert.match(inline, /^<iframe /);
+
+    const fallback = hooks.buildPdfPreviewHtml(doc, false);
+    assert.doesNotMatch(fallback, /<iframe/);
+    assert.match(fallback, /aiscan-pdf-preview-unavailable/);
+    assert.match(fallback, /href="blob:test"/);
+    assert.doesNotMatch(fallback, /Factura "A"/);
+});
+
+test('canInlinePdf trusts navigator.pdfViewerEnabled, assuming yes when unknown (#150)', () => {
+    assert.equal(loadTestHooks({navigator: {pdfViewerEnabled: false}}).hooks.canInlinePdf(), false);
+    assert.equal(loadTestHooks({navigator: {pdfViewerEnabled: true}}).hooks.canInlinePdf(), true);
+    assert.equal(loadTestHooks({navigator: {}}).hooks.canInlinePdf(), true);
+});

@@ -14,6 +14,8 @@
             applyPinnedProductToLines,
             applySelectionRange,
             buildConfidenceBadge,
+            buildPdfPreviewHtml,
+            canInlinePdf,
             choiceLabel,
             modelChoiceForDoc,
             nextRotation,
