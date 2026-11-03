@@ -198,9 +198,16 @@ final class AddonContractTest extends TestCase
         foreach ((new FormaPago())->all([], [], 0, 1) as $method) {
             $supplier->codpago = $method->codpago;
         }
-        foreach ((new Serie())->all([], [], 0, 1) as $serie) {
-            $supplier->codserie = $serie->codserie;
+        $series = (new Serie())->all([], [], 0, 1);
+        if (empty($series)) {
+            // A fresh database (CI) has no series until someone creates one.
+            $serie = new Serie();
+            $serie->codserie = 'A';
+            $serie->descripcion = 'Test series';
+            $this->assertTrue($serie->save());
+            $series[] = $serie;
         }
+        $supplier->codserie = $series[0]->codserie;
         $this->assertTrue($supplier->save());
         $this->supplier = $supplier;
 

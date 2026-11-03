@@ -14,6 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Fixed
 
 - Con el proveedor reconocido, una línea cuya descripción coincide con un único artículo se enlaza a ese artículo y no al producto habitual del proveedor.
+- Analizar sin un país configurado ya no deja el país vacío en los ajustes en memoria; FacturaScripts usaba ese valor para cargar los datos iniciales de tablas nuevas (impuestos, productos) y elegía los de otro país.
 
 ## [8.8] - 2026-10-20
 
