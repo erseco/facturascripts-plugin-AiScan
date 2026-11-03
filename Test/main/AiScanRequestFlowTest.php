@@ -56,6 +56,7 @@ use FacturaScripts\Plugins\AiScan\Controller\ListAiScanHistory;
 use FacturaScripts\Plugins\AiScan\Lib\AttachmentService;
 use FacturaScripts\Plugins\AiScan\Lib\ExtractionService;
 use FacturaScripts\Plugins\AiScan\Lib\HistoricalContextService;
+use FacturaScripts\Plugins\AiScan\Lib\InvoiceEnricher;
 use FacturaScripts\Plugins\AiScan\Model\AiScanImportBatch;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierAlias;
 use FacturaScripts\Plugins\AiScan\Model\AiScanSupplierProduct;
@@ -354,11 +355,9 @@ final class AiScanRequestFlowTest extends TestCase
 
         // Issue #118: the warning must show which existing invoice matched (date and total),
         // so its code is not mistaken for the supplier's number.
-        $enrich = new ReflectionMethod(AiScanInvoice::class, 'enrichExtractedData');
-        $enrich->setAccessible(true);
         $existing = new FacturaProveedor();
         self::assertTrue($existing->load($first['invoice_id']));
-        $message = $enrich->invoke(new AiScanInvoice('AiScanInvoice'), $data)['_duplicate']['message'];
+        $message = (new InvoiceEnricher())->enrich($data)['_duplicate']['message'];
         self::assertStringContainsString($existing->codigo, $message);
         self::assertStringContainsString($existing->fecha, $message);
         self::assertStringContainsString(Tools::money(100, 'EUR'), $message);
@@ -465,10 +464,8 @@ final class AiScanRequestFlowTest extends TestCase
         self::assertTrue($pin['success']);
         self::assertTrue($this->call('get-supplier-default-product', ['codproveedor' => $id])['found']);
         self::assertSame('pinned', $this->call('suggest-supplier-products', ['codproveedor' => $id])['source']);
-        $enrich = new ReflectionMethod(AiScanInvoice::class, 'enrichExtractedData');
-        $enrich->setAccessible(true);
         $data['supplier']['name'] = $supplier['supplier']['name'];
-        $enriched = $enrich->invoke(new AiScanInvoice('AiScanInvoice'), $data);
+        $enriched = (new InvoiceEnricher())->enrich($data);
         self::assertSame($invoice->idfactura, $enriched['_duplicate']['invoice_id']);
         self::assertSame($product->referencia, $enriched['lines'][0]['referencia']);
         $data['lines'][0]['unit_price'] = 75;

@@ -93,6 +93,37 @@ AiScan intenta emparejar automáticamente el proveedor extraído con los proveed
 
 También intenta reutilizar productos existentes a partir del SKU o de la descripción de las líneas cuando encuentra una coincidencia clara. El usuario puede buscar y seleccionar manualmente un producto desde el modal de detalle de cada línea.
 
+## Integración con otros plugins
+
+AiScan se centra en extraer los datos de la factura y crear la factura de proveedor. La recepción por correo, el
+análisis en segundo plano y la bandeja de documentos los cubre [AIScanConnect](https://facturascripts.com/plugins/aiscanconnect),
+un complemento de otro desarrollador que funciona sobre AiScan.
+
+Los plugins que usan AiScan pueden contar con estas clases de `Lib/`. Un cambio incompatible en ellas se anotará en el
+CHANGELOG, y `Test/main/AddonContractTest.php` comprueba que siguen funcionando tal y como las usan esos plugins.
+
+| Clase | Uso estable |
+|---|---|
+| `AiScanSettings` | `isEnabled()`, `getDefaultProvider()`, `getDefaultModel($provider)`, `getMaxUploadSizeMb()`, `getAllowedExtensions()` |
+| `ExtractionService` | `getAvailableModels()`; `extractFromFile($path, $mime, $provider, $importMode, $historicalContext, $mockFixture, $model)` devuelve una factura o `['_multi_invoice' => true, 'invoices' => [...]]` |
+| `InvoiceEnricher` | `enrich($invoice)` empareja proveedor, artículos y duplicados; `findDuplicateInvoice($invoice)` |
+| `SupplierMatcher` | `findMatch($supplier)` devuelve `match_status`, `supplier`, `candidates` y `match_source` |
+| `ProductMatcher` | `findReference($line, $suggestedReference)`; se puede heredar |
+| `HistoricalContextService` | `buildContext($codproveedor)`, `formatForPrompt($context)`, `getSuggestedProduct($codproveedor)` |
+| `SchemaValidator` | `completeMatchedSupplierTaxId($invoice, $taxId)` |
+| `InvoiceMapper` | constructor con `productMatcher:`; `mapToInvoice($invoice, $invoiceId, $importMode, $updateStock)` devuelve `success`, `invoice_id`, `errors` y `warnings` |
+| `ImageToPdfConverter` | `isConvertibleImage($mime)`, `convert($path, $mime, $originalName)` |
+
+Para los plugins que revisan la extracción por su cuenta, `mapToInvoice` acepta además:
+
+- `'unlinked' => true` en una línea: se importa sin artículo, sin buscar coincidencias ni usar el producto habitual del
+  proveedor.
+- `'_idfile' => <id>`: enlaza a la factura un `AttachedFile` que ya existe, sin copiarlo, en lugar del temporal de
+  `_upload`.
+
+La versión de `facturascripts.ini` solo es la real en el ZIP de cada release; en el código fuente pone `1.0`. Si tu plugin
+comprueba la versión de AiScan, instálalo desde el ZIP.
+
 ## Instalación
 
 1. Descarga el ZIP desde [Releases](../../releases/latest)

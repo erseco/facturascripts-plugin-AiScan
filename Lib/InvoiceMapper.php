@@ -265,7 +265,12 @@ class InvoiceMapper
             // Issue #133: el adjunto va el último porque mueve el archivo fuera de
             // aiscan_tmp. Si algo fallaba antes, la factura se descartaba y el
             // reintento ya no encontraba el documento escaneado.
-            $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
+            // '_idfile': the caller already stores the source as an AttachedFile.
+            if (!empty($extractedData['_idfile'])) {
+                $this->attachmentService->attachExistingFile($invoice, (int) $extractedData['_idfile']);
+            } else {
+                $this->attachmentService->attachTemporaryFile($invoice, $extractedData['_upload'] ?? []);
+            }
 
             $result['success'] = true;
             $result['invoice_id'] = $invoice->idfactura;
@@ -317,9 +322,12 @@ class InvoiceMapper
         }
 
         foreach ($preparedLines as $lineData) {
-            $reference = !empty($lineData['referencia'])
-                ? $lineData['referencia']
-                : $this->productMatcher->findReference($lineData, $suggestedReference);
+            $reference = $lineData['referencia'] ?? null;
+            // 'unlinked': the reviewer left the line without product on purpose,
+            // so no automatic match or supplier fallback may link it again.
+            if (empty($reference) && empty($lineData['unlinked'])) {
+                $reference = $this->productMatcher->findReference($lineData, $suggestedReference);
+            }
             $line = $reference ? $invoice->getNewProductLine($reference) : $invoice->getNewLine();
             // Issue #121: sin producto, la referencia es la del proveedor y puede
             // pasar de los 30 caracteres de la columna; se recorta para poder grabar.

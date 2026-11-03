@@ -69,17 +69,37 @@ class AttachmentService
         );
         $this->applyOriginalFileName($attachedFile, $displayName);
 
+        if (false === $this->relateToInvoice($invoice, (int) $attachedFile->idfile)) {
+            $attachedFile->delete();
+        }
+    }
+
+    /**
+     * Links a file the caller already stores as an AttachedFile, without
+     * copying it. The file is never deleted here: it belongs to the caller.
+     */
+    public function attachExistingFile(FacturaProveedor $invoice, int $idfile): void
+    {
+        $attachedFile = new AttachedFile();
+        if ($idfile <= 0 || false === $attachedFile->load($idfile)) {
+            Tools::log()->warning('AiScan could not find the attached file to link.', ['%idfile%' => $idfile]);
+            return;
+        }
+
+        $this->relateToInvoice($invoice, $idfile);
+    }
+
+    private function relateToInvoice(FacturaProveedor $invoice, int $idfile): bool
+    {
         $relation = new AttachedFileRelation();
-        $relation->idfile = $attachedFile->idfile;
+        $relation->idfile = $idfile;
         $relation->model = 'FacturaProveedor';
         $relation->modelid = (int) $invoice->idfactura;
         $relation->modelcode = (string) $invoice->idfactura;
         $relation->nick = Session::get('user')?->nick ?? $invoice->nick;
         $relation->observations = Tools::lang()->trans('aiscan-scanned-source-invoice');
 
-        if (false === $relation->save()) {
-            $attachedFile->delete();
-        }
+        return $relation->save();
     }
 
     private function resolveAttachmentDisplayName(string $originalName, string $storedFile): string

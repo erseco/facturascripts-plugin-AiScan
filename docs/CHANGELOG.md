@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+
+- `InvoiceEnricher`: el emparejado de proveedor, artículos y facturas duplicadas del análisis sale del controlador a un servicio público, para que otros plugins (como AIScanConnect) no tengan que copiarlo (#151).
+- `InvoiceMapper` acepta `'unlinked' => true` en una línea para importarla sin artículo, y `'_idfile'` para enlazar a la factura un adjunto que ya existe sin copiarlo (#151).
+- Sección «Integración con otros plugins» en el README con las clases que se mantienen estables, y un test que las usa como lo hacen esos plugins (#151).
+
+### Fixed
+
+- Con el proveedor reconocido, una línea cuya descripción coincide con un único artículo se enlaza a ese artículo y no al producto habitual del proveedor.
+
 ## [8.8] - 2026-10-20
 
 Correcciones de la revisión del equipo de FacturaScripts para el catálogo.
