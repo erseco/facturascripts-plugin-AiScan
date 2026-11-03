@@ -20,7 +20,12 @@
 
 namespace FacturaScripts\Test\Plugins;
 
+use FacturaScripts\Core\Base\MiniLog;
+use FacturaScripts\Core\Session;
+use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\AttachedFile;
+use FacturaScripts\Dinamic\Model\AttachedFileRelation;
+use FacturaScripts\Dinamic\Model\FacturaProveedor;
 use FacturaScripts\Plugins\AiScan\Lib\AttachmentService;
 use PHPUnit\Framework\TestCase;
 
@@ -120,6 +125,82 @@ final class AttachmentServiceTest extends TestCase
         );
 
         $this->assertSame('factura.pdf', $result);
+    }
+
+    public function testFailedLinkDeletesTheNewAttachedFile(): void
+    {
+        $name = 'aiscan_link_' . bin2hex(random_bytes(4)) . '.pdf';
+        file_put_contents(FS_FOLDER . '/MyFiles/aiscan_tmp/' . $name, '%PDF-1.4 link');
+        $before = (new AttachedFile())->count();
+
+        $this->withoutSessionUser(function () use ($name): void {
+            $this->service->attachTemporaryFile($this->invoiceOfUnknownUser(), ['tmp_file' => $name]);
+        });
+
+        $this->assertSame($before, (new AttachedFile())->count());
+    }
+
+    public function testExistingFileSurvivesAFailedLink(): void
+    {
+        $staged = 'aiscan_link_' . bin2hex(random_bytes(4)) . '.pdf';
+        file_put_contents(FS_FOLDER . '/MyFiles/' . $staged, '%PDF-1.4 link');
+        $file = new AttachedFile();
+        $file->path = $staged;
+        $this->assertTrue($file->save());
+
+        try {
+            $this->withoutSessionUser(function () use ($file): void {
+                $this->service->attachExistingFile($this->invoiceOfUnknownUser(), (int) $file->idfile);
+            });
+
+            $this->assertTrue((new AttachedFile())->load($file->idfile));
+            $this->assertSame(0, (new AttachedFileRelation())->count([Where::eq('idfile', $file->idfile)]));
+        } finally {
+            $file->delete();
+        }
+    }
+
+    public function testUnknownAttachedFileIsReportedAndNotLinked(): void
+    {
+        MiniLog::clear();
+        $invoice = new FacturaProveedor();
+        $invoice->idfactura = 999999999;
+
+        $this->service->attachExistingFile($invoice, 999999999);
+
+        $warnings = array_filter(
+            MiniLog::read('', ['warning']),
+            static fn (array $item): bool => ($item['context']['%idfile%'] ?? null) === 999999999
+        );
+        $this->assertCount(1, $warnings);
+        $this->assertSame(0, (new AttachedFileRelation())->count([
+            Where::eq('model', 'FacturaProveedor'),
+            Where::eq('modelid', 999999999),
+        ]));
+    }
+
+    /**
+     * The relation's user must exist (foreign key), so this invoice makes
+     * linking any file fail.
+     */
+    private function invoiceOfUnknownUser(): FacturaProveedor
+    {
+        $invoice = new FacturaProveedor();
+        $invoice->idfactura = 999999999;
+        $invoice->nick = 'ghost-' . bin2hex(random_bytes(4));
+
+        return $invoice;
+    }
+
+    private function withoutSessionUser(callable $callback): void
+    {
+        $user = Session::get('user');
+        Session::set('user', null);
+        try {
+            $callback();
+        } finally {
+            Session::set('user', $user);
+        }
     }
 
     private function invokeMethod(string $methodName, array $args): mixed
