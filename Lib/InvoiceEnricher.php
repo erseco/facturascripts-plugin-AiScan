@@ -148,11 +148,8 @@ class InvoiceEnricher
      */
     private function suggestSupplierProducts(array &$extracted): void
     {
-        $codproveedor = (string) ($extracted['supplier']['matched_supplier_id'] ?? '');
-        if ($codproveedor === '') {
-            return;
-        }
-
+        // enrich() only calls this with a matched supplier.
+        $codproveedor = (string) $extracted['supplier']['matched_supplier_id'];
         $suggestion = $this->historicalContext->getSuggestedProduct($codproveedor);
         if (empty($suggestion['referencia'])) {
             $extracted['_product_suggestion'] = null;
