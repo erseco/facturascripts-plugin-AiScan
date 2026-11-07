@@ -21,7 +21,7 @@
 namespace FacturaScripts\Plugins\AiScan\Lib\Provider;
 
 /**
- * Builds Chat Completions bodies that stay valid across GPT-5, Grok and
+ * Builds Chat Completions bodies that stay valid across GPT-5+, Grok and
  * classic OpenAI-compatible endpoints.
  */
 class ChatCompletionsPayload
@@ -57,7 +57,7 @@ class ChatCompletionsPayload
     public static function usesMaxCompletionTokens(string $model): bool
     {
         $id = strtolower(trim($model));
-        return str_contains($id, 'gpt-5') || (bool) preg_match('/(?:^|\/)o[1-9]/', $id);
+        return (bool) preg_match('/(?:^|[\/\-_ ])(?:(?:chat)?gpt[- ]?(?:[5-9]|\d{2,})|o[1-9])/', $id);
     }
 
     public static function supportsTemperature(string $model): bool

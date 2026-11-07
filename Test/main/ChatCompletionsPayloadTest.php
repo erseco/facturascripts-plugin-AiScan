@@ -69,4 +69,78 @@ final class ChatCompletionsPayloadTest extends TestCase
         $this->assertArrayNotHasKey('temperature', $payload);
         $this->assertSame(32768, $payload['max_completion_tokens']);
     }
+
+    public function testGpt6LunaOmitsTemperatureAndUsesMaxCompletionTokens(): void
+    {
+        $payload = ChatCompletionsPayload::build('gpt-6-luna', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+
+        $this->assertSame('gpt-6-luna', $payload['model']);
+        $this->assertArrayNotHasKey('temperature', $payload);
+        $this->assertSame(32768, $payload['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $payload);
+    }
+
+    public function testOpenRouterGpt6LunaUsesMaxCompletionTokens(): void
+    {
+        $payload = ChatCompletionsPayload::build('openai/gpt-6-luna', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+
+        $this->assertSame('openai/gpt-6-luna', $payload['model']);
+        $this->assertArrayNotHasKey('temperature', $payload);
+        $this->assertSame(32768, $payload['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $payload);
+    }
+
+    public function testGpt6WithSpaceOmitsTemperatureAndUsesMaxCompletionTokens(): void
+    {
+        $payload = ChatCompletionsPayload::build('gpt 6 luna', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+
+        $this->assertArrayNotHasKey('temperature', $payload);
+        $this->assertSame(32768, $payload['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $payload);
+    }
+
+    public function testO3MiniOmitsTemperatureAndUsesMaxCompletionTokens(): void
+    {
+        $payload = ChatCompletionsPayload::build('o3-mini', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+
+        $this->assertSame('o3-mini', $payload['model']);
+        $this->assertArrayNotHasKey('temperature', $payload);
+        $this->assertSame(32768, $payload['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $payload);
+    }
+
+    public function testPrefixedGpt6AndChatGpt6UseMaxCompletionTokens(): void
+    {
+        $payloadAzure = ChatCompletionsPayload::build('azure-gpt-6', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+        $this->assertArrayNotHasKey('temperature', $payloadAzure);
+        $this->assertSame(32768, $payloadAzure['max_completion_tokens']);
+
+        $payloadChatGpt = ChatCompletionsPayload::build('chatgpt-6', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+        $this->assertArrayNotHasKey('temperature', $payloadChatGpt);
+        $this->assertSame(32768, $payloadChatGpt['max_completion_tokens']);
+    }
+
+    public function testGpt4oKeepsMaxTokensAndTemperature(): void
+    {
+        $payload = ChatCompletionsPayload::build('gpt-4o', [
+            ['role' => 'user', 'content' => 'hi'],
+        ]);
+
+        $this->assertSame('gpt-4o', $payload['model']);
+        $this->assertSame(0, $payload['temperature']);
+        $this->assertSame(32768, $payload['max_tokens']);
+        $this->assertArrayNotHasKey('max_completion_tokens', $payload);
+    }
 }
