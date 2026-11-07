@@ -15,7 +15,7 @@ El campo de modelo es texto libre: no hay whitelist. Gemini 2.5 Flash acepta
 `gemini-3.1-pro`, …) rechaza ambos con HTTP 400 `INVALID_ARGUMENT` y usa
 `thinkingLevel` (`low` / `medium` / `high`; `minimal` no existe en todos).
 
-OpenAI GPT-5 / o-series usan `max_completion_tokens` y no aceptan `temperature`.
+OpenAI GPT-5+ / o-series usan `max_completion_tokens` y no aceptan `temperature`.
 xAI Grok (Chat Completions en `https://api.x.ai/v1`) sigue usando `max_tokens`
 y `temperature`.
 
@@ -30,7 +30,7 @@ Construir el cuerpo de la peticion segun el identificador del modelo:
 - Gemini 2.5 Flash / Flash-Lite: `temperature: 0` y `thinkingBudget: 0`.
 - Gemini 2.5 Pro: `temperature: 0` y sin `thinkingConfig` (no se puede
   desactivar thinking).
-- GPT-5 / o-series: `max_completion_tokens`, sin `temperature`.
+- GPT-5+ / o-series: `max_completion_tokens`, sin `temperature`.
 - Grok y el resto de Chat Completions: `max_tokens` + `temperature: 0`.
 
 Anadir Grok como proveedor de primera clase (misma API compatible con OpenAI)
