@@ -193,6 +193,12 @@ jobs:
             php Test/install-plugins.php
           fi
 
+      # El core no crea tablas dentro de la transacción de delete(): se crean
+      # todas antes, como en una instalación que ya se ha usado.
+      - name: Create core tables
+        working-directory: facturascripts
+        run: php Plugins/AiScan/Test/create-core-tables.php
+
       - name: Run PHPUnit tests
         working-directory: facturascripts
         run: |
