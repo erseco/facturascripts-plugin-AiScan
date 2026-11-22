@@ -196,6 +196,35 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->assertEqualsWithDelta(0.42, (float) $invoice->totalrecargo, 0.001);
     }
 
+    /**
+     * Issue #157: un recargo explícito (corregido en la revisión) se respeta,
+     * también escrito con coma decimal.
+     */
+    public function testExplicitSurchargeWithDecimalCommaIsKept(): void
+    {
+        $default = Impuestos::default();
+        $this->createTax('ZZZ9', $default->operacion, 9.87, 1.4);
+
+        $supplier = $this->createSupplier();
+        $supplier->regimeniva = RegimenIVA::TAX_SYSTEM_SURCHARGE;
+        $this->assertTrue($supplier->save());
+
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 9.87, 'recargo' => '0,5'], ['tax_amount' => 2.96, 'total' => 33.11]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $this->assertEqualsWithDelta(0.5, (float) $invoice->getLines()[0]->recargo, 0.001);
+    }
+
     public function testRateWithoutTaxCodeAndNoMatchingTaxAbortsTheImport(): void
     {
         $supplier = $this->createSupplier();
