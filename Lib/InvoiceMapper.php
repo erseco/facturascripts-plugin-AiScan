@@ -375,9 +375,12 @@ class InvoiceMapper
                 $line->codretencion = $codret;
             }
 
-            if (!empty($lineData['recargo'] ?? 0)) {
-                $line->recargo = (float) $lineData['recargo'];
-            }
+            // Issue #157: el recargo es el del impuesto definitivo de la línea, no el
+            // del impuesto con el que se creó, salvo que venga uno explícito.
+            $surcharge = (float) str_replace(',', '.', (string) ($lineData['recargo'] ?? 0));
+            $line->recargo = $surcharge > 0
+                ? $surcharge
+                : (float) Impuestos::get((string) $line->codimpuesto)->recargo;
 
             // Issue #93: la IA a veces devuelve el texto legal completo
             // ("Art. 50.Uno.27 Ley 4/2012") en lugar del código de excepción.

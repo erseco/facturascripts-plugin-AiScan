@@ -3064,16 +3064,29 @@
         return parseFloat(value) || 0;
     }
 
-    function calcLineTotal(row) {
-        const qty = parseFloat(row.querySelector('[data-field="cantidad"]')?.value || 0);
-        const price = parseFloat(row.querySelector('[data-field="pvpunitario"]')?.value || 0);
-        const discount = parseFloat(row.querySelector('[data-field="dtopor"]')?.value || 0);
-        const tax = parseFloat(row.querySelector('[data-field="iva"]')?.value || 0);
-        const irpf = parseFloat(row.querySelector('[data-field="irpf"]')?.value || 0);
+    // Issue #157: el total de la línea incluye el recargo de equivalencia.
+    function lineAmounts({qty = 0, price = 0, discount = 0, tax = 0, irpf = 0, surcharge = 0}) {
         const base = qty * price * (1 - discount / 100);
         const taxAmount = base * (tax / 100);
+        const surchargeAmount = base * (surcharge / 100);
         const irpfAmount = base * (irpf / 100);
-        const total = base + taxAmount - irpfAmount;
+        return {base, taxAmount, surchargeAmount, irpfAmount, total: base + taxAmount + surchargeAmount - irpfAmount};
+    }
+
+    function rowAmounts(row) {
+        const num = field => parseFloat(row.querySelector(`[data-field="${field}"]`)?.value || 0);
+        return lineAmounts({
+            qty: num('cantidad'),
+            price: num('pvpunitario'),
+            discount: num('dtopor'),
+            tax: num('iva'),
+            irpf: num('irpf'),
+            surcharge: num('recargo'),
+        });
+    }
+
+    function calcLineTotal(row) {
+        const {base, taxAmount, irpfAmount, total} = rowAmounts(row);
 
         const totalInput = row.querySelector('.aiscan-line-total');
         if (totalInput) {
@@ -3105,16 +3118,11 @@
         let totalFinal = 0;
         document.querySelectorAll('#aiscan-lines-body .aiscan-line-row').forEach(row => {
             calcLineTotal(row);
-            const qty = parseFloat(row.querySelector('[data-field="cantidad"]')?.value || 0);
-            const price = parseFloat(row.querySelector('[data-field="pvpunitario"]')?.value || 0);
-            const discount = parseFloat(row.querySelector('[data-field="dtopor"]')?.value || 0);
-            const tax = parseFloat(row.querySelector('[data-field="iva"]')?.value || 0);
-            const irpf = parseFloat(row.querySelector('[data-field="irpf"]')?.value || 0);
-            const base = qty * price * (1 - discount / 100);
-            totalBase += base;
-            totalTax += base * (tax / 100);
-            totalIrpf += base * (irpf / 100);
-            totalFinal += base + base * (tax / 100) - base * (irpf / 100);
+            const amounts = rowAmounts(row);
+            totalBase += amounts.base;
+            totalTax += amounts.taxAmount;
+            totalIrpf += amounts.irpfAmount;
+            totalFinal += amounts.total;
         });
         const subtotalEl = document.getElementById('invoice_subtotal');
         if (subtotalEl) { subtotalEl.value = fmtNumber(totalBase); }
@@ -3147,6 +3155,27 @@
         const taxes = window.aiscanTaxTypes || [];
         const match = taxes.find(t => t.code === code);
         return match ? match.rate : 0;
+    }
+
+    // Issue #157: % de recargo de un impuesto, por código o, sin él, por tipo.
+    function taxCodeToSurcharge(code, rate) {
+        const taxes = window.aiscanTaxTypes || [];
+        const match = taxes.find(t => t.code === code)
+            || (code ? null : taxes.find(t => Math.abs(t.rate - (parseFloat(rate) || 0)) < 0.01));
+        return match ? (parseFloat(match.surcharge) || 0) : 0;
+    }
+
+    // Recargo con el que arranca la línea: el leído del documento o, si la empresa
+    // está en recargo de equivalencia, el de su impuesto (lo que grabará el core).
+    function initialLineSurcharge(line) {
+        const explicit = parseLocaleNumber(line.recargo ?? 0);
+        if (explicit > 0) {
+            return explicit;
+        }
+        if (!window.aiscanCompanySurcharge) {
+            return 0;
+        }
+        return taxCodeToSurcharge(line.codimpuesto || line.tax_code || '', line.iva ?? line.tax_rate ?? 0);
     }
 
     function lineDiscountBase(qty, price) {
@@ -3197,10 +3226,10 @@
         const taxCode = modal.querySelector('.aiscan-modal-tax')?.value || '';
         const tax = taxCodeToRate(taxCode);
         const irpf = parseFloat(modal.querySelector('.aiscan-modal-irpf')?.value || 0);
-        const base = qty * price * (1 - discount / 100);
-        const taxAmt = base * (tax / 100);
-        const irpfAmt = base * (irpf / 100);
-        const total = base + taxAmt - irpfAmt;
+        const surcharge = parseFloat(modal.querySelector('.aiscan-modal-recargo')?.value || 0);
+        const {base, taxAmount: taxAmt, irpfAmount: irpfAmt, total} = lineAmounts({
+            qty, price, discount, tax, irpf, surcharge,
+        });
         const b = modal.querySelector('.aiscan-modal-base');
         if (b) { b.textContent = fmtNumber(base); }
         const t = modal.querySelector('.aiscan-modal-tax-amount');
@@ -3217,6 +3246,7 @@
             cantidad: '.aiscan-modal-quantity',
             pvpunitario: '.aiscan-modal-price',
             dtopor: '.aiscan-modal-discount',
+            recargo: '.aiscan-modal-recargo',
         };
         for (const [field, sel] of Object.entries(fields)) {
             const rowInput = row.querySelector(`[data-field="${field}"]`);
@@ -3254,6 +3284,7 @@
             cantidad: '.aiscan-modal-quantity',
             pvpunitario: '.aiscan-modal-price',
             dtopor: '.aiscan-modal-discount',
+            recargo: '.aiscan-modal-recargo',
         };
         for (const [field, sel] of Object.entries(fields)) {
             const el = modal.querySelector(sel);
@@ -3417,7 +3448,7 @@
         const taxCode = line.codimpuesto || line.tax_code || '';
         const irpfRate = line.irpf ?? 0;
         const irpfCode = line.codretencion || line.irpf_code || '';
-        const recargo = line.recargo ?? 0;
+        const recargo = initialLineSurcharge(line);
         const excepcion = line.excepcioniva ?? '';
         const suplido = line.suplido && line.suplido !== '0' && line.suplido !== 'false' ? '1' : '0';
         return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${taxRate}" data-tax-code="${escapeAttr(taxCode)}" data-irpf-code="${escapeAttr(irpfCode)}">
@@ -3498,6 +3529,13 @@
                                 <div class="col-6">
                                     <label class="form-label small mb-1">IRPF</label>
                                     ${buildWithholdingSelect(irpfRate, irpfCode).replace('class="form-select form-select-sm" data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1" for="${modalId}-surcharge">${escapeHtml(trans('surcharge'))}</label>
+                                    <div class="input-group input-group-sm">
+                                        <input id="${modalId}-surcharge" type="number" class="form-control aiscan-modal-recargo" min="0" max="100" step="any" value="${escapeAttr(recargo)}">
+                                        <span class="input-group-text">%</span>
+                                    </div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>
@@ -3885,6 +3923,12 @@
         section.addEventListener('change', e => {
             const modal = e.target.closest('.modal');
             if (modal) {
+                // Issue #157: al cambiar el impuesto, el recargo pasa a ser el suyo.
+                const surcharge = modal.querySelector('.aiscan-modal-recargo');
+                if (e.target.classList.contains('aiscan-modal-tax') && surcharge
+                    && (window.aiscanCompanySurcharge || parseFloat(surcharge.value) > 0)) {
+                    surcharge.value = taxCodeToSurcharge(e.target.value);
+                }
                 calcModalPreview(modal);
                 return;
             }
@@ -4967,6 +5011,9 @@
             formatDiscountValue,
             highlightAutocompleteOption,
             taxCodeToRate,
+            taxCodeToSurcharge,
+            initialLineSurcharge,
+            lineAmounts,
             trans,
             parseLocaleNumber,
             readJsonResponse,
