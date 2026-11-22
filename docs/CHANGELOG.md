@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [8.9] - 2026-11-22
+
 ### Added
 
 - `InvoiceEnricher`: el emparejado de proveedor, artículos y facturas duplicadas del análisis sale del controlador a un servicio público, para que otros plugins (como AIScanConnect) no tengan que copiarlo (#151).
@@ -15,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 - Con el proveedor reconocido, una línea cuya descripción coincide con un único artículo se enlaza a ese artículo y no al producto habitual del proveedor.
 - Analizar sin un país configurado ya no deja el país vacío en los ajustes en memoria; FacturaScripts usaba ese valor para cargar los datos iniciales de tablas nuevas (impuestos, productos) y elegía los de otro país.
+- El recargo de equivalencia de cada línea es el de su impuesto definitivo, y no el del impuesto con el que se creó la línea; un recargo explícito se respeta, también con coma decimal (#157).
+- En la revisión, los totales incluyen el recargo de equivalencia, y «Más opciones» permite ver y corregir el % de recargo de cada línea (#157).
+- Los modelos GPT-6 y posteriores reciben `max_completion_tokens` en lugar de `max_tokens` y no reciben `temperature`, que devolvían un error HTTP 400 (#155).
+- La vista previa del PDF en navegadores móviles sin visor de PDF muestra un enlace para abrir el archivo en lugar de un recuadro vacío (#150).
 
 ## [8.8] - 2026-10-20
 
