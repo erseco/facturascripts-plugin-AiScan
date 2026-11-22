@@ -36,9 +36,18 @@ foreach (glob(FS_FOLDER . '/Core/Model/*.php') as $file) {
     }
 
     $reflection = new ReflectionClass($class);
-    if ($reflection->isInstantiable() && $reflection->isSubclassOf(ModelClass::class)) {
+    if (!$reflection->isInstantiable() || !$reflection->isSubclassOf(ModelClass::class)) {
+        continue;
+    }
+
+    // Si una tabla no se puede crear (p. ej. sus datos iniciales no encajan con
+    // la base de datos de pruebas), se sigue con el resto: solo hacen falta las
+    // que se usan dentro de la transacción de delete().
+    try {
         new $class();
         $created++;
+    } catch (Throwable $exception) {
+        echo 'Aviso: ' . $class . ': ' . strtok($exception->getMessage(), ':') . PHP_EOL;
     }
 }
 
