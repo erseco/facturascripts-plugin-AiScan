@@ -169,6 +169,12 @@
         section.addEventListener('change', e => {
             const modal = e.target.closest('.modal');
             if (modal) {
+                // Issue #157: al cambiar el impuesto, el recargo pasa a ser el suyo.
+                const surcharge = modal.querySelector('.aiscan-modal-recargo');
+                if (e.target.classList.contains('aiscan-modal-tax') && surcharge
+                    && (window.aiscanCompanySurcharge || parseFloat(surcharge.value) > 0)) {
+                    surcharge.value = taxCodeToSurcharge(e.target.value);
+                }
                 calcModalPreview(modal);
                 return;
             }

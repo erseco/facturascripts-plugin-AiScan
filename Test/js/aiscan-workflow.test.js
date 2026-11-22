@@ -1598,3 +1598,21 @@ test('canInlinePdf trusts navigator.pdfViewerEnabled, assuming yes when unknown 
     assert.equal(loadTestHooks({navigator: {pdfViewerEnabled: true}}).hooks.canInlinePdf(), true);
     assert.equal(loadTestHooks({navigator: {}}).hooks.canInlinePdf(), true);
 });
+
+test('el recargo de equivalencia entra en el total y sigue al impuesto (#157)', () => {
+    const aiscanTaxTypes = [{code: 'IVA21', rate: 21, surcharge: 5.2}, {code: 'IVA10', rate: 10, surcharge: 1.4}];
+
+    const {hooks} = loadTestHooks({aiscanTaxTypes, aiscanCompanySurcharge: true});
+    const amounts = hooks.lineAmounts({qty: 1, price: 100, tax: 10, surcharge: 1.4});
+    assert.equal(Math.round(amounts.total * 100) / 100, 111.4);
+    assert.equal(Math.round(amounts.surchargeAmount * 100) / 100, 1.4);
+
+    // Sin recargo en el documento, la empresa en RE toma el de su impuesto.
+    assert.equal(hooks.initialLineSurcharge({codimpuesto: 'IVA10', recargo: 0}), 1.4);
+    assert.equal(hooks.initialLineSurcharge({iva: 10}), 1.4);
+    assert.equal(hooks.initialLineSurcharge({codimpuesto: 'IVA10', recargo: '0,5'}), 0.5);
+    assert.equal(hooks.taxCodeToSurcharge('IVA21'), 5.2);
+
+    const general = loadTestHooks({aiscanTaxTypes, aiscanCompanySurcharge: false}).hooks;
+    assert.equal(general.initialLineSurcharge({codimpuesto: 'IVA10', recargo: 0}), 0);
+});

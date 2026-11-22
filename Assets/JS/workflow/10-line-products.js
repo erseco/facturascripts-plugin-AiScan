@@ -127,7 +127,7 @@
         const taxCode = line.codimpuesto || line.tax_code || '';
         const irpfRate = line.irpf ?? 0;
         const irpfCode = line.codretencion || line.irpf_code || '';
-        const recargo = line.recargo ?? 0;
+        const recargo = initialLineSurcharge(line);
         const excepcion = line.excepcioniva ?? '';
         const suplido = line.suplido && line.suplido !== '0' && line.suplido !== 'false' ? '1' : '0';
         return `<div class="aiscan-line-row d-flex gap-1 align-items-center py-1 border-bottom" data-line-index="${index}" data-tax-rate="${taxRate}" data-tax-code="${escapeAttr(taxCode)}" data-irpf-code="${escapeAttr(irpfCode)}">
@@ -208,6 +208,13 @@
                                 <div class="col-6">
                                     <label class="form-label small mb-1">IRPF</label>
                                     ${buildWithholdingSelect(irpfRate, irpfCode).replace('class="form-select form-select-sm" data-field="irpf"', 'class="form-select form-select-sm aiscan-modal-irpf"')}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1" for="${modalId}-surcharge">${escapeHtml(trans('surcharge'))}</label>
+                                    <div class="input-group input-group-sm">
+                                        <input id="${modalId}-surcharge" type="number" class="form-control aiscan-modal-recargo" min="0" max="100" step="any" value="${escapeAttr(recargo)}">
+                                        <span class="input-group-text">%</span>
+                                    </div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">${escapeHtml(trans('aiscan-tax-exception'))}</label>

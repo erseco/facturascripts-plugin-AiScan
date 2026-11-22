@@ -20,6 +20,7 @@
 
 namespace FacturaScripts\Plugins\AiScan\Controller;
 
+use FacturaScripts\Core\DataSrc\Empresas;
 use FacturaScripts\Core\Template\Controller;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Dinamic\Lib\AssetManager;
@@ -118,6 +119,7 @@ class AiScanInvoice extends Controller
                 'defaultProvider' => AiScanSettings::getDefaultProvider(),
                 'defaultModel' => AiScanSettings::getDefaultModel(AiScanSettings::getDefaultProvider()),
                 'taxTypes' => $impuesto->all([], ['iva' => 'ASC'], 0, 0),
+                'companySurcharge' => Empresas::default()->regimeniva === RegimenIVA::TAX_SYSTEM_SURCHARGE,
                 'withholdingTypes' => $retencion->all([], ['porcentaje' => 'ASC'], 0, 0),
                 'taxExceptions' => $this->buildTaxExceptionChoices(),
                 'paymentMethods' => $formaPago->all([], ['descripcion' => 'ASC'], 0, 0),

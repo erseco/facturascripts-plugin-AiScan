@@ -310,9 +310,10 @@
 <script>
     window.aiscanTaxTypes = [
         {% for tax in taxTypes %}
-            {code: '{{ tax.codimpuesto }}', description: '{{ tax.descripcion|e('js') }}', rate: {{ tax.iva }}},
+            {code: '{{ tax.codimpuesto }}', description: '{{ tax.descripcion|e('js') }}', rate: {{ tax.iva }}, surcharge: {{ tax.recargo }}},
         {% endfor %}
     ];
+    window.aiscanCompanySurcharge = {{ companySurcharge ? 'true' : 'false' }};
     window.aiscanWithholdingTypes = [
         {code: '', description: '------', rate: 0},
         {% for ret in withholdingTypes %}
@@ -468,6 +469,7 @@
         'search': '{{ i18n.trans('search')|e('js') }}',
         'select-all': '{{ i18n.trans('select-all')|e('js') }}',
         'subtotal': '{{ i18n.trans('subtotal')|e('js') }}',
+        'surcharge': '{{ i18n.trans('surcharge')|e('js') }}',
         'summary': '{{ i18n.trans('summary')|e('js') }}',
         'tax': '{{ i18n.trans('tax')|e('js') }}',
         'tax-amount': '{{ i18n.trans('tax-amount')|e('js') }}',

@@ -22,6 +22,7 @@ namespace FacturaScripts\Test\Plugins;
 
 use FacturaScripts\Core\Base\MiniLog;
 use FacturaScripts\Core\DataSrc\Impuestos;
+use FacturaScripts\Core\Lib\RegimenIVA;
 use FacturaScripts\Core\Tools;
 use FacturaScripts\Core\Where;
 use FacturaScripts\Dinamic\Model\EstadoDocumento;
@@ -161,6 +162,67 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $line = $invoice->getLines()[0];
         $this->assertSame($expected->codimpuesto, $line->codimpuesto);
         $this->assertEqualsWithDelta(9.87, (float) $line->iva, 0.001);
+    }
+
+    /**
+     * Issue #157: al cambiar el impuesto de la línea se quedaba el recargo del
+     * impuesto anterior (el predeterminado o el del producto) en lugar del suyo.
+     */
+    public function testSurchargeFollowsTheResolvedTax(): void
+    {
+        $default = Impuestos::default();
+        $expected = $this->createTax('ZZZ9', $default->operacion, 9.87, 1.4);
+
+        $supplier = $this->createSupplier();
+        $supplier->regimeniva = RegimenIVA::TAX_SYSTEM_SURCHARGE;
+        $this->assertTrue($supplier->save());
+
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 9.87, 'recargo' => 0], ['tax_amount' => 2.96, 'total' => 33.38]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $line = $invoice->getLines()[0];
+        $this->assertSame($expected->codimpuesto, $line->codimpuesto);
+        $this->assertEqualsWithDelta(1.4, (float) $line->recargo, 0.001);
+        $this->assertEqualsWithDelta(0.42, (float) $invoice->totalrecargo, 0.001);
+    }
+
+    /**
+     * Issue #157: un recargo explícito (corregido en la revisión) se respeta,
+     * también escrito con coma decimal.
+     */
+    public function testExplicitSurchargeWithDecimalCommaIsKept(): void
+    {
+        $default = Impuestos::default();
+        $this->createTax('ZZZ9', $default->operacion, 9.87, 1.4);
+
+        $supplier = $this->createSupplier();
+        $supplier->regimeniva = RegimenIVA::TAX_SYSTEM_SURCHARGE;
+        $this->assertTrue($supplier->save());
+
+        $result = (new InvoiceMapper())->mapToInvoice(
+            $this->buildData($supplier, ['iva' => 9.87, 'recargo' => '0,5'], ['tax_amount' => 2.96, 'total' => 33.11]),
+            null,
+            'lines',
+            false
+        );
+
+        $this->assertTrue($result['success'], implode('; ', $result['errors'] ?? []));
+
+        $invoice = new FacturaProveedor();
+        $this->assertTrue($invoice->loadFromCode($result['invoice_id']));
+        $this->invoicesToDelete[] = $invoice;
+
+        $this->assertEqualsWithDelta(0.5, (float) $invoice->getLines()[0]->recargo, 0.001);
     }
 
     public function testRateWithoutTaxCodeAndNoMatchingTaxAbortsTheImport(): void
@@ -458,13 +520,13 @@ final class InvoiceMapperInvalidTaxTest extends TestCase
         $this->markTestSkipped('No hay un estado editable para FacturaProveedor.');
     }
 
-    private function createTax(string $code, string $operation, float $rate = 9.87): Impuesto
+    private function createTax(string $code, string $operation, float $rate = 9.87, float $surcharge = 0.0): Impuesto
     {
         $tax = new Impuesto();
         $tax->codimpuesto = $code;
         $tax->descripcion = 'AiScan test ' . $code;
         $tax->iva = $rate;
-        $tax->recargo = 0.0;
+        $tax->recargo = $surcharge;
         $tax->operacion = $operation;
         $this->assertTrue($tax->save(), 'No se pudo crear el impuesto de prueba ' . $code);
         $this->taxesToDelete[] = $tax;
